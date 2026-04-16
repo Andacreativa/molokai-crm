@@ -93,8 +93,8 @@ export default function ClientiPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
           {filtered.map(c => {
             const fatture = c.fatture ?? []
-            const totaleFatture = fatture.reduce((s, f) => s + (f?.importo ?? 0), 0)
-            const fatturePagate = fatture.filter(f => f?.pagato).reduce((s, f) => s + (f?.importo ?? 0), 0)
+            const totaleFatture = fatture.reduce((s: number, f) => s + (f?.importo ?? 0), 0)
+            const fatturePagate = fatture.filter(f => f?.pagato).reduce((s: number, f) => s + (f?.importo ?? 0), 0)
             return (
               <div key={c.id} className="glass-card rounded-2xl p-5 space-y-4">
                 {/* Top */}
