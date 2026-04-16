@@ -124,8 +124,7 @@ export default function ContattiPage() {
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Cerca per nome, paese, email..."
-          className="w-full max-w-sm border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 bg-white"
-          style={{ '--tw-ring-color': BRAND } as React.CSSProperties}
+          className="w-full max-w-sm border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-300 bg-white"
         />
         <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
           {[{ value: 'tutti', label: 'Tutti' }, ...STATUS_OPTIONS].map(o => (

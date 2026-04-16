@@ -43,6 +43,51 @@ export async function POST(request: Request) {
         dataScadenza: body.dataScadenza ? new Date(body.dataScadenza) : null,
       },
     })
+
+    // Crea Contatto se non esiste già (cerca per email o nome)
+    const existingContatto = await prisma.contatto.findFirst({
+      where: body.emailCliente
+        ? { email: body.emailCliente }
+        : { nome: body.nomeCliente },
+    })
+    if (!existingContatto) {
+      await prisma.contatto.create({
+        data: {
+          nome: body.nomeCliente,
+          email: body.emailCliente || null,
+          note: body.aziendaCliente ? `Azienda: ${body.aziendaCliente}` : null,
+          status: 'acquisito',
+        },
+      })
+    }
+
+    // Crea Lead in pipeline (stage proposta) se non esiste già per questo cliente
+    const existingLead = await prisma.lead.findFirst({
+      where: {
+        OR: [
+          body.emailCliente ? { email: body.emailCliente } : {},
+          { nome: body.nomeCliente },
+        ],
+      },
+    })
+    if (!existingLead) {
+      await prisma.lead.create({
+        data: {
+          nome: body.nomeCliente,
+          azienda: body.aziendaCliente || null,
+          email: body.emailCliente || null,
+          valore: totale,
+          stage: 'proposta',
+          note: `Preventivo ${numero}: ${body.oggetto}`,
+        },
+      })
+    } else {
+      await prisma.lead.update({
+        where: { id: existingLead.id },
+        data: { stage: 'proposta', valore: totale },
+      })
+    }
+
     return NextResponse.json(preventivo)
   } catch (e) {
     console.error('[POST /api/preventivi]', e)
