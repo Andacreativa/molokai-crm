@@ -1,0 +1,82 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Cliente {
+  id          Int       @id @default(autoincrement())
+  nome        String
+  paese       String    @default("Italia")
+  email       String?
+  telefono    String?
+  partitaIva  String?
+  indirizzo   String?
+  note        String?
+  createdAt   DateTime  @default(now())
+  fatture     Fattura[]
+}
+
+model Fattura {
+  id          Int      @id @default(autoincrement())
+  clienteId   Int
+  cliente     Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  azienda     String   @default("Spagna")
+  aziendaNota String?
+  descrizione String?
+  mese        Int
+  anno        Int      @default(2025)
+  importo     Float
+  pagato      Boolean  @default(false)
+  scadenza    DateTime?
+  createdAt   DateTime @default(now())
+}
+
+model Spesa {
+  id           Int      @id @default(autoincrement())
+  azienda      String   @default("Spagna")
+  aziendaNota  String?
+  fornitore    String
+  categoria    String
+  descrizione  String?
+  note         String?
+  ricevutaPath String?
+  mese         Int
+  anno         Int      @default(2025)
+  importo      Float
+  createdAt    DateTime @default(now())
+}
+
+model Contatto {
+  id         Int      @id @default(autoincrement())
+  nome       String
+  paese      String   @default("Italia")
+  email      String?
+  telefono   String?
+  partitaIva String?
+  indirizzo  String?
+  note       String?
+  status     String   @default("lead")
+  createdAt  DateTime @default(now())
+}
+
+model Preventivo {
+  id             Int       @id @default(autoincrement())
+  numero         String
+  nomeCliente    String
+  emailCliente   String?
+  aziendaCliente String?
+  azienda        String    @default("Spagna")
+  oggetto        String
+  voci           String
+  iva            Float     @default(21)
+  subtotale      Float     @default(0)
+  totale         Float     @default(0)
+  status         String    @default("attesa")
+  note           String?
+  condizioni     String?
+  dataScadenza   DateTime?
+  createdAt      DateTime  @default(now())
+}
