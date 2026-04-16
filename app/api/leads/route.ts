@@ -4,7 +4,10 @@ import { prisma } from '@/lib/prisma'
 export async function GET() {
   const leads = await prisma.lead.findMany({
     orderBy: { createdAt: 'desc' },
-    include: { appunti: { orderBy: { createdAt: 'desc' } } },
+    include: {
+      appunti: { orderBy: { createdAt: 'desc' } },
+      preventivi: { orderBy: { createdAt: 'desc' }, select: { id: true, numero: true, oggetto: true, subtotale: true, totale: true, feeCommerciale: true, iva: true, status: true, createdAt: true } },
+    },
   })
   return NextResponse.json(leads)
 }

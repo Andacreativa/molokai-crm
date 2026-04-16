@@ -21,28 +21,11 @@ export async function POST(request: Request) {
     const iva = body.iva ?? 21
     const totale = subtotale * (1 + iva / 100)
 
+    const feeCommerciale = body.feeCommerciale ? Number(body.feeCommerciale) : 0
+
     const count = await prisma.preventivo.count()
     const anno = new Date().getFullYear()
     const numero = `PRE-${anno}-${String(count + 1).padStart(3, '0')}`
-
-    const preventivo = await prisma.preventivo.create({
-      data: {
-        numero,
-        nomeCliente: body.nomeCliente,
-        emailCliente: body.emailCliente || null,
-        aziendaCliente: body.aziendaCliente || null,
-        azienda: body.azienda || 'Spagna',
-        oggetto: body.oggetto,
-        voci: JSON.stringify(vociArr),
-        iva,
-        subtotale,
-        totale,
-        status: body.status || 'attesa',
-        note: body.note || null,
-        condizioni: body.condizioni || null,
-        dataScadenza: body.dataScadenza ? new Date(body.dataScadenza) : null,
-      },
-    })
 
     // Crea Contatto se non esiste già (cerca per email o nome)
     const existingContatto = await prisma.contatto.findFirst({
@@ -70,8 +53,10 @@ export async function POST(request: Request) {
         ],
       },
     })
+
+    let leadId: number | null = null
     if (!existingLead) {
-      await prisma.lead.create({
+      const newLead = await prisma.lead.create({
         data: {
           nome: body.nomeCliente,
           azienda: body.aziendaCliente || null,
@@ -81,12 +66,35 @@ export async function POST(request: Request) {
           note: `Preventivo ${numero}: ${body.oggetto}`,
         },
       })
+      leadId = newLead.id
     } else {
       await prisma.lead.update({
         where: { id: existingLead.id },
         data: { stage: 'proposta', valore: totale },
       })
+      leadId = existingLead.id
     }
+
+    const preventivo = await prisma.preventivo.create({
+      data: {
+        numero,
+        nomeCliente: body.nomeCliente,
+        emailCliente: body.emailCliente || null,
+        aziendaCliente: body.aziendaCliente || null,
+        azienda: body.azienda || 'Spagna',
+        oggetto: body.oggetto,
+        voci: JSON.stringify(vociArr),
+        iva,
+        subtotale,
+        totale,
+        feeCommerciale,
+        leadId,
+        status: body.status || 'attesa',
+        note: body.note || null,
+        condizioni: body.condizioni || null,
+        dataScadenza: body.dataScadenza ? new Date(body.dataScadenza) : null,
+      },
+    })
 
     return NextResponse.json(preventivo)
   } catch (e) {

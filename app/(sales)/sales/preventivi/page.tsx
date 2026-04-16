@@ -17,6 +17,7 @@ interface Preventivo {
   iva: number
   subtotale: number
   totale: number
+  feeCommerciale: number
   status: string
   note: string | null
   condizioni: string | null
@@ -66,6 +67,7 @@ const emptyForm = {
   aziendaCliente: '',
   azienda: AZIENDE[0],
   iva: 21,
+  feeCommerciale: 0,
   status: 'attesa',
   note: '',
   condizioni: DEFAULT_CONDIZIONI,
@@ -112,6 +114,7 @@ export default function PreventiviPage() {
       aziendaCliente: p.aziendaCliente || '',
       azienda: p.azienda,
       iva: p.iva,
+      feeCommerciale: p.feeCommerciale ?? 0,
       status: p.status,
       note: p.note || '',
       condizioni: p.condizioni || DEFAULT_CONDIZIONI,
@@ -201,7 +204,7 @@ export default function PreventiviPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex items-center justify-between flex-wrap gap-3 pl-10 md:pl-0">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Preventivi</h1>
           <p className="text-gray-500 text-sm mt-1">{preventivi.length} preventivi totali</p>
@@ -236,7 +239,7 @@ export default function PreventiviPage() {
       </div>
 
       {/* KPI cards */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { label: 'Totale valore', val: fmt((preventivi ?? []).reduce((s, p) => s + (p?.totale ?? 0), 0)), color: 'text-gray-900' },
           { label: 'Accettati', val: fmt((preventivi ?? []).filter(p => p?.status === 'accettato').reduce((s, p) => s + (p?.totale ?? 0), 0)), color: 'text-emerald-600' },
@@ -250,8 +253,8 @@ export default function PreventiviPage() {
       </div>
 
       {/* Table */}
-      <div className="glass-card rounded-2xl overflow-hidden">
-        <table className="w-full">
+      <div className="glass-card rounded-2xl overflow-hidden overflow-x-auto">
+        <table className="w-full min-w-[700px]">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50">
               {['Numero', 'Cliente', 'Oggetto', 'Data', 'Scadenza', 'Totale', 'Status', ''].map(h => (
@@ -342,8 +345,8 @@ export default function PreventiviPage() {
 
       {/* FORM MODAL */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 overflow-y-auto">
-          <div className="glass-modal rounded-2xl w-full max-w-3xl my-4 p-6 space-y-5">
+        <div className="fixed inset-0 bg-black/50 flex items-end md:items-start justify-center z-50 p-0 md:p-4 overflow-y-auto">
+          <div className="glass-modal rounded-t-2xl md:rounded-2xl w-full max-w-3xl md:my-4 p-4 md:p-6 space-y-4 md:space-y-5 max-h-[95vh] overflow-y-auto">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold text-gray-900">
                 {editing ? `Modifica ${editing.numero}` : 'Nuovo Preventivo'}
@@ -546,7 +549,7 @@ export default function PreventiviPage() {
 
               {/* Totali */}
               <div className="mt-3 flex justify-end">
-                <div className="space-y-1 text-sm min-w-[200px]">
+                <div className="space-y-1 text-sm min-w-[240px]">
                   <div className="flex justify-between text-gray-600">
                     <span>Subtotale</span>
                     <span className="font-medium">{fmt(subtotale)}</span>
@@ -566,9 +569,31 @@ export default function PreventiviPage() {
                       <span className="font-medium ml-1">{fmt(ivaAmt)}</span>
                     </div>
                   </div>
+                  <div className="flex justify-between items-center text-gray-600">
+                    <span>Fee commerciale</span>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        step={0.1}
+                        value={form.feeCommerciale}
+                        onChange={e => setForm(f => ({ ...f, feeCommerciale: parseFloat(e.target.value) || 0 }))}
+                        className="w-16 border border-gray-200 rounded px-2 py-0.5 text-xs text-right focus:outline-none focus:ring-1 focus:ring-red-300"
+                      />
+                      <span className="text-xs text-gray-400">%</span>
+                      <span className="font-medium ml-1 text-orange-600">
+                        {fmt(subtotale * (form.feeCommerciale || 0) / 100)}
+                      </span>
+                    </div>
+                  </div>
                   <div className="flex justify-between font-bold text-gray-900 border-t border-gray-200 pt-1">
                     <span>TOTALE</span>
                     <span>{fmt(totale)}</span>
+                  </div>
+                  <div className="flex justify-between text-emerald-700 font-semibold">
+                    <span>Guadagno netto</span>
+                    <span>{fmt(subtotale * (1 - (form.feeCommerciale || 0) / 100))}</span>
                   </div>
                 </div>
               </div>

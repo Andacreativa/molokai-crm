@@ -101,7 +101,7 @@ export default function ContattiPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between pl-10 md:pl-0">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Contatti</h1>
           <p className="text-gray-500 text-sm mt-1">{contatti.length} contatti in anagrafica</p>

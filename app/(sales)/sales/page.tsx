@@ -1,11 +1,23 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Plus, X, Trash2, Phone, ChevronRight, Euro, Building2, Mail, MessageSquare, Send } from 'lucide-react'
+import { Plus, X, Trash2, Phone, ChevronRight, Euro, Building2, Mail, MessageSquare, Send, FileText } from 'lucide-react'
 
 interface AppuntoCall {
   id: number
   testo: string
+  createdAt: string
+}
+
+interface PreventivoSummary {
+  id: number
+  numero: string
+  oggetto: string
+  subtotale: number
+  totale: number
+  feeCommerciale: number
+  iva: number
+  status: string
   createdAt: string
 }
 
@@ -20,6 +32,21 @@ interface Lead {
   note: string | null
   createdAt: string
   appunti: AppuntoCall[]
+  preventivi: PreventivoSummary[]
+}
+
+interface Preventivo {
+  id: number
+  numero: string
+  nomeCliente: string
+  aziendaCliente: string | null
+  oggetto: string
+  iva: number
+  subtotale: number
+  totale: number
+  feeCommerciale: number
+  status: string
+  createdAt: string
 }
 
 const STAGES = [
@@ -40,6 +67,7 @@ const emptyForm = { nome: '', azienda: '', email: '', telefono: '', valore: '', 
 
 export default function SalesDashboard() {
   const [leads, setLeads] = useState<Lead[]>([])
+  const [preventivi, setPreventivi] = useState<Preventivo[]>([])
   const [selected, setSelected] = useState<Lead | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [addingToStage, setAddingToStage] = useState<string | null>(null)
@@ -49,9 +77,13 @@ export default function SalesDashboard() {
   const appuntiEndRef = useRef<HTMLDivElement>(null)
 
   const load = async () => {
-    const data = await fetch('/api/leads').then(r => r.json())
-    const list: Lead[] = Array.isArray(data) ? data : []
+    const [leadsData, prevData] = await Promise.all([
+      fetch('/api/leads').then(r => r.json()),
+      fetch('/api/preventivi').then(r => r.json()),
+    ])
+    const list: Lead[] = Array.isArray(leadsData) ? leadsData : []
     setLeads(list)
+    setPreventivi(Array.isArray(prevData) ? prevData : [])
     if (selected) {
       const updated = list.find(l => l.id === selected.id)
       if (updated) setSelected(updated)
@@ -125,31 +157,31 @@ export default function SalesDashboard() {
   const totalePipeline = leads.filter(l => !['vinto', 'perso'].includes(l.stage)).reduce((s, l) => s + (l.valore ?? 0), 0)
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden -m-8">
+    <div className="flex flex-col h-screen overflow-hidden -m-4 -mt-14 md:-m-8">
 
       {/* Header */}
-      <div className="flex items-center justify-between px-8 py-5 border-b border-gray-200 bg-white/60 backdrop-blur shrink-0">
+      <div className="flex items-center justify-between flex-wrap gap-2 pl-14 pr-4 md:px-8 py-3 md:py-5 border-b border-gray-200 bg-white/60 backdrop-blur shrink-0">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Pipeline Sales</h1>
-          <p className="text-gray-500 text-sm mt-0.5">{leads.length} lead totali</p>
+          <h1 className="text-lg md:text-2xl font-bold text-gray-900">Pipeline Sales</h1>
+          <p className="text-gray-500 text-xs md:text-sm mt-0.5">{leads.length} lead totali</p>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="text-right">
-            <p className="text-xs text-gray-400">Pipeline attiva</p>
-            <p className="text-base font-bold text-indigo-600">{fmt(totalePipeline)}</p>
+        <div className="flex items-center gap-2 md:gap-4">
+          <div className="text-right hidden sm:block">
+            <p className="text-xs text-gray-400">Pipeline</p>
+            <p className="text-sm font-bold text-indigo-600">{fmt(totalePipeline)}</p>
           </div>
-          <div className="text-right">
+          <div className="text-right hidden sm:block">
             <p className="text-xs text-gray-400">Vinto</p>
-            <p className="text-base font-bold text-emerald-600">{fmt(totaleVinto)}</p>
+            <p className="text-sm font-bold text-emerald-600">{fmt(totaleVinto)}</p>
           </div>
           <button
             onClick={() => openNew('nuovo')}
-            className="flex items-center gap-2 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition-all ml-2"
+            className="flex items-center gap-2 text-white text-xs md:text-sm font-medium px-3 md:px-4 py-2 md:py-2.5 rounded-xl transition-all"
             style={{ background: BRAND }}
             onMouseEnter={e => ((e.currentTarget as HTMLElement).style.opacity = '0.85')}
             onMouseLeave={e => ((e.currentTarget as HTMLElement).style.opacity = '1')}
           >
-            <Plus className="w-4 h-4" /> Nuovo Lead
+            <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Nuovo</span> Lead
           </button>
         </div>
       </div>
@@ -159,12 +191,12 @@ export default function SalesDashboard() {
 
         {/* Kanban board */}
         <div className="flex-1 overflow-x-auto overflow-y-hidden">
-          <div className="flex gap-4 h-full px-8 py-6" style={{ minWidth: `${STAGES.length * 280}px` }}>
+          <div className="flex gap-3 md:gap-4 h-full px-4 md:px-8 py-4 md:py-6" style={{ minWidth: `${STAGES.length * 220}px` }}>
             {STAGES.map(stage => {
               const stageleads = leads.filter(l => l.stage === stage.key)
               const stageVal = stageleads.reduce((s, l) => s + (l.valore ?? 0), 0)
               return (
-                <div key={stage.key} className="flex flex-col w-64 shrink-0">
+                <div key={stage.key} className="flex flex-col w-52 md:w-64 shrink-0">
                   {/* Column header */}
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
@@ -257,7 +289,7 @@ export default function SalesDashboard() {
 
         {/* Detail / Call notes panel */}
         {selected && (
-          <div className="w-80 shrink-0 border-l border-gray-200 bg-white/80 backdrop-blur flex flex-col overflow-hidden">
+          <div className="fixed inset-0 z-40 md:relative md:inset-auto md:w-80 md:shrink-0 border-l border-gray-200 bg-white/95 md:bg-white/80 backdrop-blur flex flex-col overflow-hidden">
             {/* Panel header */}
             <div className="px-5 py-4 border-b border-gray-100 shrink-0">
               <div className="flex items-start justify-between">
@@ -304,6 +336,38 @@ export default function SalesDashboard() {
                 <p className="mt-3 text-xs text-gray-500 italic border-t border-gray-100 pt-2">{selected.note}</p>
               )}
             </div>
+
+            {/* Preventivi collegati */}
+            {selected.preventivi?.length > 0 && (
+              <div className="px-5 py-3 border-b border-gray-100 shrink-0 space-y-2">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5" /> Preventivi
+                </p>
+                {selected.preventivi.map(p => {
+                  const guadagno = p.subtotale * (1 - (p.feeCommerciale ?? 0) / 100)
+                  const statusColor = p.status === 'accettato' ? 'text-emerald-600 bg-emerald-50 border-emerald-200'
+                    : p.status === 'rifiutato' ? 'text-red-500 bg-red-50 border-red-200'
+                    : 'text-amber-600 bg-amber-50 border-amber-200'
+                  return (
+                    <div key={p.id} className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-[10px] font-mono text-gray-400">{p.numero}</span>
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${statusColor}`}>
+                          {p.status === 'accettato' ? 'Accettato' : p.status === 'rifiutato' ? 'Rifiutato' : 'Attesa'}
+                        </span>
+                      </div>
+                      <p className="text-xs font-medium text-gray-700 mt-0.5 truncate">{p.oggetto}</p>
+                      <div className="flex items-center justify-between mt-1.5">
+                        <span className="text-[10px] text-gray-400">Totale: <span className="font-semibold text-gray-700">{fmt(p.totale)}</span></span>
+                        {p.feeCommerciale > 0 && (
+                          <span className="text-[10px] text-emerald-600 font-semibold">Netto: {fmt(guadagno)}</span>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
 
             {/* Appunti call list */}
             <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
@@ -356,10 +420,69 @@ export default function SalesDashboard() {
         )}
       </div>
 
+      {/* Preventivi section */}
+      <div className="shrink-0 border-t border-gray-200 bg-white/60 backdrop-blur px-4 md:px-8 py-4 md:py-5 max-h-[220px] md:max-h-[260px] overflow-y-auto">
+        <div className="flex items-center gap-2 mb-4">
+          <FileText className="w-4 h-4 text-gray-500" />
+          <h2 className="text-sm font-semibold text-gray-700">Preventivi</h2>
+          <span className="text-xs text-gray-400 font-normal ml-1">{preventivi.length} totali</span>
+          <div className="ml-auto flex items-center gap-4 text-xs">
+            <span className="text-gray-400">
+              Guadagno totale:{' '}
+              <span className="font-bold text-emerald-600">
+                {fmt(preventivi.reduce((s, p) => s + p.subtotale * (1 - (p.feeCommerciale ?? 0) / 100), 0))}
+              </span>
+            </span>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-gray-100">
+                {['Numero', 'Cliente', 'Oggetto', '€ Servizi', 'Subtotale', 'IVA', 'Fee commerciale', 'Guadagno'].map(h => (
+                  <th key={h} className="text-left font-semibold text-gray-400 uppercase tracking-wide px-3 py-2 whitespace-nowrap last:text-right">
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {preventivi.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="text-center text-gray-400 py-6">Nessun preventivo</td>
+                </tr>
+              )}
+              {preventivi.map(p => {
+                const ivaAmt = p.subtotale * (p.iva / 100)
+                const feeAmt = p.subtotale * (p.feeCommerciale ?? 0) / 100
+                const guadagno = p.subtotale - feeAmt
+                return (
+                  <tr key={p.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                    <td className="px-3 py-2.5 font-mono text-gray-600 whitespace-nowrap">{p.numero}</td>
+                    <td className="px-3 py-2.5">
+                      <p className="font-medium text-gray-800">{p.nomeCliente}</p>
+                      {p.aziendaCliente && <p className="text-gray-400">{p.aziendaCliente}</p>}
+                    </td>
+                    <td className="px-3 py-2.5 text-gray-600 max-w-[160px] truncate">{p.oggetto}</td>
+                    <td className="px-3 py-2.5 font-medium text-gray-800">{fmt(p.subtotale)}</td>
+                    <td className="px-3 py-2.5 text-gray-600">{fmt(p.subtotale)}</td>
+                    <td className="px-3 py-2.5 text-gray-500">{p.iva}% · {fmt(ivaAmt)}</td>
+                    <td className="px-3 py-2.5 text-orange-600 font-medium">
+                      {p.feeCommerciale ? <>{p.feeCommerciale}% · {fmt(feeAmt)}</> : <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="px-3 py-2.5 font-bold text-emerald-600 text-right">{fmt(guadagno)}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       {/* New Lead Modal */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="glass-modal rounded-2xl w-full max-w-md p-6 space-y-4">
+        <div className="fixed inset-0 bg-black/40 flex items-end md:items-center justify-center z-50 p-0 md:p-4">
+          <div className="glass-modal rounded-t-2xl md:rounded-2xl w-full max-w-md p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold text-gray-900">
                 Nuovo Lead

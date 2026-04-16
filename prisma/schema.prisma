@@ -63,17 +63,18 @@ model Contatto {
 }
 
 model Lead {
-  id        Int           @id @default(autoincrement())
-  nome      String
-  azienda   String?
-  email     String?
-  telefono  String?
-  valore    Float?
-  stage     String        @default("nuovo")
-  note      String?
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
-  appunti   AppuntoCall[]
+  id         Int           @id @default(autoincrement())
+  nome       String
+  azienda    String?
+  email      String?
+  telefono   String?
+  valore     Float?
+  stage      String        @default("nuovo")
+  note       String?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  appunti    AppuntoCall[]
+  preventivi Preventivo[]
 }
 
 model AppuntoCall {
@@ -96,6 +97,9 @@ model Preventivo {
   iva            Float     @default(21)
   subtotale      Float     @default(0)
   totale         Float     @default(0)
+  feeCommerciale Float     @default(0)
+  leadId         Int?
+  lead           Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
   status         String    @default("attesa")
   note           String?
   condizioni     String?

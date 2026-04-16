@@ -28,6 +28,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         ...(body.iva !== undefined && { iva: body.iva }),
         ...(subtotale !== undefined && { subtotale }),
         ...(totale !== undefined && { totale }),
+        ...(body.feeCommerciale !== undefined && { feeCommerciale: Number(body.feeCommerciale) }),
         ...(body.status !== undefined && { status: body.status }),
         ...(body.note !== undefined && { note: body.note }),
         ...(body.condizioni !== undefined && { condizioni: body.condizioni }),
