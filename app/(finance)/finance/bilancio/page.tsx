@@ -28,12 +28,12 @@ export default function BilancioPage() {
       ])
       const fatture: { mese: number; importo: number }[] = Array.isArray(rawF) ? rawF : []
       const spese: { mese: number; importo: number }[] = Array.isArray(rawS) ? rawS : []
-      setFattureTotale(fatture.reduce((s, f) => s + (f?.importo ?? 0), 0))
-      setSpeseTotale(spese.reduce((s, e) => s + (e?.importo ?? 0), 0))
+      setFattureTotale(fatture.reduce((s: number, f) => s + (f?.importo ?? 0), 0))
+      setSpeseTotale(spese.reduce((s: number, e) => s + (e?.importo ?? 0), 0))
       setDati(Array.from({ length: 12 }, (_, i) => {
         const m = i + 1
-        const entrate = fatture.filter(f => f?.mese === m).reduce((s, f) => s + (f?.importo ?? 0), 0)
-        const uscite = spese.filter(e => e?.mese === m).reduce((s, e) => s + (e?.importo ?? 0), 0)
+        const entrate = fatture.filter(f => f?.mese === m).reduce((s: number, f) => s + (f?.importo ?? 0), 0)
+        const uscite = spese.filter(e => e?.mese === m).reduce((s: number, e) => s + (e?.importo ?? 0), 0)
         return { mese: m, entrate, uscite, bilancio: entrate - uscite }
       }))
     }
