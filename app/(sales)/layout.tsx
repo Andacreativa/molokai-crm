@@ -1,6 +1,10 @@
-import SalesSidebar from '@/components/SalesSidebar'
+import SalesSidebar from "@/components/SalesSidebar";
 
-export default function SalesLayout({ children }: { children: React.ReactNode }) {
+export default function SalesLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <div className="sales-bg min-h-screen flex">
       <SalesSidebar />
@@ -8,5 +12,5 @@ export default function SalesLayout({ children }: { children: React.ReactNode })
         {children}
       </main>
     </div>
-  )
+  );
 }

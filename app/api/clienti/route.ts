@@ -1,20 +1,20 @@
-import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   const clienti = await prisma.cliente.findMany({
     include: { fatture: true },
-    orderBy: { nome: 'asc' },
-  })
-  return NextResponse.json(clienti)
+    orderBy: { nome: "asc" },
+  });
+  return NextResponse.json(clienti);
 }
 
 export async function POST(request: Request) {
-  const body = await request.json()
+  const body = await request.json();
   const cliente = await prisma.cliente.create({
     data: {
       nome: body.nome,
-      paese: body.paese || 'Italia',
+      paese: body.paese || "Italia",
       email: body.email || null,
       telefono: body.telefono || null,
       partitaIva: body.partitaIva || null,
@@ -24,6 +24,6 @@ export async function POST(request: Request) {
       provincia: body.provincia || null,
       note: body.note || null,
     },
-  })
-  return NextResponse.json(cliente)
+  });
+  return NextResponse.json(cliente);
 }

@@ -1,10 +1,13 @@
-import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 
-export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
   try {
-    const { id } = await params
-    const body = await request.json()
+    const { id } = await params;
+    const body = await request.json();
     const contatto = await prisma.contatto.update({
       where: { id: parseInt(id) },
       data: {
@@ -16,25 +19,30 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         ...(body.via !== undefined && { via: body.via || null }),
         ...(body.cap !== undefined && { cap: body.cap || null }),
         ...(body.citta !== undefined && { citta: body.citta || null }),
-        ...(body.provincia !== undefined && { provincia: body.provincia || null }),
+        ...(body.provincia !== undefined && {
+          provincia: body.provincia || null,
+        }),
         ...(body.note !== undefined && { note: body.note }),
         ...(body.status !== undefined && { status: body.status }),
       },
-    })
-    return NextResponse.json(contatto)
+    });
+    return NextResponse.json(contatto);
   } catch (e) {
-    console.error('[PATCH /api/contatti/[id]]', e)
-    return NextResponse.json({ error: String(e) }, { status: 500 })
+    console.error("[PATCH /api/contatti/[id]]", e);
+    return NextResponse.json({ error: String(e) }, { status: 500 });
   }
 }
 
-export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(
+  _: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
   try {
-    const { id } = await params
-    await prisma.contatto.delete({ where: { id: parseInt(id) } })
-    return NextResponse.json({ ok: true })
+    const { id } = await params;
+    await prisma.contatto.delete({ where: { id: parseInt(id) } });
+    return NextResponse.json({ ok: true });
   } catch (e) {
-    console.error('[DELETE /api/contatti/[id]]', e)
-    return NextResponse.json({ error: String(e) }, { status: 500 })
+    console.error("[DELETE /api/contatti/[id]]", e);
+    return NextResponse.json({ error: String(e) }, { status: 500 });
   }
 }

@@ -1,7 +1,11 @@
-import Sidebar from '@/components/Sidebar'
-import Providers from '@/components/Providers'
+import Sidebar from "@/components/Sidebar";
+import Providers from "@/components/Providers";
 
-export default function FinanceLayout({ children }: { children: React.ReactNode }) {
+export default function FinanceLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <div className="min-h-screen flex">
       <Providers>
@@ -11,5 +15,5 @@ export default function FinanceLayout({ children }: { children: React.ReactNode 
         </main>
       </Providers>
     </div>
-  )
+  );
 }

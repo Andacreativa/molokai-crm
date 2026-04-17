@@ -80,7 +80,7 @@
   --sidebar-accent: #1a1a1a;
   --sidebar-border: #222222;
   --sidebar-ring: #e8308a;
-  --font-roboto: 'Roboto', sans-serif;
+  --font-roboto: "Roboto", sans-serif;
 }
 
 .dark {
@@ -124,9 +124,21 @@
   body {
     @apply bg-background text-foreground;
     background-image:
-      radial-gradient(ellipse at 20% 20%, rgba(232, 48, 138, 0.07) 0%, transparent 55%),
-      radial-gradient(ellipse at 80% 80%, rgba(99, 102, 241, 0.06) 0%, transparent 55%),
-      radial-gradient(ellipse at 60% 10%, rgba(16, 185, 129, 0.04) 0%, transparent 45%);
+      radial-gradient(
+        ellipse at 20% 20%,
+        rgba(232, 48, 138, 0.07) 0%,
+        transparent 55%
+      ),
+      radial-gradient(
+        ellipse at 80% 80%,
+        rgba(99, 102, 241, 0.06) 0%,
+        transparent 55%
+      ),
+      radial-gradient(
+        ellipse at 60% 10%,
+        rgba(16, 185, 129, 0.04) 0%,
+        transparent 45%
+      );
     background-attachment: fixed;
   }
   html {
@@ -138,10 +150,29 @@
 .sales-bg {
   background-color: #eef0f7;
   background-image:
-    radial-gradient(ellipse at 20% 20%, rgba(219, 41, 27, 0.07) 0%, transparent 55%),
-    radial-gradient(ellipse at 80% 80%, rgba(180, 20, 10, 0.05) 0%, transparent 55%),
-    radial-gradient(ellipse at 60% 10%, rgba(239, 68, 68, 0.04) 0%, transparent 45%);
+    radial-gradient(
+      ellipse at 20% 20%,
+      rgba(219, 41, 27, 0.07) 0%,
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse at 80% 80%,
+      rgba(180, 20, 10, 0.05) 0%,
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse at 60% 10%,
+      rgba(239, 68, 68, 0.04) 0%,
+      transparent 45%
+    );
   background-attachment: fixed;
+}
+
+/* ── Zebra striping tabelle ────────────────────────────────────────────────
+   Usata su <tbody class="zebra">. Usa !important per vincere su bg translucidi
+   del container (glass-card) e sulle classi utility di base di Tailwind. */
+tbody.zebra > tr:nth-child(even) {
+  background-color: #f0f0f0 !important;
 }
 
 /* ── iOS Liquid Glass ─────────────────────────────────────────────────────── */
@@ -151,9 +182,9 @@
   -webkit-backdrop-filter: blur(18px) saturate(1.6);
   border: 1px solid rgba(255, 255, 255, 0.85);
   box-shadow:
-    0 1px 0 0 rgba(255, 255, 255, 0.95) inset,   /* highlight top */
-    0 -1px 0 0 rgba(0, 0, 0, 0.04) inset,          /* shadow bottom */
-    0 4px 24px rgba(0, 0, 0, 0.07),
+    0 1px 0 0 rgba(255, 255, 255, 0.95) inset,
+    /* highlight top */ 0 -1px 0 0 rgba(0, 0, 0, 0.04) inset,
+    /* shadow bottom */ 0 4px 24px rgba(0, 0, 0, 0.07),
     0 1px 4px rgba(0, 0, 0, 0.05);
 }
 
@@ -178,9 +209,9 @@
   );
   border: 1px solid rgba(255, 180, 210, 0.6);
   box-shadow:
-    0 1px 0 0 rgba(255, 200, 220, 0.7) inset,   /* highlight top */
-    0 -1px 0 0 rgba(140, 0, 60, 0.4) inset,      /* ombra bottom */
-    0 4px 16px rgba(232, 48, 138, 0.35),
+    0 1px 0 0 rgba(255, 200, 220, 0.7) inset,
+    /* highlight top */ 0 -1px 0 0 rgba(140, 0, 60, 0.4) inset,
+    /* ombra bottom */ 0 4px 16px rgba(232, 48, 138, 0.35),
     0 1px 4px rgba(0, 0, 0, 0.12);
   color: #ffffff;
   transition: all 0.15s ease;

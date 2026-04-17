@@ -1,26 +1,28 @@
-import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 
 export async function GET(request: Request) {
   try {
-    const { searchParams } = new URL(request.url)
-    const anno = parseInt(searchParams.get('anno') || String(new Date().getFullYear()))
+    const { searchParams } = new URL(request.url);
+    const anno = parseInt(
+      searchParams.get("anno") || String(new Date().getFullYear()),
+    );
     const dipendenti = await prisma.dipendente.findMany({
-      orderBy: { nome: 'asc' },
+      orderBy: { nome: "asc" },
       include: {
         pagamenti: { where: { anno } },
       },
-    })
-    return NextResponse.json(dipendenti)
+    });
+    return NextResponse.json(dipendenti);
   } catch (e) {
-    console.error('[GET /api/dipendenti]', e)
-    return NextResponse.json({ error: String(e) }, { status: 500 })
+    console.error("[GET /api/dipendenti]", e);
+    return NextResponse.json({ error: String(e) }, { status: 500 });
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json()
+    const body = await request.json();
     const dipendente = await prisma.dipendente.create({
       data: {
         nome: body.nome,
@@ -33,7 +35,7 @@ export async function POST(request: Request) {
         cap: body.cap || null,
         citta: body.citta || null,
         provincia: body.provincia || null,
-        paese: body.paese || 'Spagna',
+        paese: body.paese || "Spagna",
         telefono: body.telefono || null,
         email: body.email || null,
         iban: body.iban || null,
@@ -41,10 +43,10 @@ export async function POST(request: Request) {
         irpf: parseFloat(body.irpf) || 0,
         seguridadSocial: parseFloat(body.seguridadSocial) || 0,
       },
-    })
-    return NextResponse.json(dipendente)
+    });
+    return NextResponse.json(dipendente);
   } catch (e) {
-    console.error('[POST /api/dipendenti]', e)
-    return NextResponse.json({ error: String(e) }, { status: 500 })
+    console.error("[POST /api/dipendenti]", e);
+    return NextResponse.json({ error: String(e) }, { status: 500 });
   }
 }

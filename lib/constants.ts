@@ -1,67 +1,101 @@
 export const MESI = [
-  'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
-  'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre',
-]
+  "Gennaio",
+  "Febbraio",
+  "Marzo",
+  "Aprile",
+  "Maggio",
+  "Giugno",
+  "Luglio",
+  "Agosto",
+  "Settembre",
+  "Ottobre",
+  "Novembre",
+  "Dicembre",
+];
 
 export const CATEGORIE_SPESA = [
-  'Stipendio',
-  'Seguridad Social',
-  'Tasse',
-  'Carta Aziendale',
-  'Costi Aziendali',
-  'Software',
-  'Commercialista',
-  'Fornitori',
-  'Soci',
-  'Costi Bancari',
-  'Altro',
-]
+  "Stipendio",
+  "Seguridad Social",
+  "Tasse",
+  "Carta Aziendale",
+  "Costi Aziendali",
+  "Software",
+  "Commercialista",
+  "Fornitori",
+  "Soci",
+  "Costi Bancari",
+  "Altro",
+];
 
-export const AZIENDE = ['Spagna', 'Italia', 'Altro']
+export const AZIENDE = ["Spagna", "Italia", "Altro"];
 
-export const AZIENDA_COLORI: Record<string, { bg: string; text: string; border: string }> = {
-  'Spagna': { bg: '#ef4444', text: '#ffffff', border: '#ef4444' },
-  'Italia': { bg: '#22c55e', text: '#ffffff', border: '#22c55e' },
-  'Altro':  { bg: '#f8f9fc', text: '#64748b', border: '#e2e8f0' },
-}
+export const AZIENDA_COLORI: Record<
+  string,
+  { bg: string; text: string; border: string }
+> = {
+  Spagna: { bg: "#ef4444", text: "#ffffff", border: "#ef4444" },
+  Italia: { bg: "#22c55e", text: "#ffffff", border: "#22c55e" },
+  Altro: { bg: "#f8f9fc", text: "#64748b", border: "#e2e8f0" },
+};
 
 export const PAESI = [
-  'Italia',
-  'Spagna',
-  'Francia',
-  'Germania',
-  'Portogallo',
-  'Regno Unito',
-  'Altro',
-]
+  "Italia",
+  "Spagna",
+  "Francia",
+  "Germania",
+  "Portogallo",
+  "Regno Unito",
+  "Altro",
+];
 
+// Palette pastello per i badge categoria. Colori morbidi da usare come sfondo
+// solido con testo scuro (vedi CATEGORIA_TEXT).
 export const CATEGORIE_COLORI: Record<string, string> = {
-  'Stipendio': '#e8308a',
-  'Seguridad Social': '#8b5cf6',
-  'Tasse': '#ef4444',
-  'Carta Aziendale': '#f59e0b',
-  'Costi Aziendali': '#10b981',
-  'Software': '#06b6d4',
-  'Commercialista': '#f97316',
-  'Fornitori': '#3b82f6',
-  'Soci': '#ec4899',
-  'Costi Bancari': '#64748b',
-  'Altro': '#94a3b8',
-}
+  Stipendio: "#BDE3F5", // azzurro chiaro
+  "Seguridad Social": "#FFAAAA", // rosso pastello
+  "Carta Aziendale": "#B8F0C8", // verde menta
+  Software: "#D4BBEE", // viola chiaro
+  Soci: "#FFF0A0", // giallo pastello
+  Commercialista: "#FFD6D6", // rosa chiaro
+  "Costi Bancari": "#E0E0E0", // grigio chiaro
+  Fornitori: "#D4E8A0", // verde oliva chiaro
+  Tasse: "#FFC9A0", // pesca pastello (non specificato, coerente)
+  "Costi Aziendali": "#C8E6F0", // azzurro tenue (non specificato)
+  Altro: "#EDEDED", // grigio neutro
+};
 
-export const BRAND = '#e8308a'
+// Testo scuro uniforme per i badge categoria — leggibile su tutti i pastel.
+export const CATEGORIA_TEXT = "#1f2937";
+
+// Versioni sature delle categorie per grafici (pie/bar). I pastel di
+// CATEGORIE_COLORI sono pensati per badge — troppo chiari su fette grandi.
+export const CATEGORIE_COLORI_CHART: Record<string, string> = {
+  Stipendio: "#5BB8E8",
+  "Seguridad Social": "#FF6B6B",
+  "Carta Aziendale": "#4DD68C",
+  Software: "#9B6ED4",
+  Soci: "#F5D020",
+  Commercialista: "#FF9999",
+  "Costi Bancari": "#AAAAAA",
+  Fornitori: "#8DB84A",
+  Tasse: "#FF9940",
+  "Costi Aziendali": "#5BA9D8",
+  Altro: "#B0B0B0",
+};
+
+export const BRAND = "#e8308a";
 
 // Formato europeo: punto separatore migliaia, virgola decimale, sempre 2 decimali (es. "3.250,00 €")
 // Implementazione manuale per evitare problemi con dati locali ICU ridotti su Node.
 export function fmt(n: number | null | undefined): string {
-  const value = Number(n) || 0
-  const negative = value < 0
-  const abs = Math.abs(value)
-  const [intPart, decPart] = abs.toFixed(2).split('.')
-  const intWithSep = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
-  return `${negative ? '-' : ''}${intWithSep},${decPart} €`
+  const value = Number(n) || 0;
+  const negative = value < 0;
+  const abs = Math.abs(value);
+  const [intPart, decPart] = abs.toFixed(2).split(".");
+  const intWithSep = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return `${negative ? "-" : ""}${intWithSep},${decPart} €`;
 }
 
 // Genera anni in ordine decrescente a partire dall'anno corrente
-const ANNO_CORRENTE = new Date().getFullYear()
-export const ANNI = Array.from({ length: 5 }, (_, i) => ANNO_CORRENTE - i) // es. 2026,2025,2024,2023,2022
+const ANNO_CORRENTE = new Date().getFullYear();
+export const ANNI = Array.from({ length: 5 }, (_, i) => ANNO_CORRENTE - i); // es. 2026,2025,2024,2023,2022

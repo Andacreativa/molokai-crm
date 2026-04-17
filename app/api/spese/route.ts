@@ -1,24 +1,24 @@
-import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url)
-  const anno = parseInt(searchParams.get('anno') || '2025')
-  const azienda = searchParams.get('azienda') || undefined
+  const { searchParams } = new URL(request.url);
+  const anno = parseInt(searchParams.get("anno") || "2025");
+  const azienda = searchParams.get("azienda") || undefined;
 
   const spese = await prisma.spesa.findMany({
     where: { anno, ...(azienda ? { azienda } : {}) },
-    orderBy: [{ mese: 'asc' }, { createdAt: 'desc' }],
-  })
+    orderBy: [{ mese: "desc" }, { createdAt: "desc" }],
+  });
 
-  return NextResponse.json(spese)
+  return NextResponse.json(spese);
 }
 
 export async function POST(request: Request) {
-  const body = await request.json()
+  const body = await request.json();
   const spesa = await prisma.spesa.create({
     data: {
-      azienda: body.azienda || 'Spagna',
+      azienda: body.azienda || "Spagna",
       aziendaNota: body.aziendaNota || null,
       fornitore: body.fornitore,
       fornitoreId: body.fornitoreId ? Number(body.fornitoreId) : null,
@@ -30,6 +30,6 @@ export async function POST(request: Request) {
       anno: body.anno || 2025,
       importo: parseFloat(body.importo),
     },
-  })
-  return NextResponse.json(spesa)
+  });
+  return NextResponse.json(spesa);
 }

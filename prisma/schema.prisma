@@ -24,8 +24,8 @@ model Cliente {
 
 model Fattura {
   id          Int      @id @default(autoincrement())
-  clienteId   Int
-  cliente     Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  clienteId   Int?
+  cliente     Cliente? @relation(fields: [clienteId], references: [id], onDelete: SetNull)
   azienda     String   @default("Spagna")
   aziendaNota String?
   descrizione String?
@@ -36,6 +36,20 @@ model Fattura {
   iva         Float    @default(21)
   pagato      Boolean  @default(false)
   scadenza    DateTime?
+  createdAt   DateTime @default(now())
+}
+
+model AltroIngresso {
+  id          Int      @id @default(autoincrement())
+  fonte       String
+  azienda     String   @default("Spagna")
+  aziendaNota String?
+  descrizione String?
+  mese        Int
+  anno        Int      @default(2025)
+  importo     Float
+  incassato   Boolean  @default(false)
+  dataIncasso DateTime?
   createdAt   DateTime @default(now())
 }
 

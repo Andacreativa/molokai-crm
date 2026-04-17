@@ -1,13 +1,18 @@
-import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 
-export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const body = await request.json()
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
+  const body = await request.json();
   const fattura = await prisma.fattura.update({
     where: { id: parseInt(id) },
     data: {
-      ...(body.clienteId !== undefined && { clienteId: body.clienteId }),
+      ...(body.clienteId !== undefined && {
+        clienteId: body.clienteId ?? null,
+      }),
       ...(body.azienda !== undefined && { azienda: body.azienda }),
       ...(body.aziendaNota !== undefined && { aziendaNota: body.aziendaNota }),
       ...(body.descrizione !== undefined && { descrizione: body.descrizione }),
@@ -17,15 +22,20 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       ...(body.tipoIva !== undefined && { tipoIva: body.tipoIva }),
       ...(body.iva !== undefined && { iva: Number(body.iva) }),
       ...(body.pagato !== undefined && { pagato: body.pagato }),
-      ...(body.scadenza !== undefined && { scadenza: body.scadenza ? new Date(body.scadenza) : null }),
+      ...(body.scadenza !== undefined && {
+        scadenza: body.scadenza ? new Date(body.scadenza) : null,
+      }),
     },
     include: { cliente: true },
-  })
-  return NextResponse.json(fattura)
+  });
+  return NextResponse.json(fattura);
 }
 
-export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  await prisma.fattura.delete({ where: { id: parseInt(id) } })
-  return NextResponse.json({ ok: true })
+export async function DELETE(
+  _: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
+  await prisma.fattura.delete({ where: { id: parseInt(id) } });
+  return NextResponse.json({ ok: true });
 }
