@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, Check } from "lucide-react";
+import { Fragment, useEffect, useRef, useState } from "react";
+import { Plus, Pencil, Trash2, Check, Upload } from "lucide-react";
 import { fmt, MESI } from "@/lib/constants";
 import { useAnno } from "@/lib/anno-context";
 import CopyFieldsModal, { CopyField } from "@/components/CopyFieldsModal";
 import AddressFields, { formatAddress } from "@/components/AddressFields";
+import Avatar from "@/components/Avatar";
 
 interface Pagamento {
   id: number;
@@ -31,8 +32,10 @@ interface Dipendente {
   telefono: string | null;
   email: string | null;
   iban: string | null;
+  fotoPath: string | null;
   nettoBustaPaga: number;
   irpf: number;
+  irpfImporto: number;
   seguridadSocial: number;
   pagamenti: Pagamento[];
 }
@@ -52,8 +55,10 @@ const emptyForm = {
   telefono: "",
   email: "",
   iban: "",
+  fotoPath: "",
   nettoBustaPaga: "",
   irpf: "",
+  irpfImporto: "",
   seguridadSocial: "",
 };
 
@@ -65,6 +70,25 @@ export default function DipendentiPage() {
   const { anno, setAnno } = useAnno();
   const [busy, setBusy] = useState<string | null>(null);
   const [infoDip, setInfoDip] = useState<Dipendente | null>(null);
+  const [uploadingFoto, setUploadingFoto] = useState(false);
+  const fotoRef = useRef<HTMLInputElement>(null);
+
+  const onFotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingFoto(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("subdir", "avatars");
+      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      const j = (await res.json()) as { path?: string; error?: string };
+      if (j.path) setForm((f) => ({ ...f, fotoPath: j.path! }));
+    } finally {
+      setUploadingFoto(false);
+      if (fotoRef.current) fotoRef.current.value = "";
+    }
+  };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const load = async () => {
@@ -99,8 +123,10 @@ export default function DipendentiPage() {
       telefono: d.telefono ?? "",
       email: d.email ?? "",
       iban: d.iban ?? "",
+      fotoPath: d.fotoPath ?? "",
       nettoBustaPaga: String(d.nettoBustaPaga ?? ""),
       irpf: String(d.irpf ?? ""),
+      irpfImporto: String(d.irpfImporto ?? ""),
       seguridadSocial: String(d.seguridadSocial ?? ""),
     });
     setShowForm(true);
@@ -232,7 +258,7 @@ export default function DipendentiPage() {
         <table className="w-full">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50">
-              {["Nome", "Netto busta paga", "IRPF", "Seguridad Social", ""].map(
+              {["Nome", "Netto busta paga", "IRPF (%)", "IRPF (€)", "Seguridad Social", ""].map(
                 (h, i) => (
                   <th
                     key={h}
@@ -267,19 +293,30 @@ export default function DipendentiPage() {
                 className="border-b border-gray-50 hover:bg-gray-50 transition-colors"
               >
                 <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                  <button
-                    onClick={() => setInfoDip(d)}
-                    className="text-left hover:text-pink-600 hover:underline transition-colors cursor-pointer"
-                  >
-                    {d.nome}
-                    {d.cognome ? ` ${d.cognome}` : ""}
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <Avatar
+                      nome={d.nome}
+                      cognome={d.cognome}
+                      fotoPath={d.fotoPath}
+                      size={36}
+                    />
+                    <button
+                      onClick={() => setInfoDip(d)}
+                      className="text-left hover:text-pink-600 hover:underline transition-colors cursor-pointer"
+                    >
+                      {d.nome}
+                      {d.cognome ? ` ${d.cognome}` : ""}
+                    </button>
+                  </div>
                 </td>
                 <td className="px-4 py-3 text-sm font-semibold text-gray-900 text-right">
                   {fmt(d.nettoBustaPaga)}
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-700 text-right">
-                  {fmt(d.irpf)}
+                  {(d.irpf ?? 0).toFixed(2).replace(".", ",")}%
+                </td>
+                <td className="px-4 py-3 text-sm text-gray-700 text-right">
+                  {fmt(d.irpfImporto)}
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-700 text-right">
                   {fmt(d.seguridadSocial)}
@@ -306,104 +343,135 @@ export default function DipendentiPage() {
         </table>
       </div>
 
-      {/* Griglia mensile per dipendente */}
-      {dipendenti.map((d) => (
-        <div
-          key={`grid-${d.id}`}
-          className="glass-card rounded-2xl p-5 space-y-3"
-        >
+      {/* Griglia pagamenti compatta — 1 riga per dipendente, 12 mesi × 2 sub-celle */}
+      {dipendenti.length > 0 && (
+        <div className="glass-card rounded-2xl p-4 space-y-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <h3 className="text-base font-bold text-gray-900">
-              {d.nome}
-              {d.cognome ? ` ${d.cognome}` : ""}
+              Pagamenti mensili {anno}
             </h3>
-            <div className="flex items-center gap-3 text-xs text-gray-500">
+            <div className="flex items-center gap-4 text-xs text-gray-500">
               <span className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-sm bg-emerald-500" /> Stipendio
+                <span className="w-3 h-3 rounded-sm bg-emerald-500" />
+                <strong className="text-gray-700">N</strong> = Stipendio
+                (Nómina)
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-sm bg-blue-500" /> Seguridad
+                <span className="w-3 h-3 rounded-sm bg-blue-500" />
+                <strong className="text-gray-700">SS</strong> = Seguridad
                 Social
               </span>
             </div>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px]">
+            <table className="border-separate border-spacing-0 text-xs min-w-[820px]">
               <thead>
-                <tr className="border-b border-gray-100">
-                  <th className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2 py-2 text-left">
-                    Mese
+                <tr>
+                  <th
+                    rowSpan={2}
+                    className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-3 py-2 sticky left-0 bg-white z-10 border-b border-gray-100"
+                  >
+                    Dipendente
                   </th>
-                  <th className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2 py-2 text-center">
-                    Stipendio
-                  </th>
-                  <th className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2 py-2 text-center">
-                    Seguridad Social
-                  </th>
+                  {MESI.map((m) => (
+                    <th
+                      key={m}
+                      colSpan={2}
+                      className="text-center text-[11px] font-semibold text-gray-500 uppercase tracking-wide px-1 py-1 border-b border-gray-100"
+                    >
+                      {m.slice(0, 3)}
+                    </th>
+                  ))}
+                </tr>
+                <tr>
+                  {MESI.map((m, i) => (
+                    <Fragment key={`mh-${i}`}>
+                      <th
+                        className="text-center text-[10px] font-semibold text-emerald-700 px-1 py-1 border-b border-gray-100"
+                        title={`${m} — Stipendio (Nómina)`}
+                      >
+                        N
+                      </th>
+                      <th
+                        className="text-center text-[10px] font-semibold text-blue-700 px-1 py-1 border-b border-gray-100"
+                        title={`${m} — Seguridad Social`}
+                      >
+                        SS
+                      </th>
+                    </Fragment>
+                  ))}
                 </tr>
               </thead>
-              <tbody className="zebra">
-                {Array.from({ length: 12 }, (_, i) => i + 1).map((mese) => {
-                  const stipPaid = isPaid(d, mese, "stipendio");
-                  const ssPaid = isPaid(d, mese, "seguridad");
-                  const stipKey = `${d.id}-${mese}-stipendio`;
-                  const ssKey = `${d.id}-${mese}-seguridad`;
-                  return (
-                    <tr
-                      key={mese}
-                      className="border-b border-gray-50 hover:bg-gray-50/60"
+              <tbody>
+                {dipendenti.map((d, rowIdx) => (
+                  <tr key={d.id} className={rowIdx % 2 === 1 ? "bg-[#F0F0F0]" : ""}>
+                    <td className="px-3 py-1.5 sticky left-0 z-10 border-b border-gray-50 whitespace-nowrap"
+                      style={{ background: rowIdx % 2 === 1 ? "#F0F0F0" : "#fff" }}
                     >
-                      <td className="px-2 py-2 text-sm text-gray-700">
-                        {MESI[mese - 1]}
-                      </td>
-                      <td className="px-2 py-2 text-center">
-                        <button
-                          onClick={() =>
-                            togglePagamento(d.id, mese, "stipendio")
-                          }
-                          disabled={busy === stipKey}
-                          className={`inline-flex items-center justify-center w-7 h-7 rounded-md border transition-all ${
-                            stipPaid
-                              ? "bg-emerald-500 border-emerald-500 text-white hover:bg-emerald-600"
-                              : "bg-white border-gray-300 text-transparent hover:border-emerald-400"
-                          } ${busy === stipKey ? "opacity-50 cursor-wait" : "cursor-pointer"}`}
-                          title={
-                            stipPaid
-                              ? "Stipendio pagato — clicca per annullare"
-                              : "Segna come pagato"
-                          }
-                        >
-                          <Check className="w-4 h-4" />
-                        </button>
-                      </td>
-                      <td className="px-2 py-2 text-center">
-                        <button
-                          onClick={() =>
-                            togglePagamento(d.id, mese, "seguridad")
-                          }
-                          disabled={busy === ssKey}
-                          className={`inline-flex items-center justify-center w-7 h-7 rounded-md border transition-all ${
-                            ssPaid
-                              ? "bg-blue-500 border-blue-500 text-white hover:bg-blue-600"
-                              : "bg-white border-gray-300 text-transparent hover:border-blue-400"
-                          } ${busy === ssKey ? "opacity-50 cursor-wait" : "cursor-pointer"}`}
-                          title={
-                            ssPaid
-                              ? "Seguridad Social pagata — clicca per annullare"
-                              : "Segna come pagata"
-                          }
-                        >
-                          <Check className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
+                      <div className="flex items-center gap-2">
+                        <Avatar
+                          nome={d.nome}
+                          cognome={d.cognome}
+                          fotoPath={d.fotoPath}
+                          size={24}
+                        />
+                        <span className="text-sm font-medium text-gray-800">
+                          {d.nome}
+                          {d.cognome ? ` ${d.cognome}` : ""}
+                        </span>
+                      </div>
+                    </td>
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map((mese) => {
+                      const stipPaid = isPaid(d, mese, "stipendio");
+                      const ssPaid = isPaid(d, mese, "seguridad");
+                      const stipKey = `${d.id}-${mese}-stipendio`;
+                      const ssKey = `${d.id}-${mese}-seguridad`;
+                      return (
+                        <Fragment key={`m-${d.id}-${mese}`}>
+                          <td className="px-0.5 py-1 text-center border-b border-gray-50">
+                            <button
+                              onClick={() =>
+                                togglePagamento(d.id, mese, "stipendio")
+                              }
+                              disabled={busy === stipKey}
+                              className={`inline-flex items-center justify-center w-5 h-5 rounded border transition-all ${
+                                stipPaid
+                                  ? "bg-emerald-500 border-emerald-500 text-white hover:bg-emerald-600"
+                                  : "bg-white border-gray-300 text-transparent hover:border-emerald-400"
+                              } ${busy === stipKey ? "opacity-50 cursor-wait" : "cursor-pointer"}`}
+                              title={`${MESI[mese - 1]} — Stipendio ${stipPaid ? "pagato" : "non pagato"}`}
+                            >
+                              <Check className="w-3 h-3" strokeWidth={3} />
+                            </button>
+                          </td>
+                          <td
+                            className={`px-0.5 py-1 text-center border-b border-gray-50 ${mese < 12 ? "border-r border-gray-100" : ""}`}
+                          >
+                            <button
+                              onClick={() =>
+                                togglePagamento(d.id, mese, "seguridad")
+                              }
+                              disabled={busy === ssKey}
+                              className={`inline-flex items-center justify-center w-5 h-5 rounded border transition-all ${
+                                ssPaid
+                                  ? "bg-blue-500 border-blue-500 text-white hover:bg-blue-600"
+                                  : "bg-white border-gray-300 text-transparent hover:border-blue-400"
+                              } ${busy === ssKey ? "opacity-50 cursor-wait" : "cursor-pointer"}`}
+                              title={`${MESI[mese - 1]} — Seguridad Social ${ssPaid ? "pagata" : "non pagata"}`}
+                            >
+                              <Check className="w-3 h-3" strokeWidth={3} />
+                            </button>
+                          </td>
+                        </Fragment>
+                      );
+                    })}
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
         </div>
-      ))}
+      )}
 
       {/* Modal crea/modifica dipendente */}
       {showForm && (
@@ -412,6 +480,52 @@ export default function DipendentiPage() {
             <h2 className="text-lg font-bold text-gray-900">
               {editing ? "Modifica Dipendente" : "Nuovo Dipendente"}
             </h2>
+
+            {/* Foto profilo */}
+            <div className="flex items-center gap-4">
+              <Avatar
+                nome={form.nome || "?"}
+                cognome={form.cognome}
+                fotoPath={form.fotoPath || null}
+                size={64}
+              />
+              <div className="flex flex-col gap-1.5">
+                <input
+                  ref={fotoRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={onFotoChange}
+                  className="hidden"
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => fotoRef.current?.click()}
+                    disabled={uploadingFoto}
+                    className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    {uploadingFoto
+                      ? "Caricamento..."
+                      : form.fotoPath
+                        ? "Cambia foto"
+                        : "Carica foto"}
+                  </button>
+                  {form.fotoPath && (
+                    <button
+                      type="button"
+                      onClick={() => setForm((f) => ({ ...f, fotoPath: "" }))}
+                      className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-red-600 hover:bg-red-50"
+                    >
+                      Rimuovi
+                    </button>
+                  )}
+                </div>
+                <p className="text-[11px] text-gray-400">
+                  PNG/JPG. In assenza di foto verranno mostrate le iniziali.
+                </p>
+              </div>
+            </div>
 
             {/* Anagrafica */}
             <div className="space-y-3">
@@ -594,14 +708,31 @@ export default function DipendentiPage() {
                 </div>
                 <div>
                   <label className="text-xs font-medium text-gray-600 block mb-1">
+                    IRPF (%)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    value={form.irpf}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, irpf: e.target.value }))
+                    }
+                    placeholder="0"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-1">
                     IRPF (€)
                   </label>
                   <input
                     type="number"
                     step="0.01"
-                    value={form.irpf}
+                    value={form.irpfImporto}
                     onChange={(e) =>
-                      setForm((f) => ({ ...f, irpf: e.target.value }))
+                      setForm((f) => ({ ...f, irpfImporto: e.target.value }))
                     }
                     placeholder="0.00"
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"

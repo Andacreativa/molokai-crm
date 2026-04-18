@@ -29,6 +29,7 @@ import {
   fattureToPDF,
 } from "@/lib/export";
 import AltriIngressi from "@/components/AltriIngressi";
+import { PageSizeSelect, PageNav } from "@/components/Pagination";
 
 interface Cliente {
   id: number;
@@ -37,6 +38,8 @@ interface Cliente {
 }
 interface Fattura {
   id: number;
+  numero: string | null;
+  data: string | null;
   clienteId: number | null;
   cliente: Cliente | null;
   azienda: string;
@@ -48,13 +51,14 @@ interface Fattura {
   tipoIva: string;
   iva: number;
   pagato: boolean;
+  metodo: string | null;
   scadenza: string | null;
 }
 
 type TipoIva = "igic_exenta" | "igic7";
 const TIPO_IVA_OPTIONS: { value: TipoIva; label: string }[] = [
-  { value: "igic_exenta", label: "IGC Exenta" },
-  { value: "igic7", label: "IGC 7%" },
+  { value: "igic_exenta", label: "IGIC Exente" },
+  { value: "igic7", label: "IGIC 7%" },
 ];
 
 const MESI_NUMS = Array.from({ length: 12 }, (_, i) => i + 1);
@@ -83,6 +87,8 @@ export default function FatturePage() {
   >("tutti");
   const { anno, setAnno } = useAnno();
   const [azienda, setAzienda] = useState("");
+  const [pageSize, setPageSize] = useState(10);
+  const [page, setPage] = useState(1);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const load = async () => {
@@ -167,6 +173,12 @@ export default function FatturePage() {
     return true;
   });
 
+  // Reset page se i filtri restringono il dataset
+  useEffect(() => {
+    setPage(1);
+  }, [filtroMese, filtroPagato, anno, azienda, pageSize]);
+  const paged = filtered.slice((page - 1) * pageSize, page * pageSize);
+
   const totale = filtered.reduce((s, f) => s + (f?.importo ?? 0), 0);
   const pagate = filtered
     .filter((f) => f?.pagato)
@@ -199,6 +211,7 @@ export default function FatturePage() {
             onAzienda={setAzienda}
             altroLabel="Altri Ingressi"
           />
+          <PageSizeSelect pageSize={pageSize} onChange={setPageSize} />
           <button
             onClick={() =>
               exportExcel(fattureToExcel(filtered, MESI), `fatture_${anno}`)
@@ -292,6 +305,7 @@ export default function FatturePage() {
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
                 {[
+                  "Numero",
                   "Cliente",
                   "Azienda",
                   "Mese",
@@ -314,18 +328,21 @@ export default function FatturePage() {
               {filtered.length === 0 && (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={9}
                     className="text-center text-gray-400 py-12 text-sm"
                   >
                     Nessuna fattura trovata
                   </td>
                 </tr>
               )}
-              {filtered.map((f, i) => (
+              {paged.map((f, i) => (
                 <tr
                   key={f.id}
                   className={`border-b border-gray-50 hover:bg-gray-50 transition-colors ${isScaduta(f) ? "bg-red-50" : isInScadenza(f) ? "bg-amber-50" : i % 2 === 1 ? "bg-[#F0F0F0]" : ""}`}
                 >
+                  <td className="px-4 py-3 text-sm font-mono font-medium text-gray-700 whitespace-nowrap">
+                    {f.numero ?? "—"}
+                  </td>
                   <td className="px-4 py-3 text-sm font-medium text-gray-900">
                     {f.cliente?.nome ?? "—"}
                     <span className="ml-1 text-xs text-gray-400">
@@ -412,6 +429,15 @@ export default function FatturePage() {
             </tbody>
           </table>
         </div>
+      )}
+      {azienda !== "Altro" && filtered.length > 0 && (
+        <PageNav
+          total={filtered.length}
+          page={page}
+          pageSize={pageSize}
+          onPage={setPage}
+          labelSuffix="fatture"
+        />
       )}
 
       {/* Tabella Altri Ingressi — stesso formato delle fatture */}
@@ -684,7 +710,7 @@ export default function FatturePage() {
                 const imposta = (sub * pct) / 100;
                 const tot = sub + imposta;
                 const label =
-                  form.tipoIva === "igic7" ? "IGC 7%" : "IGC Exenta";
+                  form.tipoIva === "igic7" ? "IGIC 7%" : "IGIC Exente";
                 return (
                   <div className="bg-gray-50 rounded-lg p-3 space-y-1 text-sm">
                     <div className="flex justify-between text-gray-600">

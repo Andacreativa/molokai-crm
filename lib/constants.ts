@@ -85,6 +85,13 @@ export const CATEGORIE_COLORI_CHART: Record<string, string> = {
 
 export const BRAND = "#e8308a";
 
+export const TIPO_IMPOSTA_OPTIONS = [
+  "IGIC Exente",
+  "IGIC 0%",
+  "IGIC 7%",
+  "IGIC 21%",
+];
+
 // Formato europeo: punto separatore migliaia, virgola decimale, sempre 2 decimali (es. "3.250,00 €")
 // Implementazione manuale per evitare problemi con dati locali ICU ridotti su Node.
 export function fmt(n: number | null | undefined): string {

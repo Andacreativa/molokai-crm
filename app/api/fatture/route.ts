@@ -9,7 +9,7 @@ export async function GET(request: Request) {
   const fatture = await prisma.fattura.findMany({
     where: { anno, ...(azienda ? { azienda } : {}) },
     include: { cliente: true },
-    orderBy: [{ mese: "desc" }, { createdAt: "desc" }],
+    orderBy: [{ data: "desc" }, { mese: "desc" }, { createdAt: "desc" }],
   });
 
   return NextResponse.json(fatture);
@@ -26,6 +26,8 @@ export async function POST(request: Request) {
         : Number(body.iva ?? 21);
   const fattura = await prisma.fattura.create({
     data: {
+      numero: body.numero || null,
+      data: body.data ? new Date(body.data) : null,
       clienteId: body.clienteId ?? null,
       azienda: body.azienda || "Spagna",
       aziendaNota: body.aziendaNota || null,
@@ -36,6 +38,7 @@ export async function POST(request: Request) {
       tipoIva,
       iva,
       pagato: body.pagato || false,
+      metodo: body.metodo || null,
       scadenza: body.scadenza ? new Date(body.scadenza) : null,
     },
     include: { cliente: true },

@@ -39,8 +39,10 @@ export async function POST(request: Request) {
         telefono: body.telefono || null,
         email: body.email || null,
         iban: body.iban || null,
+        fotoPath: body.fotoPath || null,
         nettoBustaPaga: parseFloat(body.nettoBustaPaga) || 0,
         irpf: parseFloat(body.irpf) || 0,
+        irpfImporto: parseFloat(body.irpfImporto) || 0,
         seguridadSocial: parseFloat(body.seguridadSocial) || 0,
       },
     });

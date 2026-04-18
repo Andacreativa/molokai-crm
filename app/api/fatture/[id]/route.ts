@@ -10,6 +10,10 @@ export async function PATCH(
   const fattura = await prisma.fattura.update({
     where: { id: parseInt(id) },
     data: {
+      ...(body.numero !== undefined && { numero: body.numero || null }),
+      ...(body.data !== undefined && {
+        data: body.data ? new Date(body.data) : null,
+      }),
       ...(body.clienteId !== undefined && {
         clienteId: body.clienteId ?? null,
       }),
@@ -22,6 +26,7 @@ export async function PATCH(
       ...(body.tipoIva !== undefined && { tipoIva: body.tipoIva }),
       ...(body.iva !== undefined && { iva: Number(body.iva) }),
       ...(body.pagato !== undefined && { pagato: body.pagato }),
+      ...(body.metodo !== undefined && { metodo: body.metodo || null }),
       ...(body.scadenza !== undefined && {
         scadenza: body.scadenza ? new Date(body.scadenza) : null,
       }),

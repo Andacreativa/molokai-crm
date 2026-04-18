@@ -22,6 +22,8 @@ export async function POST(request: Request) {
       cap: body.cap || null,
       citta: body.citta || null,
       provincia: body.provincia || null,
+      iban: body.iban || null,
+      tipoImposta: body.tipoImposta || "IGIC Exente",
       note: body.note || null,
     },
   });

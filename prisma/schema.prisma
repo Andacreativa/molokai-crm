@@ -7,36 +7,41 @@ datasource db {
 }
 
 model Cliente {
-  id          Int       @id @default(autoincrement())
-  nome        String
-  paese       String    @default("Italia")
-  email       String?
-  telefono    String?
-  partitaIva  String?
-  via         String?
-  cap         String?
-  citta       String?
-  provincia   String?
-  note        String?
-  createdAt   DateTime  @default(now())
-  fatture     Fattura[]
+  id           Int       @id @default(autoincrement())
+  nome         String
+  paese        String    @default("Italia")
+  email        String?
+  telefono     String?
+  partitaIva   String?
+  via          String?
+  cap          String?
+  citta        String?
+  provincia    String?
+  iban         String?
+  tipoImposta  String?   @default("IGIC Exente")
+  note         String?
+  createdAt    DateTime  @default(now())
+  fatture      Fattura[]
 }
 
 model Fattura {
-  id          Int      @id @default(autoincrement())
+  id          Int       @id @default(autoincrement())
+  numero      String?
+  data        DateTime?
   clienteId   Int?
-  cliente     Cliente? @relation(fields: [clienteId], references: [id], onDelete: SetNull)
-  azienda     String   @default("Spagna")
+  cliente     Cliente?  @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  azienda     String    @default("Spagna")
   aziendaNota String?
   descrizione String?
   mese        Int
-  anno        Int      @default(2025)
+  anno        Int       @default(2025)
   importo     Float
-  tipoIva     String   @default("iva")
-  iva         Float    @default(21)
-  pagato      Boolean  @default(false)
+  tipoIva     String    @default("iva")
+  iva         Float     @default(21)
+  pagato      Boolean   @default(false)
+  metodo      String?
   scadenza    DateTime?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
 }
 
 model AltroIngresso {
@@ -111,8 +116,10 @@ model Dipendente {
   telefono         String?
   email            String?
   iban             String?
+  fotoPath         String?
   nettoBustaPaga   Float     @default(0)
   irpf             Float     @default(0)
+  irpfImporto      Float     @default(0)
   seguridadSocial  Float     @default(0)
   createdAt        DateTime  @default(now())
   pagamenti        PagamentoDipendente[]

@@ -23,6 +23,7 @@ import FiltriBar from "@/components/FiltriBar";
 import { useAnno } from "@/lib/anno-context";
 import { exportExcel, exportPDF, speseToExcel } from "@/lib/export";
 import SpeseFisse from "@/components/SpeseFisse";
+import { PageSizeSelect, PageNav } from "@/components/Pagination";
 
 interface Spesa {
   id: number;
@@ -72,6 +73,8 @@ export default function SpesePage() {
   const [azienda, setAzienda] = useState("");
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [pageSize, setPageSize] = useState(10);
+  const [page, setPage] = useState(1);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const load = async () => {
@@ -109,16 +112,6 @@ export default function SpesePage() {
       ricevutaPath: s.ricevutaPath || "",
     });
     setShowForm(true);
-  };
-
-  const applyFornitore = (id: string) => {
-    if (!id) {
-      setForm((f) => ({ ...f, fornitoreId: "", fornitore: "" }));
-      return;
-    }
-    const fnt = (fornitori ?? []).find((x) => x.id === parseInt(id));
-    if (fnt)
-      setForm((f) => ({ ...f, fornitoreId: fnt.id, fornitore: fnt.nome }));
   };
 
   const uploadRicevuta = async (file: File) => {
@@ -168,6 +161,12 @@ export default function SpesePage() {
     return true;
   });
 
+  // Reset page se i filtri restringono il dataset
+  useEffect(() => {
+    setPage(1);
+  }, [filtroMese, filtroCategoria, anno, azienda, pageSize]);
+  const paged = filtered.slice((page - 1) * pageSize, page * pageSize);
+
   const totale = filtered.reduce((s, e) => s + (e?.importo ?? 0), 0);
   const perCategoria: Record<string, number> = {};
   (spese ?? []).forEach((s) => {
@@ -206,6 +205,7 @@ export default function SpesePage() {
             onAnno={setAnno}
             onAzienda={setAzienda}
           />
+          <PageSizeSelect pageSize={pageSize} onChange={setPageSize} />
           <button
             onClick={handleExcelExport}
             className="flex items-center gap-1.5 border border-gray-200 text-gray-600 text-sm font-medium px-3 py-2 rounded-xl hover:bg-gray-50"
@@ -294,12 +294,11 @@ export default function SpesePage() {
               <tr className="border-b border-gray-100 bg-gray-50">
                 {[
                   "Fornitore",
+                  "Descrizione",
                   "Categoria",
                   "Azienda",
                   "Mese",
                   "Importo",
-                  "Note",
-                  "Ric.",
                   "",
                 ].map((h) => (
                   <th
@@ -315,20 +314,23 @@ export default function SpesePage() {
               {filtered.length === 0 && (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={7}
                     className="text-center text-gray-400 py-12 text-sm"
                   >
                     Nessuna spesa trovata
                   </td>
                 </tr>
               )}
-              {filtered.map((s) => (
+              {paged.map((s) => (
                 <tr
                   key={s.id}
                   className="border-b border-gray-50 hover:bg-gray-50 transition-colors"
                 >
                   <td className="px-4 py-3 text-sm font-medium text-gray-900">
                     {s.fornitore}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-600 max-w-[220px] truncate">
+                    {s.descrizione || s.note || "—"}
                   </td>
                   <td className="px-4 py-3">
                     <span
@@ -370,24 +372,6 @@ export default function SpesePage() {
                   <td className="px-4 py-3 text-sm font-semibold text-gray-900 text-right">
                     {fmt(s.importo)}
                   </td>
-                  <td className="px-4 py-3 text-xs text-gray-400 max-w-[120px] truncate">
-                    {s.note || s.descrizione || "—"}
-                  </td>
-                  <td className="px-4 py-3">
-                    {s.ricevutaPath ? (
-                      <a
-                        href={s.ricevutaPath}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-xs text-pink-600 hover:underline"
-                      >
-                        <Paperclip className="w-3 h-3" />
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    ) : (
-                      <span className="text-gray-300 text-xs">—</span>
-                    )}
-                  </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2 justify-end">
                       <button
@@ -409,6 +393,15 @@ export default function SpesePage() {
             </tbody>
           </table>
         </div>
+      )}
+      {azienda !== "Altro" && filtered.length > 0 && (
+        <PageNav
+          total={filtered.length}
+          page={page}
+          pageSize={pageSize}
+          onPage={setPage}
+          labelSuffix="spese"
+        />
       )}
 
       {/* Blocco Spese Fisse */}
@@ -461,42 +454,22 @@ export default function SpesePage() {
                   })}
                 </div>
               </div>
-              <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">
-                  Da anagrafica fornitori
-                </label>
-                <select
-                  value={form.fornitoreId || ""}
-                  onChange={(e) => applyFornitore(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300 text-gray-700"
-                >
-                  <option value="">
-                    — Seleziona dall'anagrafica (opzionale) —
-                  </option>
-                  {fornitori.map((fn) => (
-                    <option key={fn.id} value={fn.id}>
-                      {fn.nome}
-                    </option>
-                  ))}
-                </select>
-              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-medium text-gray-600 block mb-1">
                     Fornitore *
                   </label>
-                  <input
-                    type="text"
+                  <FornitoreAutocomplete
                     value={form.fornitore}
-                    onChange={(e) =>
+                    fornitoreId={form.fornitoreId}
+                    fornitori={fornitori}
+                    onChange={(nome, id) =>
                       setForm((f) => ({
                         ...f,
-                        fornitore: e.target.value,
-                        fornitoreId: "",
+                        fornitore: nome,
+                        fornitoreId: id ?? "",
                       }))
                     }
-                    placeholder="Es. Google"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
                   />
                 </div>
                 <div>
@@ -643,6 +616,91 @@ export default function SpesePage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Autocomplete Fornitore ─────────────────────────────────────────────────
+// Single input: digiti liberamente; mentre scrivi vedi suggerimenti dall'anagrafica
+// fornitori. Click su uno → popola fornitore + fornitoreId. Testo libero → fornitoreId
+// resta vuoto.
+function FornitoreAutocomplete({
+  value,
+  fornitoreId,
+  fornitori,
+  onChange,
+}: {
+  value: string;
+  fornitoreId: string | number;
+  fornitori: { id: number; nome: string }[];
+  onChange: (nome: string, id: number | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onDoc = (e: MouseEvent) => {
+      if (!containerRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
+
+  const q = (value ?? "").toLowerCase().trim();
+  const matches = q
+    ? fornitori
+        .filter((f) => f.nome.toLowerCase().includes(q))
+        .slice(0, 8)
+    : fornitori.slice(0, 8);
+
+  const selected = fornitoreId
+    ? fornitori.find((f) => f.id === parseInt(String(fornitoreId)))
+    : null;
+
+  return (
+    <div ref={containerRef} className="relative">
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => {
+          onChange(e.target.value, null);
+          setOpen(true);
+        }}
+        onFocus={() => setOpen(true)}
+        placeholder="Es. Google, Stipendio Leo, ..."
+        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
+      />
+      {selected && (
+        <p className="text-[10px] text-emerald-600 mt-0.5">
+          ✓ collegato a anagrafica: {selected.nome}
+        </p>
+      )}
+      {open && matches.length > 0 && (
+        <div className="absolute top-full left-0 right-0 mt-1 max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg z-20">
+          {matches.map((f) => {
+            const isActive = selected?.id === f.id;
+            return (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => {
+                  onChange(f.nome, f.id);
+                  setOpen(false);
+                }}
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-pink-50 flex items-center justify-between ${isActive ? "bg-pink-50 text-pink-700" : "text-gray-700"}`}
+              >
+                <span>{f.nome}</span>
+                {isActive && <span className="text-[10px]">✓</span>}
+              </button>
+            );
+          })}
+          {q && !matches.some((m) => m.nome.toLowerCase() === q) && (
+            <div className="px-3 py-2 text-[11px] text-gray-400 border-t border-gray-100">
+              Premi invio per usare &quot;{value}&quot; come testo libero
+            </div>
+          )}
         </div>
       )}
     </div>

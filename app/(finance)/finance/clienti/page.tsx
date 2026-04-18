@@ -1,18 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  Plus,
-  Pencil,
-  Trash2,
-  Mail,
-  Phone,
-  MapPin,
-  FileText,
-} from "lucide-react";
-import { fmt } from "@/lib/constants";
+import { Plus, Pencil, Trash2, X, Copy, Check } from "lucide-react";
+import { fmt, TIPO_IMPOSTA_OPTIONS } from "@/lib/constants";
 import AddressFields, { formatAddress } from "@/components/AddressFields";
 import FiltriBar from "@/components/FiltriBar";
+import { PageSizeSelect, PageNav } from "@/components/Pagination";
 
 interface Fattura {
   importo: number;
@@ -29,6 +22,8 @@ interface Cliente {
   cap: string | null;
   citta: string | null;
   provincia: string | null;
+  iban: string | null;
+  tipoImposta: string | null;
   note: string | null;
   fatture: Fattura[];
 }
@@ -43,7 +38,18 @@ const emptyForm = {
   cap: "",
   citta: "",
   provincia: "",
+  iban: "",
+  tipoImposta: "IGIC Exente",
   note: "",
+};
+
+const PAESE_FLAG: Record<string, string> = {
+  Italia: "🇮🇹",
+  Spagna: "🇪🇸",
+  Francia: "🇫🇷",
+  Germania: "🇩🇪",
+  Portogallo: "🇵🇹",
+  "Regno Unito": "🇬🇧",
 };
 
 export default function ClientiPage() {
@@ -53,6 +59,9 @@ export default function ClientiPage() {
   const [form, setForm] = useState({ ...emptyForm });
   const [search, setSearch] = useState("");
   const [paeseFiltro, setPaeseFiltro] = useState("");
+  const [detail, setDetail] = useState<Cliente | null>(null);
+  const [pageSize, setPageSize] = useState(10);
+  const [page, setPage] = useState(1);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const load = async () => {
@@ -80,6 +89,8 @@ export default function ClientiPage() {
       cap: c.cap || "",
       citta: c.citta || "",
       provincia: c.provincia || "",
+      iban: c.iban || "",
+      tipoImposta: c.tipoImposta || "IGIC Exente",
       note: c.note || "",
     });
     setShowForm(true);
@@ -107,11 +118,12 @@ export default function ClientiPage() {
   const del = async (id: number) => {
     if (
       !confirm(
-        "Eliminare questo cliente? Verranno eliminate anche le sue fatture.",
+        "Eliminare questo cliente? Verranno scollegate le sue fatture (non eliminate).",
       )
     )
       return;
     await fetch(`/api/clienti/${id}`, { method: "DELETE" });
+    if (detail?.id === id) setDetail(null);
     load();
   };
 
@@ -131,13 +143,18 @@ export default function ClientiPage() {
     );
   });
 
-  const paesiFlag: Record<string, string> = {
-    Italia: "🇮🇹",
-    Spagna: "🇪🇸",
-    Francia: "🇫🇷",
-    Germania: "🇩🇪",
-    Portogallo: "🇵🇹",
-    "Regno Unito": "🇬🇧",
+  useEffect(() => {
+    setPage(1);
+  }, [search, paeseFiltro, pageSize]);
+  const paged = filtered.slice((page - 1) * pageSize, page * pageSize);
+
+  const stats = (c: Cliente) => {
+    const fatture = c.fatture ?? [];
+    const totale = fatture.reduce((s, f) => s + (f?.importo ?? 0), 0);
+    const incassato = fatture
+      .filter((f) => f?.pagato)
+      .reduce((s, f) => s + (f?.importo ?? 0), 0);
+    return { totale, incassato, daIncassare: totale - incassato };
   };
 
   return (
@@ -158,6 +175,7 @@ export default function ClientiPage() {
             onAzienda={setPaeseFiltro}
             showAnno={false}
           />
+          <PageSizeSelect pageSize={pageSize} onChange={setPageSize} />
           <button
             onClick={openNew}
             className="glass-btn-primary flex items-center gap-2 text-white text-sm font-medium px-4 py-2.5 rounded-xl"
@@ -176,127 +194,111 @@ export default function ClientiPage() {
         className="w-full max-w-sm border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
       />
 
-      {/* Cards clienti */}
-      {filtered.length === 0 ? (
-        <div className="text-center py-16 text-gray-400">
-          <p className="text-lg mb-1">Nessun cliente trovato</p>
-          <p className="text-sm">
-            Aggiungi il tuo primo cliente con il pulsante in alto
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filtered.map((c, i) => {
-            const fatture = c.fatture ?? [];
-            const totaleFatture = fatture.reduce(
-              (s: number, f) => s + (f?.importo ?? 0),
-              0,
-            );
-            const fatturePagate = fatture
-              .filter((f) => f?.pagato)
-              .reduce((s: number, f) => s + (f?.importo ?? 0), 0);
-            return (
-              <div
-                key={c.id}
-                className="glass-card rounded-2xl p-5 space-y-4"
-                style={i % 2 === 1 ? { background: "#f0f0f0" } : undefined}
-              >
-                {/* Top */}
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xl">
-                        {paesiFlag[c.paese] || "🌍"}
-                      </span>
-                      <h3 className="font-semibold text-gray-900">{c.nome}</h3>
-                    </div>
-                    <p className="text-xs text-gray-400 mt-0.5">{c.paese}</p>
-                  </div>
-                  <div className="flex gap-1">
+      {/* Tabella */}
+      <div className="glass-card rounded-2xl overflow-hidden">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-gray-100 bg-gray-50">
+              {["Paese", "Cliente", "Fatturato", "Incassato", "Da incassare", ""].map(
+                (h) => (
+                  <th
+                    key={h}
+                    className={`text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 ${["Fatturato", "Incassato", "Da incassare"].includes(h) ? "text-right" : "text-left"}`}
+                  >
+                    {h}
+                  </th>
+                ),
+              )}
+            </tr>
+          </thead>
+          <tbody className="zebra">
+            {filtered.length === 0 && (
+              <tr>
+                <td
+                  colSpan={6}
+                  className="text-center text-gray-400 py-12 text-sm"
+                >
+                  Nessun cliente trovato
+                </td>
+              </tr>
+            )}
+            {paged.map((c) => {
+              const s = stats(c);
+              return (
+                <tr
+                  key={c.id}
+                  className="border-b border-gray-50 hover:bg-gray-50 transition-colors"
+                >
+                  <td className="px-4 py-3 text-xl">
+                    {PAESE_FLAG[c.paese] || "🌍"}
+                  </td>
+                  <td className="px-4 py-3">
                     <button
-                      onClick={() => openEdit(c)}
-                      className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                      onClick={() => setDetail(c)}
+                      className="text-sm font-medium text-gray-900 hover:text-pink-600 hover:underline text-left"
                     >
-                      <Pencil className="w-4 h-4" />
+                      {c.nome}
                     </button>
-                    <button
-                      onClick={() => del(c.id)}
-                      className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Contatti */}
-                <div className="space-y-1.5">
-                  {c.email && (
-                    <div className="flex items-center gap-2 text-xs text-gray-500">
-                      <Mail className="w-3.5 h-3.5 text-gray-400" />
-                      {c.email}
-                    </div>
-                  )}
-                  {c.telefono && (
-                    <div className="flex items-center gap-2 text-xs text-gray-500">
-                      <Phone className="w-3.5 h-3.5 text-gray-400" />
-                      {c.telefono}
-                    </div>
-                  )}
-                  {(c.via || c.cap || c.citta || c.provincia) && (
-                    <div className="flex items-start gap-2 text-xs text-gray-500">
-                      <MapPin className="w-3.5 h-3.5 text-gray-400 mt-0.5 shrink-0" />
-                      <span>
-                        {formatAddress({
-                          via: c.via ?? "",
-                          cap: c.cap ?? "",
-                          citta: c.citta ?? "",
-                          provincia: c.provincia ?? "",
-                          paese: c.paese,
-                        })}
-                      </span>
-                    </div>
-                  )}
-                  {c.partitaIva && (
-                    <div className="flex items-center gap-2 text-xs text-gray-500">
-                      <FileText className="w-3.5 h-3.5 text-gray-400" />
-                      P.IVA: {c.partitaIva}
-                    </div>
-                  )}
-                </div>
-
-                {/* Fatture stats */}
-                <div className="border-t border-gray-100 pt-3 grid grid-cols-2 gap-2">
-                  <div>
-                    <p className="text-xs text-gray-400">Fatturato totale</p>
-                    <p className="text-sm font-bold text-gray-900">
-                      {fmt(totaleFatture)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-400">Incassato</p>
-                    <p className="text-sm font-bold text-emerald-600">
-                      {fmt(fatturePagate)}
-                    </p>
-                  </div>
-                  <div className="col-span-2">
                     <p className="text-xs text-gray-400">
-                      Fatture: {fatture.length}
+                      {(c.fatture ?? []).length} fatture
                     </p>
-                  </div>
-                </div>
-
-                {c.note && (
-                  <p className="text-xs text-gray-400 italic border-t border-gray-50 pt-2">
-                    {c.note}
-                  </p>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                  </td>
+                  <td className="px-4 py-3 text-sm font-semibold text-gray-900 text-right">
+                    {fmt(s.totale)}
+                  </td>
+                  <td className="px-4 py-3 text-sm font-semibold text-right" style={{ color: "#22c55e" }}>
+                    {fmt(s.incassato)}
+                  </td>
+                  <td className="px-4 py-3 text-sm font-semibold text-right" style={{ color: "#f59e0b" }}>
+                    {fmt(s.daIncassare)}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2 justify-end">
+                      <button
+                        onClick={() => openEdit(c)}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => del(c.id)}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {filtered.length > 0 && (
+        <PageNav
+          total={filtered.length}
+          page={page}
+          pageSize={pageSize}
+          onPage={setPage}
+          labelSuffix="clienti"
+        />
       )}
 
-      {/* Modal form */}
+      {/* Detail modal */}
+      {detail && (
+        <ClienteDetailModal
+          cliente={detail}
+          stats={stats(detail)}
+          onClose={() => setDetail(null)}
+          onEdit={() => {
+            const c = detail;
+            setDetail(null);
+            openEdit(c);
+          }}
+        />
+      )}
+
+      {/* Edit/Create form modal */}
       {showForm && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="glass-modal rounded-2xl w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto">
@@ -321,7 +323,7 @@ export default function ClientiPage() {
                 </div>
                 <div>
                   <label className="text-xs font-medium text-gray-600 block mb-1">
-                    Partita IVA
+                    P.IVA / NIF
                   </label>
                   <input
                     type="text"
@@ -347,7 +349,7 @@ export default function ClientiPage() {
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
                   />
                 </div>
-                <div className="col-span-2">
+                <div>
                   <label className="text-xs font-medium text-gray-600 block mb-1">
                     Telefono
                   </label>
@@ -360,6 +362,55 @@ export default function ClientiPage() {
                     placeholder="+39 02..."
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
                   />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-1">
+                    IBAN
+                  </label>
+                  <input
+                    type="text"
+                    value={form.iban}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, iban: e.target.value }))
+                    }
+                    placeholder="ES91 ..."
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 font-mono"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs font-medium text-gray-600 block mb-1">
+                    Tipo Imposta
+                  </label>
+                  <div className="flex gap-2 flex-wrap">
+                    {TIPO_IMPOSTA_OPTIONS.map((opt) => {
+                      const active = form.tipoImposta === opt;
+                      return (
+                        <button
+                          key={opt}
+                          type="button"
+                          onClick={() =>
+                            setForm((f) => ({ ...f, tipoImposta: opt }))
+                          }
+                          className="text-sm py-2 px-3 rounded-lg border font-semibold transition-all"
+                          style={
+                            active
+                              ? {
+                                  background: "#fce7f3",
+                                  color: "#be185d",
+                                  borderColor: "#f9a8d4",
+                                }
+                              : {
+                                  background: "#fff",
+                                  borderColor: "#e2e8f0",
+                                  color: "#94a3b8",
+                                }
+                          }
+                        >
+                          {opt}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
                 <div className="col-span-2">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
@@ -418,6 +469,142 @@ export default function ClientiPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Detail Modal ───────────────────────────────────────────────────────────
+function ClienteDetailModal({
+  cliente,
+  stats,
+  onClose,
+  onEdit,
+}: {
+  cliente: Cliente;
+  stats: { totale: number; incassato: number; daIncassare: number };
+  onClose: () => void;
+  onEdit: () => void;
+}) {
+  const [copied, setCopied] = useState<string | null>(null);
+  const indirizzo = formatAddress({
+    via: cliente.via ?? "",
+    cap: cliente.cap ?? "",
+    citta: cliente.citta ?? "",
+    provincia: cliente.provincia ?? "",
+    paese: cliente.paese,
+  });
+  const copy = (label: string, val: string | null | undefined) => {
+    if (!val) return;
+    navigator.clipboard.writeText(val);
+    setCopied(label);
+    setTimeout(() => setCopied(null), 1500);
+  };
+  const Field = ({ label, value }: { label: string; value: string | null | undefined }) => (
+    <div className="grid grid-cols-[140px_1fr_28px] gap-2 items-start py-2 border-b border-gray-100 last:border-0">
+      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide pt-0.5">
+        {label}
+      </span>
+      <span className="text-sm text-gray-800 break-words" style={{ textAlign: "left" }}>
+        {value || <span className="text-gray-300">—</span>}
+      </span>
+      {value ? (
+        <button
+          onClick={() => copy(label, value)}
+          className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700"
+          title={`Copia ${label}`}
+        >
+          {copied === label ? (
+            <Check className="w-3.5 h-3.5 text-emerald-600" />
+          ) : (
+            <Copy className="w-3.5 h-3.5" />
+          )}
+        </button>
+      ) : (
+        <span />
+      )}
+    </div>
+  );
+  return (
+    <div
+      className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="glass-modal rounded-2xl w-full max-w-xl p-6 space-y-4 max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+        style={{ textAlign: "left" }}
+      >
+        <div className="flex items-start justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">
+                {PAESE_FLAG[cliente.paese] || "🌍"}
+              </span>
+              <h2 className="text-lg font-bold text-gray-900">{cliente.nome}</h2>
+            </div>
+            <p className="text-xs text-gray-500 mt-0.5">{cliente.paese}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Stats fatturato */}
+        <div className="grid grid-cols-3 gap-3 bg-gray-50 rounded-xl p-3">
+          <div>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wide">
+              Fatturato
+            </p>
+            <p className="text-sm font-bold text-gray-900">{fmt(stats.totale)}</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wide">
+              Incassato
+            </p>
+            <p className="text-sm font-bold" style={{ color: "#22c55e" }}>
+              {fmt(stats.incassato)}
+            </p>
+          </div>
+          <div>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wide">
+              Da incassare
+            </p>
+            <p className="text-sm font-bold" style={{ color: "#f59e0b" }}>
+              {fmt(stats.daIncassare)}
+            </p>
+          </div>
+        </div>
+
+        {/* Campi */}
+        <div className="bg-white/60 rounded-xl px-3">
+          <Field label="Ragione sociale" value={cliente.nome} />
+          <Field label="P.IVA / NIF" value={cliente.partitaIva} />
+          <Field label="Indirizzo" value={indirizzo || ""} />
+          <Field label="Email" value={cliente.email} />
+          <Field label="Telefono" value={cliente.telefono} />
+          <Field label="IBAN" value={cliente.iban} />
+          <Field label="Tipo imposta" value={cliente.tipoImposta} />
+          {cliente.note && <Field label="Note" value={cliente.note} />}
+        </div>
+
+        <div className="flex gap-3 pt-2">
+          <button
+            onClick={onClose}
+            className="flex-1 border border-gray-200 text-gray-600 text-sm font-medium py-2.5 rounded-xl hover:bg-gray-50"
+          >
+            Chiudi
+          </button>
+          <button
+            onClick={onEdit}
+            className="glass-btn-primary flex-1 text-white text-sm font-medium py-2.5 rounded-xl"
+          >
+            Modifica
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

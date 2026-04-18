@@ -29,10 +29,16 @@ export async function PATCH(
         ...(body.telefono !== undefined && { telefono: body.telefono || null }),
         ...(body.email !== undefined && { email: body.email || null }),
         ...(body.iban !== undefined && { iban: body.iban || null }),
+        ...(body.fotoPath !== undefined && {
+          fotoPath: body.fotoPath || null,
+        }),
         ...(body.nettoBustaPaga !== undefined && {
           nettoBustaPaga: parseFloat(body.nettoBustaPaga) || 0,
         }),
         ...(body.irpf !== undefined && { irpf: parseFloat(body.irpf) || 0 }),
+        ...(body.irpfImporto !== undefined && {
+          irpfImporto: parseFloat(body.irpfImporto) || 0,
+        }),
         ...(body.seguridadSocial !== undefined && {
           seguridadSocial: parseFloat(body.seguridadSocial) || 0,
         }),

@@ -21,6 +21,10 @@ export async function PATCH(
       ...(body.provincia !== undefined && {
         provincia: body.provincia || null,
       }),
+      ...(body.iban !== undefined && { iban: body.iban || null }),
+      ...(body.tipoImposta !== undefined && {
+        tipoImposta: body.tipoImposta || "IGIC Exente",
+      }),
       ...(body.note !== undefined && { note: body.note }),
     },
   });
