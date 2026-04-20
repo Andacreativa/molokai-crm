@@ -23,7 +23,7 @@ export async function POST(request: Request) {
       citta: body.citta || null,
       provincia: body.provincia || null,
       iban: body.iban || null,
-      tipoImposta: body.tipoImposta || "IGIC Exenta",
+      tipoImposta: body.tipoImposta || "IVA 21%",
       note: body.note || null,
     },
   });

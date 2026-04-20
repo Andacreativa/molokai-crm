@@ -1,29 +1,7 @@
 import { fmt } from "./constants";
 
-// ── Types ──────────────────────────────────────────────────────────────────
-export interface VocePreventivoData {
-  servizio: string;
-  descrizione: string;
-  quantita: number;
-  prezzoUnitario: number;
-}
+// ── Excel ──────────────────────────────────────────────────────────────
 
-export interface PreventivoPDFData {
-  numero: string;
-  nomeCliente: string;
-  emailCliente?: string | null;
-  aziendaCliente?: string | null;
-  oggetto: string;
-  voci: string; // JSON string
-  iva: number;
-  subtotale: number;
-  totale: number;
-  condizioni?: string | null;
-  note?: string | null;
-  createdAt: string | Date;
-}
-
-// ── Excel ──────────────────────────────────────────────────────────────────
 export async function exportExcel(
   data: Record<string, unknown>[],
   filename: string,
@@ -35,7 +13,8 @@ export async function exportExcel(
   XLSX.writeFile(wb, `${filename}.xlsx`);
 }
 
-// ── PDF ────────────────────────────────────────────────────────────────────
+// ── PDF tabellare generico (bilancio / spese export) ──────────────────
+
 export async function exportPDF(
   title: string,
   columns: string[],
@@ -47,13 +26,12 @@ export async function exportPDF(
 
   const doc = new jsPDF({ orientation: "landscape" });
 
-  // Header
   doc.setFontSize(16);
-  doc.setTextColor(232, 48, 138);
-  doc.text("anda!", 14, 16);
+  doc.setTextColor(14, 165, 233);
+  doc.text("molokai!", 14, 16);
   doc.setFontSize(10);
   doc.setTextColor(100);
-  doc.text("Anda Agencia de Publicidad SL — Leonardo Mestre", 14, 22);
+  doc.text("Molokai Experience SL — Gestionale Interno", 14, 22);
   doc.setFontSize(13);
   doc.setTextColor(30);
   doc.text(title, 14, 30);
@@ -64,382 +42,22 @@ export async function exportPDF(
     startY: 35,
     styles: { fontSize: 9, cellPadding: 3 },
     headStyles: {
-      fillColor: [232, 48, 138],
+      fillColor: [14, 165, 233],
       textColor: 255,
       fontStyle: "bold",
     },
-    alternateRowStyles: { fillColor: [253, 242, 248] },
+    alternateRowStyles: { fillColor: [240, 247, 255] },
   });
 
   doc.save(`${filename}.pdf`);
 }
 
-// ── Fatture helpers ────────────────────────────────────────────────────────
-export function fattureToExcel(
-  fatture: {
-    cliente: { nome: string; paese: string } | null;
-    azienda: string;
-    mese: number;
-    anno: number;
-    importo: number;
-    pagato: boolean;
-  }[],
-  MESI: string[],
-) {
-  return fatture.map((f) => ({
-    Cliente: f.cliente?.nome ?? "",
-    Paese: f.cliente?.paese ?? "",
-    Azienda: f.azienda,
-    Mese: MESI[f.mese - 1],
-    Anno: f.anno,
-    Importo: f.importo,
-    Stato: f.pagato ? "Pagato" : "In Attesa",
-  }));
-}
+// ── Spese helpers (Excel) ─────────────────────────────────────────────
 
-export function fattureToPDF(
-  fatture: {
-    cliente: { nome: string; paese: string } | null;
-    azienda: string;
-    mese: number;
-    importo: number;
-    pagato: boolean;
-  }[],
-  MESI: string[],
-  title: string,
-) {
-  const cols = ["Cliente", "Paese", "Azienda", "Mese", "Importo", "Stato"];
-  const rows = fatture.map((f) => [
-    f.cliente?.nome ?? "",
-    f.cliente?.paese ?? "",
-    f.azienda,
-    MESI[f.mese - 1],
-    fmt(f.importo),
-    f.pagato ? "Pagato" : "In Attesa",
-  ]);
-  return { cols, rows, title };
-}
-
-// ── Preventivo PDF ────────────────────────────────────────────────────────
-export async function exportPreventivoPDF(p: PreventivoPDFData) {
-  const { default: jsPDF } = await import("jspdf");
-  const { default: autoTable } = await import("jspdf-autotable");
-
-  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-  const W = 210,
-    H = 297,
-    ML = 14,
-    MR = 14;
-  const CW = W - ML - MR; // 182mm
-
-  const RED: [number, number, number] = [219, 41, 27];
-  const DARK: [number, number, number] = [20, 20, 20];
-  const CARD: [number, number, number] = [38, 38, 38];
-  const WHITE: [number, number, number] = [255, 255, 255];
-  const LGRAY: [number, number, number] = [160, 160, 160];
-  const DGRAY: [number, number, number] = [60, 60, 60];
-
-  // ── PAGE 1: COVER ──────────────────────────────────────────────────────
-
-  // Dark background
-  doc.setFillColor(...DARK);
-  doc.rect(0, 0, W, H, "F");
-
-  // Company name
-  doc.setFontSize(24);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...WHITE);
-  doc.text("ANDA AGENCIA DE PUBLICIDAD SL", ML, 48);
-
-  // Tagline
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(...LGRAY);
-  doc.text("Marketing Digital & Comunicación Internacional", ML, 57);
-
-  // Divider line in red
-  doc.setDrawColor(...RED);
-  doc.setLineWidth(0.6);
-  doc.line(ML, 63, W - MR, 63);
-
-  // "PROPOSTA COMMERCIALE"
-  doc.setFontSize(22);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...WHITE);
-  doc.text("PROPOSTA COMMERCIALE", ML, 83);
-
-  // oggetto
-  doc.setFontSize(13);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(...LGRAY);
-  const oggettoLines = doc.splitTextToSize(p.oggetto, CW);
-  doc.text(oggettoLines, ML, 94);
-
-  // Info box
-  const boxY = 116;
-  const boxH = 76;
-  doc.setFillColor(...CARD);
-  doc.roundedRect(ML, boxY, CW, boxH, 3, 3, "F");
-
-  const c1 = ML + 10;
-  const c2 = ML + CW / 2 + 5;
-
-  // — Preparato da —
-  doc.setFontSize(7);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...RED);
-  doc.text("PREPARATO DA", c1, boxY + 12);
-
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(...WHITE);
-  doc.text("Anda Agencia de Publicidad SL", c1, boxY + 19);
-
-  doc.setFontSize(8.5);
-  doc.setTextColor(...LGRAY);
-  doc.text("info@socialsuitevideo.com", c1, boxY + 25.5);
-
-  // — Destinatario —
-  doc.setFontSize(7);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...RED);
-  doc.text("DESTINATARIO", c2, boxY + 12);
-
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(...WHITE);
-  doc.text(p.nomeCliente, c2, boxY + 19);
-
-  let destY = boxY + 25.5;
-  if (p.aziendaCliente) {
-    doc.setFontSize(8.5);
-    doc.setTextColor(...LGRAY);
-    doc.text(p.aziendaCliente, c2, destY);
-    destY += 6;
-  }
-  if (p.emailCliente) {
-    doc.setFontSize(8.5);
-    doc.setTextColor(...LGRAY);
-    doc.text(p.emailCliente, c2, destY);
-  }
-
-  // — Data emissione —
-  doc.setFontSize(7);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...RED);
-  doc.text("DATA EMISSIONE", c1, boxY + 44);
-
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(...WHITE);
-  const dateStr = new Date(p.createdAt).toLocaleDateString("it-IT", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  });
-  doc.text(dateStr, c1, boxY + 51);
-
-  // — N. Preventivo —
-  doc.setFontSize(7);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...RED);
-  doc.text("N. PREVENTIVO", c2, boxY + 44);
-
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(...WHITE);
-  doc.text(p.numero, c2, boxY + 51);
-
-  // — Validità —
-  doc.setFontSize(7);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...RED);
-  doc.text("VALIDITÀ OFFERTA", c1, boxY + 63);
-
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(...WHITE);
-  doc.text("30 giorni dalla data di emissione", c1, boxY + 70);
-
-  // Footer note
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "italic");
-  doc.setTextColor(100, 100, 100);
-  doc.text(
-    "Il presente preventivo ha validità 30 giorni dalla data di emissione.",
-    ML,
-    278,
-  );
-
-  // Bottom red bar
-  doc.setFillColor(...RED);
-  doc.rect(0, H - 7, W, 7, "F");
-
-  // ── PAGE 2: DETAILS + PRICING ──────────────────────────────────────────
-  doc.addPage();
-
-  // Header bar
-  doc.setFillColor(...DARK);
-  doc.rect(0, 0, W, 14, "F");
-
-  doc.setFontSize(7);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(200, 200, 200);
-  const hTitle =
-    p.oggetto.length > 55 ? p.oggetto.substring(0, 52) + "..." : p.oggetto;
-  doc.text(`ANDA AGENCIA DE PUBLICIDAD SL  |  ${hTitle}`, ML, 9);
-  doc.text("Pag. 2", W - MR, 9, { align: "right" });
-
-  let y = 26;
-
-  // Section: PERIMETRO DEI SERVIZI
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...RED);
-  doc.text("PERIMETRO DEI SERVIZI", ML, y);
-  y += 5;
-
-  let voci: VocePreventivoData[] = [];
-  try {
-    voci = JSON.parse(p.voci);
-  } catch {
-    voci = [];
-  }
-
-  autoTable(doc, {
-    head: [["#", "Servizio", "Descrizione sintetica"]],
-    body: voci.map((v, i) => [String(i + 1), v.servizio, v.descrizione || "—"]),
-    startY: y,
-    styles: { fontSize: 9, cellPadding: 3.5, textColor: [40, 40, 40] },
-    headStyles: { fillColor: DARK, textColor: WHITE, fontStyle: "bold" },
-    alternateRowStyles: { fillColor: [248, 248, 248] },
-    columnStyles: {
-      0: { cellWidth: 10, halign: "center" },
-      1: { cellWidth: 58 },
-      2: { cellWidth: "auto" },
-    },
-    margin: { left: ML, right: MR },
-  });
-
-  y =
-    (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable
-      .finalY + 12;
-
-  // Section: PIANO TARIFFARIO
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...RED);
-  doc.text("PIANO TARIFFARIO", ML, y);
-  y += 5;
-
-  const ivaAmt = (p.subtotale * p.iva) / 100;
-
-  autoTable(doc, {
-    head: [["Servizio", "Q.tà", "Prezzo Unitario", "Totale"]],
-    body: voci.map((v) => [
-      v.servizio,
-      String(v.quantita),
-      fmt(v.prezzoUnitario),
-      fmt(v.quantita * v.prezzoUnitario),
-    ]),
-    foot: [
-      ["", "", "Subtotale", fmt(p.subtotale)],
-      ["", "", `IVA (${p.iva}%)`, fmt(ivaAmt)],
-      ["", "", "TOTALE", fmt(p.totale)],
-    ],
-    startY: y,
-    styles: { fontSize: 9, cellPadding: 3.5, textColor: [40, 40, 40] },
-    headStyles: { fillColor: DARK, textColor: WHITE, fontStyle: "bold" },
-    alternateRowStyles: { fillColor: [248, 248, 248] },
-    footStyles: { fillColor: DARK, textColor: WHITE, fontStyle: "bold" },
-    columnStyles: {
-      0: { cellWidth: "auto" },
-      1: { cellWidth: 18, halign: "center" },
-      2: { cellWidth: 38, halign: "right" },
-      3: { cellWidth: 38, halign: "right" },
-    },
-    margin: { left: ML, right: MR },
-  });
-
-  y =
-    (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable
-      .finalY + 12;
-
-  // Section: CONDIZIONI COMMERCIALI
-  const condText = p.condizioni || p.note;
-  if (condText && y < 250) {
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(...RED);
-    doc.text("CONDIZIONI COMMERCIALI", ML, y);
-    y += 6;
-
-    doc.setFontSize(8.5);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(...DGRAY);
-    const lines = doc.splitTextToSize(condText, CW);
-    doc.text(lines, ML, y);
-    y += lines.length * 4.5 + 10;
-  }
-
-  // Section: FIRMA E ACCETTAZIONE
-  if (y < 258) {
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(...RED);
-    doc.text("FIRMA E ACCETTAZIONE", ML, y);
-    y += 6;
-
-    doc.setFontSize(8.5);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(...DGRAY);
-    doc.text(
-      "Per accettazione della presente proposta, si prega di restituire il documento firmato.",
-      ML,
-      y,
-    );
-    y += 14;
-
-    doc.setDrawColor(190, 190, 190);
-    doc.setLineWidth(0.3);
-    doc.line(ML, y, ML + 76, y);
-    doc.line(W - MR - 76, y, W - MR, y);
-
-    y += 5;
-    doc.setFontSize(7.5);
-    doc.setTextColor(100, 100, 100);
-    doc.text("Per Anda Agencia de Publicidad SL", ML, y);
-    doc.text("Firma e timbro", ML, y + 4.5);
-    const sigName = p.aziendaCliente
-      ? `Per ${p.aziendaCliente}`
-      : `Per ${p.nomeCliente}`;
-    doc.text(sigName, W - MR - 76, y);
-    doc.text("Firma e timbro", W - MR - 76, y + 4.5);
-  }
-
-  // Bottom red bar + footer text
-  doc.setFillColor(...RED);
-  doc.rect(0, H - 7, W, 7, "F");
-
-  doc.setFontSize(7);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(120, 120, 120);
-  doc.text(
-    "ANDA AGENCIA DE PUBLICIDAD SL  |  info@socialsuitevideo.com  |  Pag. 2",
-    W / 2,
-    H - 10,
-    { align: "center" },
-  );
-
-  doc.save(`preventivo_${p.numero}.pdf`);
-}
-
-// ── Spese helpers ──────────────────────────────────────────────────────────
 export function speseToExcel(
   spese: {
     fornitore: string;
     categoria: string;
-    azienda: string;
     mese: number;
     anno: number;
     importo: number;
@@ -451,11 +69,281 @@ export function speseToExcel(
   return spese.map((s) => ({
     Fornitore: s.fornitore,
     Categoria: s.categoria,
-    Azienda: s.azienda,
     Mese: MESI[s.mese - 1],
     Anno: s.anno,
     Importo: s.importo,
     Descrizione: s.descrizione || "",
     Note: s.note || "",
   }));
+}
+
+// ── Fattura PDF (layout Molokai) ──────────────────────────────────────
+
+interface RigaPDF {
+  descrizione: string;
+  quantita: number;
+  prezzoUnitario: number;
+}
+
+interface FatturaPDFData {
+  numero: string | null;
+  data: string | null;
+  scadenza: string | null;
+  righe: string; // JSON
+  baseImponibile: number;
+  iva: number;
+  totale: number;
+  metodoPagamento: string | null;
+  note: string | null;
+}
+
+interface ClientePDFData {
+  nome: string;
+  cognome: string | null;
+  partitaIva: string | null;
+  dni: string | null;
+  via: string | null;
+  cap: string | null;
+  citta: string | null;
+  provincia: string | null;
+  paese: string | null;
+  email: string | null;
+}
+
+const AZIENDA_PDF = {
+  nome: "MOLOKAI EXPERIENCE SL",
+  cif: "B24878712",
+  via: "Carrer De Meer, 39",
+  cap: "08003",
+  citta: "Barcelona",
+  iban: "ES64 0182 0205 9902 0209 0802",
+  swift: "BBVAESMMXXX",
+  email: "aloha@molokaisupcenter.com",
+  tel: "+34 654082099",
+};
+
+const SKY: [number, number, number] = [14, 165, 233];
+const DARK: [number, number, number] = [30, 41, 59];
+const MUTED: [number, number, number] = [100, 116, 139];
+const LIGHT: [number, number, number] = [148, 163, 184];
+const BG_SOFT: [number, number, number] = [241, 245, 249];
+
+function formatDate(d: string | null): string {
+  if (!d) return "—";
+  return new Date(d).toLocaleDateString("es-ES");
+}
+
+export async function exportFatturaPDF(
+  f: FatturaPDFData,
+  c: ClientePDFData | null,
+) {
+  const { default: jsPDF } = await import("jspdf");
+  const { default: autoTable } = await import("jspdf-autotable");
+
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const W = 210,
+    ML = 14,
+    MR = 14;
+  const CW = W - ML - MR;
+
+  // Header: "molokai!" branded logo (left) + company info (right)
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(28);
+  doc.setTextColor(...SKY);
+  doc.text("molokai!", ML, 22);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(...DARK);
+  doc.text(AZIENDA_PDF.nome, W - MR, 14, { align: "right" });
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+  doc.setTextColor(...MUTED);
+  doc.text(`CIF: ${AZIENDA_PDF.cif}`, W - MR, 19, { align: "right" });
+  doc.text(AZIENDA_PDF.via, W - MR, 23.5, { align: "right" });
+  doc.text(`${AZIENDA_PDF.cap}, ${AZIENDA_PDF.citta}`, W - MR, 28, {
+    align: "right",
+  });
+  doc.text(AZIENDA_PDF.email, W - MR, 32.5, { align: "right" });
+
+  // Separator
+  doc.setDrawColor(...LIGHT);
+  doc.setLineWidth(0.3);
+  doc.line(ML, 38, W - MR, 38);
+
+  // Two boxes: CLIENTE (left) and FACTURA (right)
+  const boxY = 44;
+  const boxH = 32;
+  const col1X = ML;
+  const col2X = ML + CW / 2 + 4;
+  const colW = CW / 2 - 4;
+
+  // CLIENTE box
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(...SKY);
+  doc.text("CLIENTE", col1X, boxY);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(...DARK);
+  const nomeCliente = c
+    ? `${c.nome}${c.cognome ? " " + c.cognome : ""}`
+    : "—";
+  doc.text(nomeCliente, col1X, boxY + 5);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...MUTED);
+
+  let yC = boxY + 11;
+  const idFiscale = c?.partitaIva || c?.dni;
+  if (idFiscale) {
+    doc.text(`CIF/NIF: ${idFiscale}`, col1X, yC);
+    yC += 4;
+  }
+  if (c?.via) {
+    doc.text(c.via, col1X, yC);
+    yC += 4;
+  }
+  const localita = [c?.cap, c?.citta, c?.provincia].filter(Boolean).join(" ");
+  if (localita) {
+    doc.text(localita, col1X, yC);
+    yC += 4;
+  }
+  if (c?.paese) {
+    doc.text(c.paese, col1X, yC);
+  }
+
+  // FACTURA box
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(...SKY);
+  doc.text("FACTURA", col2X, boxY);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.setTextColor(...DARK);
+  doc.text(f.numero ?? "—", col2X, boxY + 7);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...MUTED);
+  doc.text(`Fecha: ${formatDate(f.data)}`, col2X, boxY + 14);
+  doc.text(`Vencimiento: ${formatDate(f.scadenza)}`, col2X, boxY + 19);
+
+  // Righe table
+  let righeArr: RigaPDF[] = [];
+  try {
+    const parsed = JSON.parse(f.righe || "[]");
+    if (Array.isArray(parsed)) righeArr = parsed;
+  } catch {
+    righeArr = [];
+  }
+
+  const tableStartY = boxY + boxH + 4;
+  autoTable(doc, {
+    startY: tableStartY,
+    head: [["CONCEPTO", "CANT.", "PRECIO UNI.", "IVA", "TOTAL"]],
+    body: righeArr.map((r) => [
+      r.descrizione,
+      String(r.quantita),
+      fmt(r.prezzoUnitario),
+      `${f.iva}%`,
+      fmt((Number(r.quantita) || 0) * (Number(r.prezzoUnitario) || 0)),
+    ]),
+    margin: { left: ML, right: MR },
+    styles: {
+      fontSize: 9,
+      cellPadding: 3,
+      lineColor: [226, 232, 240],
+      lineWidth: 0.1,
+    },
+    headStyles: {
+      fillColor: SKY,
+      textColor: 255,
+      fontStyle: "bold",
+      fontSize: 9,
+    },
+    alternateRowStyles: { fillColor: BG_SOFT },
+    columnStyles: {
+      0: { cellWidth: "auto" },
+      1: { halign: "right", cellWidth: 18 },
+      2: { halign: "right", cellWidth: 30 },
+      3: { halign: "right", cellWidth: 16 },
+      4: { halign: "right", cellWidth: 30 },
+    },
+  });
+
+  // Totals box (aligned right under the table)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const lastY = (doc as any).lastAutoTable?.finalY ?? tableStartY;
+  const totY = lastY + 6;
+  const totBoxX = W - MR - 80;
+  const totBoxW = 80;
+  const totBoxH = 26;
+  const ivaImporto = Math.round(f.baseImponibile * (f.iva / 100) * 100) / 100;
+
+  doc.setFillColor(...BG_SOFT);
+  doc.rect(totBoxX, totY, totBoxW, totBoxH, "F");
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...MUTED);
+  doc.text("Base Imponible", totBoxX + 3, totY + 6);
+  doc.text(`IVA ${f.iva}%`, totBoxX + 3, totY + 12);
+
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...DARK);
+  doc.text(fmt(f.baseImponibile), totBoxX + totBoxW - 3, totY + 6, {
+    align: "right",
+  });
+  doc.text(fmt(ivaImporto), totBoxX + totBoxW - 3, totY + 12, {
+    align: "right",
+  });
+
+  doc.setDrawColor(...LIGHT);
+  doc.setLineWidth(0.2);
+  doc.line(totBoxX + 3, totY + 15, totBoxX + totBoxW - 3, totY + 15);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.setTextColor(...SKY);
+  doc.text("TOTAL", totBoxX + 3, totY + 22);
+  doc.setTextColor(...DARK);
+  doc.text(fmt(f.totale), totBoxX + totBoxW - 3, totY + 22, {
+    align: "right",
+  });
+
+  // Métodos de pago footer
+  const fooY = totY + totBoxH + 10;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(...SKY);
+  doc.text("MÉTODOS DE PAGO", ML, fooY);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...DARK);
+  doc.text(`Transferencia: ${AZIENDA_PDF.iban}`, ML, fooY + 5);
+  doc.setTextColor(...MUTED);
+  doc.text(`SWIFT: ${AZIENDA_PDF.swift}`, ML, fooY + 10);
+  doc.text("Tarjeta de crédito · Bizum · Efectivo", ML, fooY + 15);
+
+  // Notes if present
+  if (f.note) {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(...SKY);
+    doc.text("NOTAS", ML, fooY + 25);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(...MUTED);
+    const split = doc.splitTextToSize(f.note, CW);
+    doc.text(split, ML, fooY + 30);
+  }
+
+  const safeNum = (f.numero ?? "fattura").replace(/[/\\]/g, "-");
+  doc.save(`${safeNum}.pdf`);
 }

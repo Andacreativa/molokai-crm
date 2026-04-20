@@ -23,7 +23,7 @@ export async function PATCH(
       }),
       ...(body.iban !== undefined && { iban: body.iban || null }),
       ...(body.tipoImposta !== undefined && {
-        tipoImposta: body.tipoImposta || "IGIC Exenta",
+        tipoImposta: body.tipoImposta || "IVA 21%",
       }),
       ...(body.note !== undefined && { note: body.note }),
     },

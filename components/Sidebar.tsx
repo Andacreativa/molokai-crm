@@ -124,9 +124,6 @@ export default function Sidebar() {
             <p className="text-xs font-medium" style={{ color: BRAND }}>
               Gestionale Interno
             </p>
-            <p className="text-xs" style={{ color: "#888888" }}>
-              Maurizio Bogliolo
-            </p>
           </div>
         </div>
 

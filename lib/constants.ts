@@ -14,29 +14,14 @@ export const MESI = [
 ];
 
 export const CATEGORIE_SPESA = [
-  "Stipendio",
-  "Seguridad Social",
-  "Tasse",
-  "Carta Aziendale",
-  "Costi Aziendali",
-  "Software",
-  "Commercialista",
-  "Fornitori",
-  "Soci",
-  "Costi Bancari",
+  "Scuola",
+  "Rappresentanza",
+  "Materiale Sportivo",
+  "Affitto",
+  "Utenze",
+  "Marketing",
   "Altro",
 ];
-
-export const AZIENDE = ["Spagna", "Italia", "Altro"];
-
-export const AZIENDA_COLORI: Record<
-  string,
-  { bg: string; text: string; border: string }
-> = {
-  Spagna: { bg: "#ef4444", text: "#ffffff", border: "#ef4444" },
-  Italia: { bg: "#22c55e", text: "#ffffff", border: "#22c55e" },
-  Altro: { bg: "#f8f9fc", text: "#64748b", border: "#e2e8f0" },
-};
 
 export const PAESI = [
   "Italia",
@@ -51,16 +36,12 @@ export const PAESI = [
 // Palette pastello per i badge categoria. Colori morbidi da usare come sfondo
 // solido con testo scuro (vedi CATEGORIA_TEXT).
 export const CATEGORIE_COLORI: Record<string, string> = {
-  Stipendio: "#BDE3F5", // azzurro chiaro
-  "Seguridad Social": "#FFAAAA", // rosso pastello
-  "Carta Aziendale": "#B8F0C8", // verde menta
-  Software: "#D4BBEE", // viola chiaro
-  Soci: "#FFF0A0", // giallo pastello
-  Commercialista: "#FFD6D6", // rosa chiaro
-  "Costi Bancari": "#E0E0E0", // grigio chiaro
-  Fornitori: "#D4E8A0", // verde oliva chiaro
-  Tasse: "#FFC9A0", // pesca pastello (non specificato, coerente)
-  "Costi Aziendali": "#C8E6F0", // azzurro tenue (non specificato)
+  Scuola: "#BDE3F5", // azzurro chiaro (ocean school)
+  Rappresentanza: "#D4BBEE", // viola chiaro
+  "Materiale Sportivo": "#B8F0C8", // verde menta (sport)
+  Affitto: "#E0E0E0", // grigio chiaro
+  Utenze: "#FFF0A0", // giallo pastello (energia)
+  Marketing: "#FFD6D6", // rosa chiaro
   Altro: "#EDEDED", // grigio neutro
 };
 
@@ -70,27 +51,57 @@ export const CATEGORIA_TEXT = "#1f2937";
 // Versioni sature delle categorie per grafici (pie/bar). I pastel di
 // CATEGORIE_COLORI sono pensati per badge — troppo chiari su fette grandi.
 export const CATEGORIE_COLORI_CHART: Record<string, string> = {
-  Stipendio: "#5BB8E8",
-  "Seguridad Social": "#FF6B6B",
-  "Carta Aziendale": "#4DD68C",
-  Software: "#9B6ED4",
-  Soci: "#F5D020",
-  Commercialista: "#FF9999",
-  "Costi Bancari": "#AAAAAA",
-  Fornitori: "#8DB84A",
-  Tasse: "#FF9940",
-  "Costi Aziendali": "#5BA9D8",
+  Scuola: "#5BB8E8",
+  Rappresentanza: "#9B6ED4",
+  "Materiale Sportivo": "#4DD68C",
+  Affitto: "#AAAAAA",
+  Utenze: "#F5D020",
+  Marketing: "#FF6B6B",
   Altro: "#B0B0B0",
 };
 
-export const BRAND = "#e8308a";
+export const BRAND = "#0ea5e9";
 
-export const TIPO_IMPOSTA_OPTIONS = [
-  "IGIC Exenta",
-  "IGIC 0%",
-  "IGIC 7%",
-  "IGIC 21%",
+export const TIPO_IMPOSTA_OPTIONS = ["IVA Exenta", "IVA 21%"];
+
+// ─── Costanti dominio Molokai ──────────────────────────────────────────
+
+export const TIPO_BUONO = ["BONO CLASE", "PACK 4 SUP", "PACK 8 SUP", "CUSTOM"];
+
+export const RUOLI_COLLABORATORE = [
+  "Istruttore Surf",
+  "Istruttore SUP",
+  "Insegnante Yoga",
+  "Fotografo",
+  "Receptionist",
+  "Altro",
 ];
+
+export const CATEGORIE_PRODOTTO = [
+  "Esperienza",
+  "Lezione",
+  "Noleggio",
+  "Pack",
+  "Abbonamento",
+];
+
+export const CANALI_VENDITA = [
+  "FareHarbor",
+  "Get Your Guide",
+  "Stripe",
+  "Cassa",
+  "Diretto",
+];
+
+export const AZIENDA = {
+  nome: "MOLOKAI EXPERIENCE SL",
+  cif: "B24878712",
+  via: "Carrer De Meer, 39",
+  cap: "08003",
+  citta: "Barcelona",
+  iban: "ES64 0182 0205 9902 0209 0802",
+  swift: "BBVAESMMXXX",
+};
 
 // Formato europeo: punto separatore migliaia, virgola decimale, sempre 2 decimali (es. "3.250,00 €")
 // Implementazione manuale per evitare problemi con dati locali ICU ridotti su Node.

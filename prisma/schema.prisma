@@ -24,6 +24,7 @@ model Cliente {
   iban        String?
   note        String?
   tipo        String    @default("privato") // privato | azienda
+  tipoImposta String    @default("IVA 21%") // IVA 21% | IVA Exenta
   createdAt   DateTime  @default(now())
   fatture     Fattura[]
 }

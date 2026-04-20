@@ -9,8 +9,8 @@ const roboto = Roboto({
 });
 
 export const metadata: Metadata = {
-  title: "Anda Dashboard",
-  description: "Dashboard — Leonardo Mestre",
+  title: "CRM Molokai",
+  description: "Gestionale Interno — Molokai Experience SL",
 };
 
 export default function RootLayout({

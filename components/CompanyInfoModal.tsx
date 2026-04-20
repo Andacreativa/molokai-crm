@@ -9,18 +9,13 @@ interface Field {
 }
 
 const FIELDS: Field[] = [
-  { label: "Ragione sociale", value: "ANDA AGENCIA DE PUBLICIDAD SL" },
-  {
-    label: "Indirizzo",
-    value: "Avenida Quinto Centenario, 23 - Piso 2 Int 21",
-  },
-  {
-    label: "Località",
-    value: "38683, Puerto de Santiago (Santa Cruz de Tenerife)",
-  },
-  { label: "NIF", value: "B16451536" },
-  { label: "Email", value: "info@andacreativa.com" },
-  { label: "IBAN BBVA", value: "ES9301820205970202087468" },
+  { label: "Ragione sociale", value: "MOLOKAI EXPERIENCE SL" },
+  { label: "Indirizzo", value: "Carrer De Meer, 39" },
+  { label: "Località", value: "08003, Barcelona (Barcelona)" },
+  { label: "NIF", value: "B24878712" },
+  { label: "Telefono", value: "+34 654082099" },
+  { label: "Email", value: "aloha@molokaisupcenter.com" },
+  { label: "IBAN BBVA", value: "ES64 0182 0205 9902 0209 0802" },
 ];
 
 export default function CompanyInfoModal({

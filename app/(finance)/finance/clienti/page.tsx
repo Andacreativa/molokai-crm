@@ -39,7 +39,7 @@ const emptyForm = {
   citta: "",
   provincia: "",
   iban: "",
-  tipoImposta: "IGIC Exenta",
+  tipoImposta: "IVA 21%",
   note: "",
 };
 
@@ -89,7 +89,7 @@ export default function ClientiPage() {
       citta: c.citta || "",
       provincia: c.provincia || "",
       iban: c.iban || "",
-      tipoImposta: c.tipoImposta || "IGIC Exenta",
+      tipoImposta: c.tipoImposta || "IVA 21%",
       note: c.note || "",
     });
     setShowForm(true);

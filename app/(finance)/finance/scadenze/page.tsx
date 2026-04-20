@@ -167,11 +167,11 @@ export default function ScadenzePage() {
     const doc = new jsPDF();
 
     doc.setFontSize(16);
-    doc.setTextColor(232, 48, 138);
-    doc.text("anda!", 14, 16);
+    doc.setTextColor(14, 165, 233);
+    doc.text("molokai!", 14, 16);
     doc.setFontSize(10);
     doc.setTextColor(100);
-    doc.text("Anda Agencia de Publicidad SL — Leonardo Mestre", 14, 22);
+    doc.text("Molokai Experience SL — CFO Leonardo Mestre", 14, 22);
     doc.setFontSize(13);
     doc.setTextColor(30);
     doc.text(`Scadenze — ${new Date().toLocaleDateString("it-IT")}`, 14, 30);

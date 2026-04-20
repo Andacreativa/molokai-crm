@@ -1,10 +1,28 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import {
-  applyFinnSplit,
-  deleteFinnSplitForFattura,
-  isFinnCommerciale,
-} from "@/lib/finn-split";
+
+interface RigaInput {
+  descrizione: string;
+  quantita: number;
+  prezzoUnitario: number;
+}
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+export async function GET(
+  _: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
+  const fattura = await prisma.fattura.findUnique({
+    where: { id: parseInt(id) },
+    include: { cliente: true },
+  });
+  if (!fattura) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+  return NextResponse.json(fattura);
+}
 
 export async function PATCH(
   request: Request,
@@ -19,52 +37,52 @@ export async function PATCH(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const fattura = await prisma.fattura.update({
-    where: { id: fatturaId },
-    data: {
-      ...(body.numero !== undefined && { numero: body.numero || null }),
-      ...(body.data !== undefined && {
-        data: body.data ? new Date(body.data) : null,
-      }),
-      ...(body.clienteId !== undefined && {
-        clienteId: body.clienteId ?? null,
-      }),
-      ...(body.azienda !== undefined && { azienda: body.azienda }),
-      ...(body.aziendaNota !== undefined && { aziendaNota: body.aziendaNota }),
-      ...(body.mese !== undefined && { mese: body.mese }),
-      ...(body.anno !== undefined && { anno: body.anno }),
-      ...(body.importo !== undefined && { importo: parseFloat(body.importo) }),
-      ...(body.tipoIva !== undefined && { tipoIva: body.tipoIva }),
-      ...(body.iva !== undefined && { iva: Number(body.iva) }),
-      ...(body.pagato !== undefined && { pagato: body.pagato }),
-      ...(body.metodo !== undefined && { metodo: body.metodo || null }),
-      ...(body.commerciale !== undefined && {
-        commerciale: body.commerciale || null,
-      }),
-      ...(body.scadenza !== undefined && {
-        scadenza: body.scadenza ? new Date(body.scadenza) : null,
-      }),
-    },
-    include: { cliente: true },
-  });
+  const data: Record<string, unknown> = {};
 
-  const wasFinnPaid = isFinnCommerciale(before.commerciale) && before.pagato;
-  const isFinnPaid = isFinnCommerciale(fattura.commerciale) && fattura.pagato;
-  const dataChanged =
-    before.importo !== fattura.importo ||
-    before.mese !== fattura.mese ||
-    before.anno !== fattura.anno ||
-    before.clienteId !== fattura.clienteId;
+  if (body.numero !== undefined) data.numero = body.numero || null;
+  if (body.data !== undefined)
+    data.data = body.data ? new Date(body.data) : null;
+  if (body.scadenza !== undefined)
+    data.scadenza = body.scadenza ? new Date(body.scadenza) : null;
+  if (body.clienteId !== undefined)
+    data.clienteId = body.clienteId ? parseInt(body.clienteId) : null;
+  if (body.pagato !== undefined) data.pagato = Boolean(body.pagato);
+  if (body.metodoPagamento !== undefined)
+    data.metodoPagamento = body.metodoPagamento || null;
+  if (body.mese !== undefined) data.mese = parseInt(body.mese);
+  if (body.anno !== undefined) data.anno = parseInt(body.anno);
+  if (body.note !== undefined) data.note = body.note || null;
 
-  if (wasFinnPaid && !isFinnPaid) {
-    await deleteFinnSplitForFattura(prisma, fatturaId);
-  } else if (!wasFinnPaid && isFinnPaid) {
-    await applyFinnSplit(prisma, fattura);
-  } else if (wasFinnPaid && isFinnPaid && dataChanged) {
-    await deleteFinnSplitForFattura(prisma, fatturaId);
-    await applyFinnSplit(prisma, fattura);
+  // Se cambiano righe o iva, ricalcolo baseImponibile e totale
+  const righeChanged = body.righe !== undefined;
+  const ivaChanged = body.iva !== undefined;
+  if (righeChanged || ivaChanged) {
+    const righe: RigaInput[] = righeChanged
+      ? Array.isArray(body.righe)
+        ? body.righe
+        : []
+      : JSON.parse(before.righe || "[]");
+    const iva = ivaChanged ? Number(body.iva) : before.iva;
+    const baseImponibile = round2(
+      righe.reduce(
+        (s, r) =>
+          s + (Number(r.quantita) || 0) * (Number(r.prezzoUnitario) || 0),
+        0,
+      ),
+    );
+    const totale = round2(baseImponibile * (1 + iva / 100));
+
+    if (righeChanged) data.righe = JSON.stringify(righe);
+    data.iva = iva;
+    data.baseImponibile = baseImponibile;
+    data.totale = totale;
   }
 
+  const fattura = await prisma.fattura.update({
+    where: { id: fatturaId },
+    data,
+    include: { cliente: true },
+  });
   return NextResponse.json(fattura);
 }
 
