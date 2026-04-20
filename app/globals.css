@@ -49,25 +49,25 @@
 }
 
 :root {
-  --background: #eef0f7;
+  --background: #f0f7ff;
   --foreground: #1a1d2e;
   --card: #ffffff;
   --card-foreground: #1a1d2e;
   --popover: #ffffff;
   --popover-foreground: #1a1d2e;
-  --primary: #e8308a;
+  --primary: #0ea5e9;
   --primary-foreground: #ffffff;
   --secondary: #f1f5f9;
   --secondary-foreground: #1a1d2e;
   --muted: #f1f5f9;
   --muted-foreground: #64748b;
-  --accent: #fce7f3;
-  --accent-foreground: #e8308a;
+  --accent: #e0f2fe;
+  --accent-foreground: #0ea5e9;
   --destructive: #ef4444;
   --border: #e2e8f0;
   --input: #e2e8f0;
-  --ring: #e8308a;
-  --chart-1: #e8308a;
+  --ring: #0ea5e9;
+  --chart-1: #0ea5e9;
   --chart-2: #10b981;
   --chart-3: #f59e0b;
   --chart-4: #ef4444;
@@ -75,11 +75,11 @@
   --radius: 0.75rem;
   --sidebar: #000000;
   --sidebar-foreground: #ffffff;
-  --sidebar-primary: #e8308a;
+  --sidebar-primary: #0ea5e9;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #1a1a1a;
   --sidebar-border: #222222;
-  --sidebar-ring: #e8308a;
+  --sidebar-ring: #0ea5e9;
   --font-roboto: "Roboto", sans-serif;
 }
 
@@ -126,7 +126,7 @@
     background-image:
       radial-gradient(
         ellipse at 20% 20%,
-        rgba(232, 48, 138, 0.07) 0%,
+        rgba(14, 165, 233, 0.07) 0%,
         transparent 55%
       ),
       radial-gradient(
@@ -203,33 +203,33 @@ tbody.zebra > tr:nth-child(even) {
 .glass-btn-primary {
   background: linear-gradient(
     160deg,
-    rgba(255, 120, 180, 0.95) 0%,
-    rgba(232, 48, 138, 0.97) 45%,
-    rgba(190, 20, 100, 0.98) 100%
+    rgba(125, 211, 252, 0.95) 0%,
+    rgba(14, 165, 233, 0.97) 45%,
+    rgba(3, 105, 161, 0.98) 100%
   );
-  border: 1px solid rgba(255, 180, 210, 0.6);
+  border: 1px solid rgba(186, 230, 253, 0.6);
   box-shadow:
-    0 1px 0 0 rgba(255, 200, 220, 0.7) inset,
-    /* highlight top */ 0 -1px 0 0 rgba(140, 0, 60, 0.4) inset,
-    /* ombra bottom */ 0 4px 16px rgba(232, 48, 138, 0.35),
+    0 1px 0 0 rgba(224, 242, 254, 0.7) inset,
+    /* highlight top */ 0 -1px 0 0 rgba(12, 74, 110, 0.4) inset,
+    /* ombra bottom */ 0 4px 16px rgba(14, 165, 233, 0.35),
     0 1px 4px rgba(0, 0, 0, 0.12);
   color: #ffffff;
   transition: all 0.15s ease;
 }
 .glass-btn-primary:hover {
   box-shadow:
-    0 1px 0 0 rgba(255, 200, 220, 0.7) inset,
-    0 -1px 0 0 rgba(140, 0, 60, 0.4) inset,
-    0 6px 22px rgba(232, 48, 138, 0.45),
+    0 1px 0 0 rgba(224, 242, 254, 0.7) inset,
+    0 -1px 0 0 rgba(12, 74, 110, 0.4) inset,
+    0 6px 22px rgba(14, 165, 233, 0.45),
     0 2px 6px rgba(0, 0, 0, 0.14);
   transform: translateY(-1px);
 }
 .glass-btn-primary:active {
   transform: translateY(0px);
   box-shadow:
-    0 1px 0 0 rgba(255, 200, 220, 0.5) inset,
-    0 -1px 0 0 rgba(140, 0, 60, 0.5) inset,
-    0 2px 8px rgba(232, 48, 138, 0.25);
+    0 1px 0 0 rgba(224, 242, 254, 0.5) inset,
+    0 -1px 0 0 rgba(12, 74, 110, 0.5) inset,
+    0 2px 8px rgba(14, 165, 233, 0.25);
 }
 
 /* Bottone secondario/outline */

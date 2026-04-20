@@ -8,9 +8,11 @@ import {
   CreditCard,
   BarChart3,
   Users,
-  Truck,
   UserCog,
-  Bell,
+  Calendar,
+  School,
+  Briefcase,
+  Package,
   Home,
   LogOut,
   Menu,
@@ -21,21 +23,25 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import CompanyInfoModal from "./CompanyInfoModal";
 
-const BRAND = "#e8308a";
+const BRAND = "#0ea5e9";
 
 const navGroups = [
-  [{ href: "/finance", label: "Dashboard", icon: LayoutDashboard }],
+  [{ href: "/", label: "Dashboard", icon: LayoutDashboard }],
   [
-    { href: "/finance/bilancio", label: "Bilancio", icon: BarChart3 },
-    { href: "/finance/fatture", label: "Fatture", icon: FileText },
-    { href: "/finance/spese", label: "Spese", icon: CreditCard },
-    { href: "/finance/scadenze", label: "Scadenze", icon: Bell },
+    { href: "/bilancio", label: "Bilancio", icon: BarChart3 },
+    { href: "/fatture", label: "Fatture", icon: FileText },
+    { href: "/spese", label: "Spese", icon: CreditCard },
   ],
   [
-    { href: "/finance/clienti", label: "Clienti", icon: Users },
-    { href: "/finance/fornitori", label: "Fornitori", icon: Truck },
+    { href: "/club", label: "Club", icon: Users },
+    { href: "/prenotazioni", label: "Prenotazioni", icon: Calendar },
+    { href: "/gruppi", label: "Gruppi", icon: School },
   ],
-  [{ href: "/finance/dipendenti", label: "Dipendenti", icon: UserCog }],
+  [
+    { href: "/collaboratori", label: "Collaboratori", icon: Briefcase },
+    { href: "/dipendenti", label: "Dipendenti", icon: UserCog },
+  ],
+  [{ href: "/prodotti", label: "Prodotti", icon: Package }],
 ];
 
 export default function Sidebar() {
@@ -92,8 +98,8 @@ export default function Sidebar() {
               style={{ width: 80, height: 80 }}
             >
               <img
-                src="/logo anda.png"
-                alt="Anda logo"
+                src="/logo-molokai.png"
+                alt="Molokai logo"
                 style={{ width: 84, height: 84, objectFit: "contain" }}
               />
             </div>
@@ -108,13 +114,7 @@ export default function Sidebar() {
               className="text-xs font-medium leading-tight"
               style={{ color: "#ffffff" }}
             >
-              Anda Agencia de
-            </p>
-            <p
-              className="text-xs font-medium leading-tight"
-              style={{ color: "#ffffff" }}
-            >
-              Publicidad SL
+              Molokai Experience SL
             </p>
           </button>
           <div
@@ -122,10 +122,10 @@ export default function Sidebar() {
             style={{ textAlign: "left" }}
           >
             <p className="text-xs font-medium" style={{ color: BRAND }}>
-              CFO Dashboard
+              Gestionale Interno
             </p>
             <p className="text-xs" style={{ color: "#888888" }}>
-              Leonardo Mestre
+              Maurizio Bogliolo
             </p>
           </div>
         </div>
@@ -151,7 +151,7 @@ export default function Sidebar() {
                       active ? "text-white shadow-md" : "hover:text-white",
                     )}
                     style={
-                      active ? { background: BRAND } : { color: "#f9a8d4" }
+                      active ? { background: BRAND } : { color: "#7dd3fc" }
                     }
                     onMouseEnter={(e) => {
                       if (!active)
@@ -211,7 +211,7 @@ export default function Sidebar() {
 
         <div className="px-6 py-4">
           <p className="text-xs" style={{ color: "#555555" }}>
-            © 2025 Anda Agencia de Publicidad SL
+            © 2026 Molokai Experience SL
           </p>
         </div>
       </aside>
