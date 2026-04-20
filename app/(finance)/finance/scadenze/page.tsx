@@ -1,7 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { AlertTriangle, Clock, CheckCircle, Check } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  AlertTriangle,
+  Clock,
+  CheckCircle,
+  Check,
+  Download,
+} from "lucide-react";
 import { fmt, MESI, AZIENDE, ANNI } from "@/lib/constants";
 import { useAnno } from "@/lib/anno-context";
 
@@ -72,6 +78,7 @@ export default function ScadenzePage() {
   const [filtroStato, setFiltroStato] = useState<
     "tutte" | "scaduta" | "urgente" | "prossima"
   >("tutte");
+  const [selected, setSelected] = useState<Set<number>>(new Set());
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const load = async () => {
@@ -116,6 +123,80 @@ export default function ScadenzePage() {
 
   const totScadute = scadute.reduce((s, f) => s + f.importo, 0);
   const totUrgenti = urgenti.reduce((s, f) => s + f.importo, 0);
+
+  const filteredIds = useMemo(() => filtered.map((f) => f.id), [filtered]);
+  const allSelected =
+    filteredIds.length > 0 && filteredIds.every((id) => selected.has(id));
+
+  const toggleOne = (id: number) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const toggleAll = () =>
+    setSelected((prev) => {
+      if (allSelected) {
+        const next = new Set(prev);
+        filteredIds.forEach((id) => next.delete(id));
+        return next;
+      }
+      const next = new Set(prev);
+      filteredIds.forEach((id) => next.add(id));
+      return next;
+    });
+
+  const exportPDF = async () => {
+    const rows = filtered.filter((f) => selected.has(f.id));
+    if (rows.length === 0) return;
+    const { default: jsPDF } = await import("jspdf");
+    const { default: autoTable } = await import("jspdf-autotable");
+
+    const doc = new jsPDF();
+
+    doc.setFontSize(16);
+    doc.setTextColor(232, 48, 138);
+    doc.text("anda!", 14, 16);
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text("Anda Agencia de Publicidad SL — Leonardo Mestre", 14, 22);
+    doc.setFontSize(13);
+    doc.setTextColor(30);
+    doc.text(`Scadenze — ${new Date().toLocaleDateString("it-IT")}`, 14, 30);
+
+    const totale = rows.reduce((s, f) => s + f.importo, 0);
+
+    autoTable(doc, {
+      head: [["Cliente", "Importo", "Data Scadenza", "Stato"]],
+      body: rows.map((f) => [
+        f.cliente?.nome ?? "—",
+        fmt(f.importo),
+        f.scadenza ? new Date(f.scadenza).toLocaleDateString("it-IT") : "—",
+        STATI_CONFIG[f.stato].label,
+      ]),
+      foot: [["TOTALE", fmt(totale), "", ""]],
+      startY: 35,
+      styles: { fontSize: 9, cellPadding: 3 },
+      headStyles: {
+        fillColor: [232, 48, 138],
+        textColor: 255,
+        fontStyle: "bold",
+      },
+      footStyles: {
+        fillColor: [248, 248, 248],
+        textColor: 30,
+        fontStyle: "bold",
+      },
+      alternateRowStyles: { fillColor: [253, 242, 248] },
+      columnStyles: {
+        1: { halign: "right" },
+      },
+    });
+
+    doc.save(`scadenze_${new Date().toISOString().slice(0, 10)}.pdf`);
+  };
 
   return (
     <div className="space-y-6">
@@ -208,27 +289,46 @@ export default function ScadenzePage() {
         </div>
       </div>
 
-      {/* Filtro stato */}
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
-        {[
-          { val: "tutte", label: "Tutte le pendenti" },
-          { val: "scaduta", label: "Scadute" },
-          { val: "urgente", label: "Urgenti" },
-          { val: "prossima", label: "Prossime" },
-        ].map(({ val, label }) => (
+      {/* Filtro stato + azioni export */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
+          {[
+            { val: "tutte", label: "Tutte le pendenti" },
+            { val: "scaduta", label: "Scadute" },
+            { val: "urgente", label: "Urgenti" },
+            { val: "prossima", label: "Prossime" },
+          ].map(({ val, label }) => (
+            <button
+              key={val}
+              onClick={() => setFiltroStato(val as typeof filtroStato)}
+              className="text-sm px-4 py-1.5 rounded-lg font-medium transition-colors"
+              style={
+                filtroStato === val
+                  ? { background: "#e8308a", color: "#fff" }
+                  : { color: "#64748b" }
+              }
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
           <button
-            key={val}
-            onClick={() => setFiltroStato(val as typeof filtroStato)}
-            className="text-sm px-4 py-1.5 rounded-lg font-medium transition-colors"
-            style={
-              filtroStato === val
-                ? { background: "#e8308a", color: "#fff" }
-                : { color: "#64748b" }
-            }
+            onClick={toggleAll}
+            disabled={filteredIds.length === 0}
+            className="text-sm border border-gray-200 text-gray-600 font-medium px-3 py-2 rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {label}
+            {allSelected ? "Deseleziona tutto" : "Seleziona tutto"}
           </button>
-        ))}
+          <button
+            onClick={exportPDF}
+            disabled={selected.size === 0}
+            className="flex items-center gap-1.5 border border-gray-200 text-gray-600 text-sm font-medium px-3 py-2 rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Download className="w-4 h-4 text-red-500" />
+            Esporta PDF{selected.size > 0 ? ` (${selected.size})` : ""}
+          </button>
+        </div>
       </div>
 
       {/* Lista fatture */}
@@ -254,6 +354,14 @@ export default function ScadenzePage() {
                 className={`bg-white rounded-2xl border shadow-sm p-5 flex items-center justify-between gap-4 ${cfg.border}`}
               >
                 <div className="flex items-center gap-4">
+                  <input
+                    type="checkbox"
+                    checked={selected.has(f.id)}
+                    onChange={() => toggleOne(f.id)}
+                    className="w-4 h-4 cursor-pointer"
+                    style={{ accentColor: "#e8308a" }}
+                    aria-label={`Seleziona scadenza ${f.cliente?.nome ?? ""}`}
+                  />
                   <div
                     className={`w-10 h-10 rounded-xl flex items-center justify-center ${cfg.bg}`}
                   >

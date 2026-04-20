@@ -5,10 +5,7 @@ export async function middleware(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
 
   // /login e API auth sempre accessibili
-  if (
-    pathname === "/login" ||
-    pathname.startsWith("/api/auth/")
-  ) {
+  if (pathname === "/login" || pathname.startsWith("/api/auth/")) {
     return NextResponse.next();
   }
 

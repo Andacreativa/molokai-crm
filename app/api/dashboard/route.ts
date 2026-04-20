@@ -8,20 +8,36 @@ export async function GET(request: Request) {
     const azienda = searchParams.get("azienda") || undefined;
     const whereBase = { anno, ...(azienda ? { azienda } : {}) };
 
-    const [fatture, spese, clienti, fattureAnnoPrec, speseAnnoPrec] =
-      await Promise.all([
-        prisma.fattura.findMany({ where: whereBase }),
-        prisma.spesa.findMany({ where: whereBase }),
-        prisma.cliente.count(),
-        prisma.fattura.findMany({
-          where: { anno: anno - 1, ...(azienda ? { azienda } : {}) },
-        }),
-        prisma.spesa.findMany({
-          where: { anno: anno - 1, ...(azienda ? { azienda } : {}) },
-        }),
-      ]);
+    const [
+      fatture,
+      altri,
+      spese,
+      clienti,
+      fattureAnnoPrec,
+      altriAnnoPrec,
+      speseAnnoPrec,
+    ] = await Promise.all([
+      prisma.fattura.findMany({ where: whereBase }),
+      prisma.altroIngresso.findMany({ where: whereBase }),
+      prisma.spesa.findMany({ where: whereBase }),
+      prisma.cliente.count(),
+      prisma.fattura.findMany({
+        where: { anno: anno - 1, ...(azienda ? { azienda } : {}) },
+      }),
+      prisma.altroIngresso.findMany({
+        where: { anno: anno - 1, ...(azienda ? { azienda } : {}) },
+      }),
+      prisma.spesa.findMany({
+        where: { anno: anno - 1, ...(azienda ? { azienda } : {}) },
+      }),
+    ]);
 
     const totaleFatture = fatture.reduce((s: number, f) => s + f.importo, 0);
+    const totaleAltriIngressi = altri.reduce(
+      (s: number, a) => s + a.importo,
+      0,
+    );
+    const totaleEntrate = totaleFatture + totaleAltriIngressi;
     const totaleFatturePagate = fatture
       .filter((f) => f.pagato)
       .reduce((s: number, f) => s + f.importo, 0);
@@ -29,7 +45,7 @@ export async function GET(request: Request) {
       .filter((f) => !f.pagato)
       .reduce((s: number, f) => s + f.importo, 0);
     const totaleSpese = spese.reduce((s: number, e) => s + e.importo, 0);
-    const bilancio = totaleFatture - totaleSpese;
+    const bilancio = totaleEntrate - totaleSpese;
 
     // Scadenze imminenti (fatture non pagate con scadenza nei prossimi 7 giorni o scadute)
     const oggi = new Date();
@@ -44,18 +60,26 @@ export async function GET(request: Request) {
       include: { cliente: true },
     });
 
-    // Monthly data
+    // Monthly data — entrate = fatture + altri ingressi
     const mesi = Array.from({ length: 12 }, (_, i) => {
       const mese = i + 1;
-      const entrate = fatture
+      const entrateFatture = fatture
         .filter((f) => f.mese === mese)
         .reduce((s: number, f) => s + f.importo, 0);
+      const entrateAltri = altri
+        .filter((a) => a.mese === mese)
+        .reduce((s: number, a) => s + a.importo, 0);
+      const entrate = entrateFatture + entrateAltri;
       const uscite = spese
         .filter((e) => e.mese === mese)
         .reduce((s: number, e) => s + e.importo, 0);
-      const entratePrec = fattureAnnoPrec
+      const entratePrecFatture = fattureAnnoPrec
         .filter((f) => f.mese === mese)
         .reduce((s: number, f) => s + f.importo, 0);
+      const entratePrecAltri = altriAnnoPrec
+        .filter((a) => a.mese === mese)
+        .reduce((s: number, a) => s + a.importo, 0);
+      const entratePrec = entratePrecFatture + entratePrecAltri;
       const uscitePrec = speseAnnoPrec
         .filter((e) => e.mese === mese)
         .reduce((s: number, e) => s + e.importo, 0);
@@ -79,9 +103,13 @@ export async function GET(request: Request) {
       take: 5,
     });
 
-    // Trend anno su anno
+    // Trend anno su anno — entrate = fatture + altri ingressi
     const totFatturePrec = fattureAnnoPrec.reduce(
       (s: number, f) => s + f.importo,
+      0,
+    );
+    const totAltriPrec = altriAnnoPrec.reduce(
+      (s: number, a) => s + a.importo,
       0,
     );
     const totSpesePrec = speseAnnoPrec.reduce(
@@ -90,7 +118,8 @@ export async function GET(request: Request) {
     );
 
     return NextResponse.json({
-      totaleFatture,
+      totaleFatture: totaleEntrate,
+      totaleAltriIngressi,
       totaleFatturePagate,
       totaleFattureInAttesa,
       totaleSpese,
@@ -101,7 +130,7 @@ export async function GET(request: Request) {
       ultimeFatture,
       scadenzeAlert,
       trend: {
-        fattureAnnoPrec: totFatturePrec,
+        fattureAnnoPrec: totFatturePrec + totAltriPrec,
         speseAnnoPrec: totSpesePrec,
       },
     });

@@ -323,7 +323,7 @@ export default function AltriIngressi({ anno, azienda, onChanged }: Props) {
                   Azienda *
                 </label>
                 <div className="flex gap-2">
-                  {AZIENDE.map((a) => {
+                  {AZIENDE.filter((a) => a !== "Altro").map((a) => {
                     const col = AZIENDA_COLORI[a];
                     const active = form.azienda === a;
                     return (

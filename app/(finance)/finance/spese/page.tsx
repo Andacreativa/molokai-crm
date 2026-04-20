@@ -69,6 +69,7 @@ export default function SpesePage() {
   const [form, setForm] = useState({ ...emptyForm });
   const [filtroMese, setFiltroMese] = useState(0);
   const [filtroCategoria, setFiltroCategoria] = useState("");
+  const [filtroFornitore, setFiltroFornitore] = useState("");
   const { anno, setAnno } = useAnno();
   const [azienda, setAzienda] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -158,13 +159,18 @@ export default function SpesePage() {
   const filtered = (spese ?? []).filter((s) => {
     if (filtroMese && s.mese !== filtroMese) return false;
     if (filtroCategoria && s.categoria !== filtroCategoria) return false;
+    if (filtroFornitore && s.fornitore !== filtroFornitore) return false;
     return true;
   });
+
+  const fornitoriUnici = Array.from(
+    new Set((spese ?? []).map((s) => s.fornitore).filter(Boolean)),
+  ).sort((a, b) => a.localeCompare(b, "it"));
 
   // Reset page se i filtri restringono il dataset
   useEffect(() => {
     setPage(1);
-  }, [filtroMese, filtroCategoria, anno, azienda, pageSize]);
+  }, [filtroMese, filtroCategoria, filtroFornitore, anno, azienda, pageSize]);
   const paged = filtered.slice((page - 1) * pageSize, page * pageSize);
 
   const totale = filtered.reduce((s, e) => s + (e?.importo ?? 0), 0);
@@ -279,7 +285,19 @@ export default function SpesePage() {
             </option>
           ))}
         </select>
-        {(filtroMese > 0 || filtroCategoria) && (
+        <select
+          value={filtroFornitore}
+          onChange={(e) => setFiltroFornitore(e.target.value)}
+          className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-pink-300 max-w-[160px]"
+        >
+          <option value="">Fornitore</option>
+          {fornitoriUnici.map((f) => (
+            <option key={f} value={f}>
+              {f}
+            </option>
+          ))}
+        </select>
+        {(filtroMese > 0 || filtroCategoria || filtroFornitore) && (
           <span className="text-sm text-gray-500 flex items-center">
             → {fmt(totale)}
           </span>

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { applyFinnSplit, isFinnCommerciale } from "@/lib/finn-split";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -45,35 +46,8 @@ export async function POST(request: Request) {
     include: { cliente: true },
   });
 
-  const isFinn = (fattura.commerciale ?? "").toLowerCase().includes("finn");
-  if (isFinn) {
-    const quota15 = Math.round(fattura.importo * 0.15 * 100) / 100;
-    const quota85 = Math.round(fattura.importo * 0.85 * 100) / 100;
-    const rifFattura = `Fattura #${fattura.id}${fattura.cliente?.nome ? " " + fattura.cliente.nome : ""}`;
-    await prisma.altroIngresso.create({
-      data: {
-        fonte: "Trattenuta gestione Anda",
-        azienda: "Spagna",
-        aziendaNota: null,
-        descrizione: `[AUTO FINN #${fattura.id}] ${rifFattura}`,
-        mese: fattura.mese,
-        anno: fattura.anno,
-        importo: quota15,
-        incassato: fattura.pagato,
-        dataIncasso: fattura.pagato ? new Date() : null,
-      },
-    });
-    await prisma.spesa.create({
-      data: {
-        azienda: "Spagna",
-        fornitore: "Finn Kalbhenn",
-        categoria: "Soci",
-        descrizione: `[AUTO FINN #${fattura.id}] 85% ${rifFattura}`,
-        mese: fattura.mese,
-        anno: fattura.anno,
-        importo: quota85,
-      },
-    });
+  if (isFinnCommerciale(fattura.commerciale) && fattura.pagato) {
+    await applyFinnSplit(prisma, fattura);
   }
 
   return NextResponse.json(fattura);

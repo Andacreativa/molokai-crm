@@ -1,14 +1,26 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import {
+  applyFinnSplit,
+  deleteFinnSplitForFattura,
+  isFinnCommerciale,
+} from "@/lib/finn-split";
 
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
+  const fatturaId = parseInt(id);
   const body = await request.json();
+
+  const before = await prisma.fattura.findUnique({ where: { id: fatturaId } });
+  if (!before) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   const fattura = await prisma.fattura.update({
-    where: { id: parseInt(id) },
+    where: { id: fatturaId },
     data: {
       ...(body.numero !== undefined && { numero: body.numero || null }),
       ...(body.data !== undefined && {
@@ -36,6 +48,24 @@ export async function PATCH(
     },
     include: { cliente: true },
   });
+
+  const wasFinnPaid = isFinnCommerciale(before.commerciale) && before.pagato;
+  const isFinnPaid = isFinnCommerciale(fattura.commerciale) && fattura.pagato;
+  const dataChanged =
+    before.importo !== fattura.importo ||
+    before.mese !== fattura.mese ||
+    before.anno !== fattura.anno ||
+    before.clienteId !== fattura.clienteId;
+
+  if (wasFinnPaid && !isFinnPaid) {
+    await deleteFinnSplitForFattura(prisma, fatturaId);
+  } else if (!wasFinnPaid && isFinnPaid) {
+    await applyFinnSplit(prisma, fattura);
+  } else if (wasFinnPaid && isFinnPaid && dataChanged) {
+    await deleteFinnSplitForFattura(prisma, fatturaId);
+    await applyFinnSplit(prisma, fattura);
+  }
+
   return NextResponse.json(fattura);
 }
 

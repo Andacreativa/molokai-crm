@@ -9,6 +9,7 @@ import {
   X,
   Download,
   FileSpreadsheet,
+  Upload,
 } from "lucide-react";
 import {
   BarChart,
@@ -30,6 +31,7 @@ import {
 } from "@/lib/export";
 import AltriIngressi from "@/components/AltriIngressi";
 import { PageSizeSelect, PageNav } from "@/components/Pagination";
+import ImportFattureModal from "@/components/ImportFattureModal";
 
 interface Cliente {
   id: number;
@@ -44,7 +46,6 @@ interface Fattura {
   cliente: Cliente | null;
   azienda: string;
   aziendaNota: string | null;
-  descrizione: string | null;
   mese: number;
   anno: number;
   importo: number;
@@ -67,7 +68,6 @@ const emptyForm = {
   clienteId: "",
   azienda: AZIENDE[0],
   aziendaNota: "",
-  descrizione: "",
   commerciale: "",
   mese: new Date().getMonth() + 1,
   anno: 2025,
@@ -91,6 +91,7 @@ export default function FatturePage() {
   const [azienda, setAzienda] = useState("");
   const [pageSize, setPageSize] = useState(10);
   const [page, setPage] = useState(1);
+  const [showImport, setShowImport] = useState(false);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const load = async () => {
@@ -118,7 +119,6 @@ export default function FatturePage() {
       clienteId: f.clienteId != null ? String(f.clienteId) : "",
       azienda: f.azienda,
       aziendaNota: f.aziendaNota || "",
-      descrizione: f.descrizione || "",
       commerciale: f.commerciale || "",
       mese: f.mese,
       anno: f.anno,
@@ -237,6 +237,12 @@ export default function FatturePage() {
             <Download className="w-4 h-4 text-red-500" /> PDF
           </button>
           <button
+            onClick={() => setShowImport(true)}
+            className="flex items-center gap-1.5 border border-gray-200 text-gray-600 text-sm font-medium px-3 py-2 rounded-xl hover:bg-gray-50 transition-colors"
+          >
+            <Upload className="w-4 h-4 text-pink-600" /> Importa Fatture
+          </button>
+          <button
             onClick={openNew}
             className="glass-btn-primary flex items-center gap-2 text-white text-sm font-medium px-4 py-2 rounded-xl transition-all"
           >
@@ -306,128 +312,124 @@ export default function FatturePage() {
         <table className="w-full">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50">
-                {[
-                  "Numero",
-                  "Cliente",
-                  "Azienda",
-                  "Mese",
-                  "Scadenza",
-                  "Descrizione",
-                  "Importo",
-                  "Stato",
-                  "",
-                ].map((h) => (
-                  <th
-                    key={h}
-                    className={`text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 ${h === "Importo" ? "text-right" : h === "Stato" ? "text-center" : "text-left"}`}
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={9}
-                    className="text-center text-gray-400 py-12 text-sm"
-                  >
-                    Nessuna fattura trovata
-                  </td>
-                </tr>
-              )}
-              {paged.map((f, i) => (
-                <tr
-                  key={f.id}
-                  className={`border-b border-gray-50 hover:bg-gray-50 transition-colors ${isScaduta(f) ? "bg-red-50" : isInScadenza(f) ? "bg-amber-50" : i % 2 === 1 ? "bg-[#F0F0F0]" : ""}`}
+              {[
+                "Numero",
+                "Cliente",
+                "Azienda",
+                "Mese",
+                "Scadenza",
+                "Importo",
+                "Stato",
+                "",
+              ].map((h) => (
+                <th
+                  key={h}
+                  className={`text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 ${h === "Importo" ? "text-right" : h === "Stato" ? "text-center" : "text-left"}`}
                 >
-                  <td className="px-4 py-3 text-sm font-mono font-medium text-gray-700 whitespace-nowrap">
-                    {f.numero ?? "—"}
-                  </td>
-                  <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                    {f.cliente?.nome ?? "—"}
-                    <span className="ml-1 text-xs text-gray-400">
-                      {f.cliente?.paese ?? ""}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className="text-xs font-semibold px-2.5 py-0.5 rounded-full"
-                      style={{
-                        background:
-                          f.azienda === "Spagna"
-                            ? "#fef2f2"
-                            : f.azienda === "Italia"
-                              ? "#f0fdf4"
-                              : "#f8fafc",
-                        color:
-                          f.azienda === "Spagna"
-                            ? "#ef4444"
-                            : f.azienda === "Italia"
-                              ? "#22c55e"
-                              : "#64748b",
-                      }}
-                    >
-                      {f.azienda === "Altro" && f.aziendaNota
-                        ? f.aziendaNota
-                        : f.azienda}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
-                    {MESI[f.mese - 1]}
-                  </td>
-                  <td className="px-4 py-3 text-sm">
-                    {f.scadenza ? (
-                      <span
-                        className={`text-xs font-medium ${isScaduta(f) ? "text-red-600" : isInScadenza(f) ? "text-amber-600" : "text-gray-500"}`}
-                      >
-                        {new Date(f.scadenza).toLocaleDateString("it-IT")}
-                      </span>
-                    ) : (
-                      <span className="text-gray-300">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">
-                    {f.descrizione || "—"}
-                  </td>
-                  <td className="px-4 py-3 text-sm font-semibold text-gray-900 text-right">
-                    {fmt(f.importo)}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <button
-                      onClick={() => togglePagato(f)}
-                      className={`inline-flex items-center gap-1 text-xs font-medium px-3 py-1 rounded-full transition-colors ${f.pagato ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200" : "bg-amber-100 text-amber-700 hover:bg-amber-200"}`}
-                    >
-                      {f.pagato ? (
-                        <>
-                          <Check className="w-3 h-3" /> Pagato
-                        </>
-                      ) : (
-                        <>
-                          <X className="w-3 h-3" /> In Attesa
-                        </>
-                      )}
-                    </button>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2 justify-end">
-                      <button
-                        onClick={() => openEdit(f)}
-                        className="p-1.5 rounded-lg text-gray-400 hover:text-pink-600 hover:bg-pink-50 transition-colors"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => del(f.id)}
-                        className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+                  {h}
+                </th>
               ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 && (
+              <tr>
+                <td
+                  colSpan={8}
+                  className="text-center text-gray-400 py-12 text-sm"
+                >
+                  Nessuna fattura trovata
+                </td>
+              </tr>
+            )}
+            {paged.map((f, i) => (
+              <tr
+                key={f.id}
+                className={`border-b border-gray-50 hover:bg-gray-50 transition-colors ${isScaduta(f) ? "bg-red-50" : isInScadenza(f) ? "bg-amber-50" : i % 2 === 1 ? "bg-[#F0F0F0]" : ""}`}
+              >
+                <td className="px-4 py-3 text-sm font-mono font-medium text-gray-700 whitespace-nowrap">
+                  {f.numero ?? "—"}
+                </td>
+                <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                  {f.cliente?.nome ?? "—"}
+                  <span className="ml-1 text-xs text-gray-400">
+                    {f.cliente?.paese ?? ""}
+                  </span>
+                </td>
+                <td className="px-4 py-3">
+                  <span
+                    className="text-xs font-semibold px-2.5 py-0.5 rounded-full"
+                    style={{
+                      background:
+                        f.azienda === "Spagna"
+                          ? "#fef2f2"
+                          : f.azienda === "Italia"
+                            ? "#f0fdf4"
+                            : "#f8fafc",
+                      color:
+                        f.azienda === "Spagna"
+                          ? "#ef4444"
+                          : f.azienda === "Italia"
+                            ? "#22c55e"
+                            : "#64748b",
+                    }}
+                  >
+                    {f.azienda === "Altro" && f.aziendaNota
+                      ? f.aziendaNota
+                      : f.azienda}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-sm text-gray-600">
+                  {MESI[f.mese - 1]}
+                </td>
+                <td className="px-4 py-3 text-sm">
+                  {f.scadenza ? (
+                    <span
+                      className={`text-xs font-medium ${isScaduta(f) ? "text-red-600" : isInScadenza(f) ? "text-amber-600" : "text-gray-500"}`}
+                    >
+                      {new Date(f.scadenza).toLocaleDateString("it-IT")}
+                    </span>
+                  ) : (
+                    <span className="text-gray-300">—</span>
+                  )}
+                </td>
+                <td className="px-4 py-3 text-sm font-semibold text-gray-900 text-right">
+                  {fmt(f.importo)}
+                </td>
+                <td className="px-4 py-3 text-center">
+                  <button
+                    onClick={() => togglePagato(f)}
+                    className={`inline-flex items-center gap-1 text-xs font-medium px-3 py-1 rounded-full transition-colors ${f.pagato ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200" : "bg-amber-100 text-amber-700 hover:bg-amber-200"}`}
+                  >
+                    {f.pagato ? (
+                      <>
+                        <Check className="w-3 h-3" /> Pagato
+                      </>
+                    ) : (
+                      <>
+                        <X className="w-3 h-3" /> In Attesa
+                      </>
+                    )}
+                  </button>
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-2 justify-end">
+                    <button
+                      onClick={() => openEdit(f)}
+                      className="p-1.5 rounded-lg text-gray-400 hover:text-pink-600 hover:bg-pink-50 transition-colors"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => del(f.id)}
+                      className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
@@ -446,108 +448,108 @@ export default function FatturePage() {
 
       {/* Grafico Spagna vs Italia (solo pagate) */}
       <div className="glass-card rounded-2xl p-5">
-          {(() => {
-            const pagateAll = (fatture ?? []).filter((f) => f?.pagato);
-            const totSpagna = pagateAll
-              .filter((f) => f.azienda === "Spagna")
-              .reduce((s: number, f) => s + (f?.importo ?? 0), 0);
-            const totItalia = pagateAll
-              .filter((f) => f.azienda === "Italia")
-              .reduce((s: number, f) => s + (f?.importo ?? 0), 0);
-            const totale = totSpagna + totItalia;
-            if (totale === 0) {
-              return (
-                <p className="text-xs text-gray-400 text-center py-8">
-                  Nessuna fattura pagata
-                </p>
-              );
-            }
-            const pctSpagna = (totSpagna / totale) * 100;
-            const pctItalia = (totItalia / totale) * 100;
-            const data = [
-              {
-                name: "Spagna",
-                value: totSpagna,
-                color: "#ef4444",
-                pct: pctSpagna,
-              },
-              {
-                name: "Italia",
-                value: totItalia,
-                color: "#22c55e",
-                pct: pctItalia,
-              },
-            ];
+        {(() => {
+          const pagateAll = (fatture ?? []).filter((f) => f?.pagato);
+          const totSpagna = pagateAll
+            .filter((f) => f.azienda === "Spagna")
+            .reduce((s: number, f) => s + (f?.importo ?? 0), 0);
+          const totItalia = pagateAll
+            .filter((f) => f.azienda === "Italia")
+            .reduce((s: number, f) => s + (f?.importo ?? 0), 0);
+          const totale = totSpagna + totItalia;
+          if (totale === 0) {
             return (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-center">
-                <div className="lg:col-span-2">
-                  <ResponsiveContainer width="100%" height={130}>
-                    <BarChart
-                      data={data}
-                      layout="vertical"
-                      margin={{ top: 5, right: 20, bottom: 5, left: 10 }}
-                    >
-                      <XAxis type="number" hide />
-                      <YAxis
-                        type="category"
-                        dataKey="name"
-                        tick={{
-                          fontSize: 12,
-                          fill: "#475569",
-                          fontWeight: 600,
-                        }}
-                        axisLine={false}
-                        tickLine={false}
-                        width={70}
-                      />
-                      <Tooltip
-                        formatter={(v) => fmt(Number(v))}
-                        cursor={{ fill: "rgba(0,0,0,0.04)" }}
-                      />
-                      <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={28}>
-                        {data.map((d, i) => (
-                          // eslint-disable-next-line @typescript-eslint/no-deprecated
-                          <Cell key={i} fill={d.color} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
+              <p className="text-xs text-gray-400 text-center py-8">
+                Nessuna fattura pagata
+              </p>
+            );
+          }
+          const pctSpagna = (totSpagna / totale) * 100;
+          const pctItalia = (totItalia / totale) * 100;
+          const data = [
+            {
+              name: "Spagna",
+              value: totSpagna,
+              color: "#ef4444",
+              pct: pctSpagna,
+            },
+            {
+              name: "Italia",
+              value: totItalia,
+              color: "#22c55e",
+              pct: pctItalia,
+            },
+          ];
+          return (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-center">
+              <div className="lg:col-span-2">
+                <ResponsiveContainer width="100%" height={130}>
+                  <BarChart
+                    data={data}
+                    layout="vertical"
+                    margin={{ top: 5, right: 20, bottom: 5, left: 10 }}
+                  >
+                    <XAxis type="number" hide />
+                    <YAxis
+                      type="category"
+                      dataKey="name"
+                      tick={{
+                        fontSize: 12,
+                        fill: "#475569",
+                        fontWeight: 600,
+                      }}
+                      axisLine={false}
+                      tickLine={false}
+                      width={70}
+                    />
+                    <Tooltip
+                      formatter={(v) => fmt(Number(v))}
+                      cursor={{ fill: "rgba(0,0,0,0.04)" }}
+                    />
+                    <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={28}>
+                      {data.map((d, i) => (
+                        // eslint-disable-next-line @typescript-eslint/no-deprecated
+                        <Cell key={i} fill={d.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="space-y-2">
+                <div className="grid grid-cols-[1fr_auto_auto] gap-3 items-center text-sm">
+                  <span className="flex items-center gap-2 font-semibold text-gray-700">
+                    <span
+                      className="w-3 h-3 rounded-sm"
+                      style={{ background: "#ef4444" }}
+                    />
+                    Spagna
+                  </span>
+                  <span className="font-semibold text-gray-900 text-right">
+                    {fmt(totSpagna)}
+                  </span>
+                  <span className="text-gray-500 tabular-nums w-14 text-right">
+                    {pctSpagna.toFixed(1)}%
+                  </span>
                 </div>
-                <div className="space-y-2">
-                  <div className="grid grid-cols-[1fr_auto_auto] gap-3 items-center text-sm">
-                    <span className="flex items-center gap-2 font-semibold text-gray-700">
-                      <span
-                        className="w-3 h-3 rounded-sm"
-                        style={{ background: "#ef4444" }}
-                      />
-                      Spagna
-                    </span>
-                    <span className="font-semibold text-gray-900 text-right">
-                      {fmt(totSpagna)}
-                    </span>
-                    <span className="text-gray-500 tabular-nums w-14 text-right">
-                      {pctSpagna.toFixed(1)}%
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-[1fr_auto_auto] gap-3 items-center text-sm">
-                    <span className="flex items-center gap-2 font-semibold text-gray-700">
-                      <span
-                        className="w-3 h-3 rounded-sm"
-                        style={{ background: "#22c55e" }}
-                      />
-                      Italia
-                    </span>
-                    <span className="font-semibold text-gray-900 text-right">
-                      {fmt(totItalia)}
-                    </span>
-                    <span className="text-gray-500 tabular-nums w-14 text-right">
-                      {pctItalia.toFixed(1)}%
-                    </span>
-                  </div>
+                <div className="grid grid-cols-[1fr_auto_auto] gap-3 items-center text-sm">
+                  <span className="flex items-center gap-2 font-semibold text-gray-700">
+                    <span
+                      className="w-3 h-3 rounded-sm"
+                      style={{ background: "#22c55e" }}
+                    />
+                    Italia
+                  </span>
+                  <span className="font-semibold text-gray-900 text-right">
+                    {fmt(totItalia)}
+                  </span>
+                  <span className="text-gray-500 tabular-nums w-14 text-right">
+                    {pctItalia.toFixed(1)}%
+                  </span>
                 </div>
               </div>
-            );
-          })()}
+            </div>
+          );
+        })()}
       </div>
 
       {/* Modal */}
@@ -563,7 +565,7 @@ export default function FatturePage() {
                   Azienda *
                 </label>
                 <div className="flex gap-2">
-                  {AZIENDE.map((a) => {
+                  {AZIENDE.filter((a) => a !== "Altro").map((a) => {
                     const col = AZIENDA_COLORI[a];
                     const active = form.azienda === a;
                     return (
@@ -728,48 +730,32 @@ export default function FatturePage() {
                 );
               })()}
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-gray-600 block mb-1">
-                    Descrizione
-                  </label>
-                  <input
-                    type="text"
-                    value={form.descrizione}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, descrizione: e.target.value }))
-                    }
-                    placeholder="Es. Consulenza"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-gray-600 block mb-1">
-                    Scadenza
-                  </label>
-                  <input
-                    type="date"
-                    value={form.scadenza}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, scadenza: e.target.value }))
-                    }
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
-                  />
-                </div>
-                <div className="col-span-2">
-                  <label className="text-xs font-medium text-gray-600 block mb-1">
-                    Commerciale
-                  </label>
-                  <input
-                    type="text"
-                    value={form.commerciale}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, commerciale: e.target.value }))
-                    }
-                    placeholder='Opzionale. Scrivi "Finn" per attivare lo split automatico 15%/85%'
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
-                  />
-                </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 block mb-1">
+                  Scadenza
+                </label>
+                <input
+                  type="date"
+                  value={form.scadenza}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, scadenza: e.target.value }))
+                  }
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 block mb-1">
+                  Commerciale
+                </label>
+                <input
+                  type="text"
+                  value={form.commerciale}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, commerciale: e.target.value }))
+                  }
+                  placeholder='Opzionale. Scrivi "Finn" per attivare lo split automatico 15%/85%'
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
+                />
               </div>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -801,6 +787,12 @@ export default function FatturePage() {
           </div>
         </div>
       )}
+
+      <ImportFattureModal
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        onImported={load}
+      />
     </div>
   );
 }

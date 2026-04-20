@@ -53,12 +53,16 @@ export async function signSession(username: string): Promise<string> {
     username,
     exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS,
   };
-  const body = bytesToBase64Url(new TextEncoder().encode(JSON.stringify(payload)));
+  const body = bytesToBase64Url(
+    new TextEncoder().encode(JSON.stringify(payload)),
+  );
   const sig = await hmac(secret, body);
   return `${body}.${sig}`;
 }
 
-export async function verifySession(token: string | undefined): Promise<SessionPayload | null> {
+export async function verifySession(
+  token: string | undefined,
+): Promise<SessionPayload | null> {
   if (!token) return null;
   const secret = process.env.AUTH_SECRET;
   if (!secret) return null;
@@ -80,7 +84,10 @@ export async function verifySession(token: string | undefined): Promise<SessionP
 
 // Verifica le credenziali contro le 2 utenze hardcoded in .env.
 // Restituisce lo username canonico (case-sensitive come in env) o null.
-export function checkCredentials(username: string, password: string): string | null {
+export function checkCredentials(
+  username: string,
+  password: string,
+): string | null {
   const u1 = process.env.USER1_USERNAME;
   const p1 = process.env.USER1_PASSWORD;
   const u2 = process.env.USER2_USERNAME;

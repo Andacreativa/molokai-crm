@@ -83,7 +83,6 @@ export function fattureToExcel(
     anno: number;
     importo: number;
     pagato: boolean;
-    descrizione: string | null;
   }[],
   MESI: string[],
 ) {
@@ -95,7 +94,6 @@ export function fattureToExcel(
     Anno: f.anno,
     Importo: f.importo,
     Stato: f.pagato ? "Pagato" : "In Attesa",
-    Descrizione: f.descrizione || "",
   }));
 }
 
@@ -106,20 +104,11 @@ export function fattureToPDF(
     mese: number;
     importo: number;
     pagato: boolean;
-    descrizione: string | null;
   }[],
   MESI: string[],
   title: string,
 ) {
-  const cols = [
-    "Cliente",
-    "Paese",
-    "Azienda",
-    "Mese",
-    "Importo",
-    "Stato",
-    "Descrizione",
-  ];
+  const cols = ["Cliente", "Paese", "Azienda", "Mese", "Importo", "Stato"];
   const rows = fatture.map((f) => [
     f.cliente?.nome ?? "",
     f.cliente?.paese ?? "",
@@ -127,7 +116,6 @@ export function fattureToPDF(
     MESI[f.mese - 1],
     fmt(f.importo),
     f.pagato ? "Pagato" : "In Attesa",
-    f.descrizione || "",
   ]);
   return { cols, rows, title };
 }

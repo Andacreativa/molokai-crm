@@ -25,38 +25,42 @@ model Cliente {
 }
 
 model Fattura {
+  id            Int            @id @default(autoincrement())
+  numero        String?
+  data          DateTime?
+  clienteId     Int?
+  cliente       Cliente?       @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  azienda       String         @default("Spagna")
+  aziendaNota   String?
+  descrizione   String?
+  mese          Int
+  anno          Int            @default(2025)
+  importo       Float
+  tipoIva       String         @default("iva")
+  iva           Float          @default(21)
+  pagato        Boolean        @default(false)
+  metodo        String?
+  commerciale   String?
+  scadenza      DateTime?
+  createdAt     DateTime       @default(now())
+  altroIngresso AltroIngresso?
+  spesa         Spesa?
+}
+
+model AltroIngresso {
   id          Int       @id @default(autoincrement())
-  numero      String?
-  data        DateTime?
-  clienteId   Int?
-  cliente     Cliente?  @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  fonte       String
   azienda     String    @default("Spagna")
   aziendaNota String?
   descrizione String?
   mese        Int
   anno        Int       @default(2025)
   importo     Float
-  tipoIva     String    @default("iva")
-  iva         Float     @default(21)
-  pagato      Boolean   @default(false)
-  metodo      String?
-  commerciale String?
-  scadenza    DateTime?
-  createdAt   DateTime  @default(now())
-}
-
-model AltroIngresso {
-  id          Int      @id @default(autoincrement())
-  fonte       String
-  azienda     String   @default("Spagna")
-  aziendaNota String?
-  descrizione String?
-  mese        Int
-  anno        Int      @default(2025)
-  importo     Float
-  incassato   Boolean  @default(false)
+  incassato   Boolean   @default(false)
   dataIncasso DateTime?
-  createdAt   DateTime @default(now())
+  fatturaId   Int?      @unique
+  fattura     Fattura?  @relation(fields: [fatturaId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
 }
 
 model SpesaFissa {
@@ -83,6 +87,8 @@ model Spesa {
   mese         Int
   anno         Int      @default(2025)
   importo      Float
+  fatturaId    Int?     @unique
+  fattura      Fattura? @relation(fields: [fatturaId], references: [id], onDelete: Cascade)
   createdAt    DateTime @default(now())
 }
 
