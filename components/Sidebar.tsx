@@ -26,22 +26,22 @@ import CompanyInfoModal from "./CompanyInfoModal";
 const BRAND = "#0ea5e9";
 
 const navGroups = [
-  [{ href: "/", label: "Dashboard", icon: LayoutDashboard }],
+  [{ href: "/finance", label: "Dashboard", icon: LayoutDashboard }],
   [
-    { href: "/bilancio", label: "Bilancio", icon: BarChart3 },
-    { href: "/fatture", label: "Fatture", icon: FileText },
-    { href: "/spese", label: "Spese", icon: CreditCard },
+    { href: "/finance/bilancio", label: "Bilancio", icon: BarChart3 },
+    { href: "/finance/fatture", label: "Fatture", icon: FileText },
+    { href: "/finance/spese", label: "Spese", icon: CreditCard },
   ],
   [
-    { href: "/club", label: "Club", icon: Users },
-    { href: "/prenotazioni", label: "Prenotazioni", icon: Calendar },
-    { href: "/gruppi", label: "Gruppi", icon: School },
+    { href: "/finance/club", label: "Club", icon: Users },
+    { href: "/finance/prenotazioni", label: "Prenotazioni", icon: Calendar },
+    { href: "/finance/gruppi", label: "Gruppi", icon: School },
   ],
   [
-    { href: "/collaboratori", label: "Collaboratori", icon: Briefcase },
-    { href: "/dipendenti", label: "Dipendenti", icon: UserCog },
+    { href: "/finance/collaboratori", label: "Collaboratori", icon: Briefcase },
+    { href: "/finance/dipendenti", label: "Dipendenti", icon: UserCog },
   ],
-  [{ href: "/prodotti", label: "Prodotti", icon: Package }],
+  [{ href: "/finance/prodotti", label: "Prodotti", icon: Package }],
 ];
 
 export default function Sidebar() {
