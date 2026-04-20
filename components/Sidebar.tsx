@@ -9,7 +9,8 @@ import {
   BarChart3,
   Users,
   UserCog,
-  Calendar,
+  Globe,
+  Store,
   School,
   Briefcase,
   Package,
@@ -34,7 +35,8 @@ const navGroups = [
   ],
   [
     { href: "/finance/club", label: "Club", icon: Users },
-    { href: "/finance/prenotazioni", label: "Prenotazioni", icon: Calendar },
+    { href: "/finance/incassi-web", label: "Incassi Web", icon: Globe },
+    { href: "/finance/incassi-scuola", label: "Incassi Scuola", icon: Store },
     { href: "/finance/gruppi", label: "Gruppi", icon: School },
   ],
   [

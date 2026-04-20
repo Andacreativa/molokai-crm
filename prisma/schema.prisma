@@ -80,22 +80,27 @@ model SpesaFissa {
 // ─── CLUB (SOCI + BUONI) ────────────────────────────────────
 
 model Socio {
-  id              Int                @id @default(autoincrement())
-  nome            String
-  cognome         String?
-  dni             String?
-  cellulare       String?
-  email           String?
-  piano           String             // PLAN VARADA | PLAN MATERIAL | ANNUALE
-  prezzoPiano     Float
-  pagamento       String             @default("MENSILE") // MENSILE | ANNUALE
-  iban            String?
-  stato           String             @default("ATTIVO") // ATTIVO | SOSPESO | CANCELLATO
-  matricola       String?
-  note            String?
-  createdAt       DateTime           @default(now())
-  pagamentiMensili PagamentoSocio[]
-  buoni           Buono[]
+  id                     Int               @id @default(autoincrement())
+  nome                   String
+  cognome                String?
+  dni                    String?
+  cellulare              String?
+  email                  String?
+  piano                  String            // PLAN VARADA | PLAN MATERIAL | ANNUALE | ALTRO
+  pianoDescrizione       String?           // usato quando piano = "ALTRO"
+  prezzoPiano            Float
+  pagamento              String            @default("MENSILE") // MENSILE | ANNUALE
+  iban                   String?
+  stato                  String            @default("ATTIVO") // ATTIVO | SOSPESO | CANCELLATO
+  matricola              String?
+  matricolaImporto       Float             @default(50)
+  matricolaGratuita      Boolean           @default(false)
+  matricolaPagata        Boolean           @default(false)
+  matricolaMesePagamento String?
+  note                   String?
+  createdAt              DateTime          @default(now())
+  pagamentiMensili       PagamentoSocio[]
+  buoni                  Buono[]
 }
 
 model PagamentoSocio {
@@ -170,13 +175,16 @@ model PrenotazioneGetYourGuide {
 }
 
 model PagamentoInScuola {
-  id        Int      @id @default(autoincrement())
-  data      DateTime
-  mese      Int
-  anno      Int      @default(2026)
-  importo   Float    @default(0)
-  note      String?
-  createdAt DateTime @default(now())
+  id            Int      @id @default(autoincrement())
+  data          DateTime @unique
+  mese          Int
+  anno          Int      @default(2026)
+  importo       Float    @default(0)
+  nTransazioni  Int      @default(0)
+  rimborsi      Float    @default(0)
+  nRimborsi     Int      @default(0)
+  note          String?
+  createdAt     DateTime @default(now())
 }
 
 // ─── GRUPPI ─────────────────────────────────────────────────

@@ -1,9 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, X, Check } from "lucide-react";
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  X,
+  Check,
+  FileDown,
+  FileSpreadsheet,
+} from "lucide-react";
 import { fmt, MESI } from "@/lib/constants";
-import { PageSizeSelect, PageNav } from "@/components/Pagination";
+import { exportPDF, exportExcel } from "@/lib/export";
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -24,11 +32,16 @@ interface Socio {
   cellulare: string | null;
   email: string | null;
   piano: string;
+  pianoDescrizione: string | null;
   prezzoPiano: number;
   pagamento: string;
   iban: string | null;
   stato: string;
   matricola: string | null;
+  matricolaImporto: number;
+  matricolaGratuita: boolean;
+  matricolaPagata: boolean;
+  matricolaMesePagamento: string | null;
   note: string | null;
   pagamentiMensili: PagamentoMensile[];
 }
@@ -52,7 +65,13 @@ interface Buono {
 
 // ─── Constants ────────────────────────────────────────────────────────────
 
-const PIANI = ["PLAN VARADA", "PLAN MATERIAL", "ANNUALE"];
+const PIANI = ["PLAN VARADA", "PLAN MATERIAL", "ANNUALE", "ALTRO"];
+// ALTRO: no default price, l'utente inserisce importo + descrizione manualmente.
+const PIANI_PREZZI: Record<string, number> = {
+  "PLAN VARADA": 60,
+  "PLAN MATERIAL": 55,
+  ANNUALE: 648,
+};
 const PAGAMENTI = ["MENSILE", "ANNUALE"];
 const STATI_SOCIO = ["ATTIVO", "SOSPESO", "CANCELLATO"];
 const STATO_COLORI_SOCIO: Record<string, { bg: string; text: string }> = {
@@ -123,8 +142,6 @@ function SociTab() {
   const [soci, setSoci] = useState<Socio[]>([]);
   const [search, setSearch] = useState("");
   const [statoFilter, setStatoFilter] = useState("");
-  const [pageSize, setPageSize] = useState(10);
-  const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Socio | null>(null);
   const [detail, setDetail] = useState<Socio | null>(null);
@@ -149,11 +166,6 @@ function SociTab() {
     );
   });
 
-  useEffect(() => {
-    setPage(1);
-  }, [search, statoFilter, pageSize]);
-  const paged = filtered.slice((page - 1) * pageSize, page * pageSize);
-
   // Stats
   const meseCorrente = new Date().getMonth() + 1;
   const sociAttivi = soci.filter((s) => s.stato === "ATTIVO").length;
@@ -163,6 +175,32 @@ function SociTab() {
     );
     return sum + (p?.importo ?? (p?.pagato ? s.prezzoPiano : 0));
   }, 0);
+
+  // Riepilogo incassi mensili (anno selezionato)
+  const [annoRiepilogo, setAnnoRiepilogo] = useState(ANNO_CORRENTE);
+  const anniDisponibili = [ANNO_CORRENTE, ANNO_CORRENTE - 1, ANNO_CORRENTE - 2];
+  const totaliMensili = Array(12).fill(0) as number[];
+  for (const s of soci) {
+    for (const p of s.pagamentiMensili ?? []) {
+      if (p.anno === annoRiepilogo && p.pagato) {
+        totaliMensili[p.mese - 1] += p.importo ?? s.prezzoPiano;
+      }
+    }
+    if (
+      s.matricolaPagata &&
+      !s.matricolaGratuita &&
+      s.matricolaMesePagamento
+    ) {
+      const lower = s.matricolaMesePagamento.toLowerCase();
+      const meseMat = MESI.findIndex((m) => lower.startsWith(m.toLowerCase()));
+      const annoMatch = s.matricolaMesePagamento.match(/\d{4}/);
+      const annoMat = annoMatch ? parseInt(annoMatch[0]) : null;
+      if (meseMat >= 0 && annoMat === annoRiepilogo) {
+        totaliMensili[meseMat] += s.matricolaImporto;
+      }
+    }
+  }
+  const totaleAnnoRiepilogo = totaliMensili.reduce((a, b) => a + b, 0);
 
   const openNew = () => {
     setEditing(null);
@@ -177,6 +215,55 @@ function SociTab() {
     await fetch(`/api/club/soci/${id}`, { method: "DELETE" });
     if (detail?.id === id) setDetail(null);
     load();
+  };
+
+  // ─── Export helpers ──────────────────────────────────────────────────
+  const pianoLabel = (s: Socio) =>
+    s.piano === "ALTRO" && s.pianoDescrizione
+      ? `ALTRO (${s.pianoDescrizione})`
+      : s.piano;
+  const matricolaLabel = (s: Socio) =>
+    s.matricolaGratuita
+      ? "Gratuita"
+      : s.matricolaPagata
+        ? s.matricolaMesePagamento ?? "Sì"
+        : "No";
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  const handleExportPDF = () => {
+    const cols = [
+      "Nome",
+      "Cognome",
+      "Piano",
+      "Prezzo",
+      "Pagamento",
+      "Stato",
+      "Matricola pagata",
+    ];
+    const rows = filtered.map((s) => [
+      s.nome,
+      s.cognome ?? "",
+      pianoLabel(s),
+      fmt(s.prezzoPiano),
+      s.pagamento,
+      s.stato,
+      matricolaLabel(s),
+    ]);
+    exportPDF("Soci Molokai", cols, rows, `soci_molokai_${today}`);
+  };
+
+  const handleExportExcel = () => {
+    const data = filtered.map((s) => ({
+      Nome: s.nome,
+      Cognome: s.cognome ?? "",
+      Piano: pianoLabel(s),
+      Prezzo: s.prezzoPiano,
+      Pagamento: s.pagamento,
+      Stato: s.stato,
+      "Matricola pagata": matricolaLabel(s),
+    }));
+    exportExcel(data, `soci_molokai_${today}`);
   };
 
   return (
@@ -203,14 +290,31 @@ function SociTab() {
               </option>
             ))}
           </select>
-          <PageSizeSelect pageSize={pageSize} onChange={setPageSize} />
         </div>
-        <button
-          onClick={openNew}
-          className="glass-btn-primary flex items-center gap-2 text-white text-sm font-medium px-4 py-2.5 rounded-xl"
-        >
-          <Plus className="w-4 h-4" /> Aggiungi Socio
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={handleExportPDF}
+            disabled={filtered.length === 0}
+            className="glass-btn-secondary flex items-center gap-2 text-gray-700 text-sm font-medium px-4 py-2.5 rounded-xl disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Esporta lista filtrata in PDF"
+          >
+            <FileDown className="w-4 h-4" /> PDF
+          </button>
+          <button
+            onClick={handleExportExcel}
+            disabled={filtered.length === 0}
+            className="glass-btn-secondary flex items-center gap-2 text-gray-700 text-sm font-medium px-4 py-2.5 rounded-xl disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Esporta lista filtrata in Excel"
+          >
+            <FileSpreadsheet className="w-4 h-4" /> Excel
+          </button>
+          <button
+            onClick={openNew}
+            className="glass-btn-primary flex items-center gap-2 text-white text-sm font-medium px-4 py-2.5 rounded-xl"
+          >
+            <Plus className="w-4 h-4" /> Aggiungi Socio
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -228,6 +332,61 @@ function SociTab() {
           <p className="text-2xl font-bold mt-1" style={{ color: "#0ea5e9" }}>
             {fmt(incassoMeseCorrente)}
           </p>
+        </div>
+      </div>
+
+      {/* Riepilogo incassi mensili */}
+      <div className="glass-card rounded-2xl p-4">
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <h3 className="text-sm font-bold text-gray-900">
+            Riepilogo incassi mensili soci
+          </h3>
+          <select
+            value={annoRiepilogo}
+            onChange={(e) => setAnnoRiepilogo(parseInt(e.target.value))}
+            className="border border-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white"
+          >
+            {anniDisponibili.map((a) => (
+              <option key={a} value={a}>
+                {a}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="grid grid-cols-6 sm:grid-cols-12 gap-1">
+          {MESI.map((mese, idx) => {
+            const tot = totaliMensili[idx];
+            const hasValue = tot > 0;
+            return (
+              <div
+                key={mese}
+                className="flex flex-col items-center gap-1 px-1 py-2 rounded-lg border"
+                style={
+                  hasValue
+                    ? { background: "#e0f2fe", borderColor: "#7dd3fc" }
+                    : { background: "#fff", borderColor: "#e2e8f0" }
+                }
+              >
+                <span className="text-[10px] uppercase tracking-wide font-semibold text-gray-500">
+                  {mese.slice(0, 3)}
+                </span>
+                <span
+                  className="text-xs font-bold"
+                  style={{ color: hasValue ? "#0369a1" : "#cbd5e1" }}
+                >
+                  {hasValue ? fmt(tot).replace(" €", "") : "—"}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-200">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            Totale {annoRiepilogo}
+          </span>
+          <span className="text-lg font-bold" style={{ color: "#0ea5e9" }}>
+            {fmt(totaleAnnoRiepilogo)}
+          </span>
         </div>
       </div>
 
@@ -257,7 +416,7 @@ function SociTab() {
                   </td>
                 </tr>
               )}
-              {paged.map((s) => {
+              {filtered.map((s) => {
                 const stato = STATO_COLORI_SOCIO[s.stato] ?? STATO_COLORI_SOCIO.ATTIVO;
                 return (
                   <tr
@@ -308,16 +467,6 @@ function SociTab() {
         </div>
       </div>
 
-      {filtered.length > 0 && (
-        <PageNav
-          total={filtered.length}
-          page={page}
-          pageSize={pageSize}
-          onPage={setPage}
-          labelSuffix="soci"
-        />
-      )}
-
       {detail && (
         <SocioDetailModal
           socio={detail}
@@ -363,11 +512,16 @@ function SocioFormModal({
     cellulare: editing?.cellulare ?? "",
     email: editing?.email ?? "",
     piano: editing?.piano ?? "PLAN VARADA",
+    pianoDescrizione: editing?.pianoDescrizione ?? "",
     prezzoPiano: String(editing?.prezzoPiano ?? 0),
     pagamento: editing?.pagamento ?? "MENSILE",
     iban: editing?.iban ?? "",
     stato: editing?.stato ?? "ATTIVO",
     matricola: editing?.matricola ?? "",
+    matricolaImporto: String(editing?.matricolaImporto ?? 50),
+    matricolaGratuita: editing?.matricolaGratuita ?? false,
+    matricolaPagata: editing?.matricolaPagata ?? false,
+    matricolaMesePagamento: editing?.matricolaMesePagamento ?? "",
     note: editing?.note ?? "",
   });
   const [saving, setSaving] = useState(false);
@@ -378,6 +532,15 @@ function SocioFormModal({
     const payload = {
       ...form,
       prezzoPiano: parseFloat(form.prezzoPiano) || 0,
+      // Descrizione piano rilevante solo per "ALTRO", altrimenti null
+      pianoDescrizione:
+        form.piano === "ALTRO" ? form.pianoDescrizione || null : null,
+      matricolaImporto: form.matricolaGratuita
+        ? 0
+        : parseFloat(form.matricolaImporto) || 0,
+      matricolaMesePagamento: form.matricolaPagata
+        ? form.matricolaMesePagamento || null
+        : null,
     };
     try {
       if (editing) {
@@ -446,7 +609,14 @@ function SocioFormModal({
             <label className="text-xs font-medium text-gray-600 block mb-1">Piano</label>
             <select
               value={form.piano}
-              onChange={(e) => setForm((f) => ({ ...f, piano: e.target.value }))}
+              onChange={(e) => {
+                const nuovoPiano = e.target.value;
+                setForm((f) => ({
+                  ...f,
+                  piano: nuovoPiano,
+                  prezzoPiano: String(PIANI_PREZZI[nuovoPiano] ?? f.prezzoPiano),
+                }));
+              }}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white"
             >
               {PIANI.map((p) => (
@@ -457,6 +627,23 @@ function SocioFormModal({
             </select>
           </div>
           {Input("prezzoPiano", "Prezzo piano (€)", "50", "number")}
+
+          {form.piano === "ALTRO" && (
+            <div className="col-span-2">
+              <label className="text-xs font-medium text-gray-600 block mb-1">
+                Descrizione piano *
+              </label>
+              <input
+                type="text"
+                value={form.pianoDescrizione}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, pianoDescrizione: e.target.value }))
+                }
+                placeholder="Es. Nuotatore - materiale ridotto"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
+              />
+            </div>
+          )}
 
           <div>
             <label className="text-xs font-medium text-gray-600 block mb-1">Pagamento</label>
@@ -499,6 +686,81 @@ function SocioFormModal({
             />
           </div>
 
+          <div className="col-span-2 border-t border-gray-200 pt-4 mt-2">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+              Matricola
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-gray-600 block mb-1">
+                  Importo (€)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={form.matricolaImporto}
+                  disabled={form.matricolaGratuita}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, matricolaImporto: e.target.value }))
+                  }
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 disabled:bg-gray-50 disabled:text-gray-400"
+                />
+              </div>
+              <div className="flex items-end">
+                <label className="inline-flex items-center gap-2 cursor-pointer py-2">
+                  <input
+                    type="checkbox"
+                    checked={form.matricolaGratuita}
+                    onChange={(e) =>
+                      setForm((f) => ({
+                        ...f,
+                        matricolaGratuita: e.target.checked,
+                        matricolaImporto: e.target.checked ? "0" : f.matricolaImporto,
+                      }))
+                    }
+                    className="w-4 h-4"
+                    style={{ accentColor: "#0ea5e9" }}
+                  />
+                  <span className="text-sm text-gray-700">Matricola gratuita</span>
+                </label>
+              </div>
+              <div>
+                <label className="inline-flex items-center gap-2 cursor-pointer py-2">
+                  <input
+                    type="checkbox"
+                    checked={form.matricolaPagata}
+                    disabled={form.matricolaGratuita}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, matricolaPagata: e.target.checked }))
+                    }
+                    className="w-4 h-4"
+                    style={{ accentColor: "#0ea5e9" }}
+                  />
+                  <span className="text-sm text-gray-700 font-medium">Pagata</span>
+                </label>
+              </div>
+              {form.matricolaPagata && (
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-1">
+                    Mese pagamento
+                  </label>
+                  <input
+                    type="text"
+                    value={form.matricolaMesePagamento}
+                    onChange={(e) =>
+                      setForm((f) => ({
+                        ...f,
+                        matricolaMesePagamento: e.target.value,
+                      }))
+                    }
+                    placeholder="Es. Gennaio 2026"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
           <div className="col-span-2">
             <label className="text-xs font-medium text-gray-600 block mb-1">Note</label>
             <textarea
@@ -533,7 +795,7 @@ function SocioFormModal({
 // ─── SOCIO DETAIL MODAL ───────────────────────────────────────────────────
 
 function SocioDetailModal({
-  socio,
+  socio: initialSocio,
   onClose,
   onEdit,
   onReload,
@@ -543,18 +805,26 @@ function SocioDetailModal({
   onEdit: () => void;
   onReload: () => void;
 }) {
+  const [socio, setSocio] = useState<Socio>(initialSocio);
   const [anno, setAnno] = useState(ANNO_CORRENTE);
-  const [pagamenti, setPagamenti] = useState<PagamentoMensile[]>(
-    socio.pagamentiMensili ?? [],
-  );
-  const [saving, setSaving] = useState<number | null>(null);
+  const [saving, setSaving] = useState<string | null>(null);
 
-  const pagatoMese = (mese: number) =>
-    pagamenti.find((p) => p.anno === anno && p.mese === mese)?.pagato ?? false;
+  const isAnnuale = socio.pagamento === "ANNUALE";
+  const pagamenti = socio.pagamentiMensili ?? [];
+
+  const pagamentoDi = (mese: number) =>
+    pagamenti.find((p) => p.anno === anno && p.mese === mese);
+
+  // Per soci annuali: il mese già pagato (se esiste) blocca gli altri.
+  const meseAnnualePagato = isAnnuale
+    ? pagamenti.find((p) => p.anno === anno && p.pagato)?.mese ?? null
+    : null;
 
   const togglePagato = async (mese: number) => {
-    const current = pagatoMese(mese);
-    setSaving(mese);
+    const p = pagamentoDi(mese);
+    const current = p?.pagato ?? false;
+    const pagato = !current;
+    setSaving(`m-${mese}`);
     try {
       const res = await fetch(`/api/club/soci/${socio.id}/pagamenti`, {
         method: "PUT",
@@ -562,22 +832,60 @@ function SocioDetailModal({
         body: JSON.stringify({
           anno,
           mese,
-          pagato: !current,
-          importo: !current ? socio.prezzoPiano : null,
+          pagato,
+          importo: pagato ? socio.prezzoPiano : null,
         }),
       });
-      const data = await res.json();
-      if (Array.isArray(data)) setPagamenti(data);
+      const updated = (await res.json()) as Socio;
+      if (updated?.id) setSocio(updated);
       onReload();
     } finally {
       setSaving(null);
     }
   };
 
-  const totaleAnno = pagamenti
-    .filter((p) => p.anno === anno && p.pagato)
-    .reduce((sum, p) => sum + (p.importo ?? socio.prezzoPiano), 0);
-  const mesiPagati = pagamenti.filter((p) => p.anno === anno && p.pagato).length;
+  const saveMatricola = async (patch: {
+    pagata?: boolean;
+    mesePagamento?: string | null;
+    importo?: number;
+  }) => {
+    setSaving("matr");
+    try {
+      const body = {
+        tipo: "matricola",
+        pagata: patch.pagata ?? socio.matricolaPagata,
+        mesePagamento:
+          patch.mesePagamento !== undefined
+            ? patch.mesePagamento
+            : socio.matricolaMesePagamento,
+        ...(patch.importo !== undefined ? { importo: patch.importo } : {}),
+      };
+      const res = await fetch(`/api/club/soci/${socio.id}/pagamenti`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const updated = (await res.json()) as Socio;
+      if (updated?.id) setSocio(updated);
+      onReload();
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  // Totale anno = mesi pagati anno + matricola (se pagata e mese appartiene all'anno)
+  const mesiPagatiAnno = pagamenti.filter((p) => p.anno === anno && p.pagato);
+  const totalePagamenti = mesiPagatiAnno.reduce(
+    (sum, p) => sum + (p.importo ?? socio.prezzoPiano),
+    0,
+  );
+  const matricolaInAnno =
+    socio.matricolaPagata &&
+    !socio.matricolaGratuita &&
+    (!socio.matricolaMesePagamento ||
+      socio.matricolaMesePagamento.includes(String(anno)));
+  const totaleMatricola = matricolaInAnno ? socio.matricolaImporto : 0;
+  const totaleAnno = totalePagamenti + totaleMatricola;
 
   const stato = STATO_COLORI_SOCIO[socio.stato] ?? STATO_COLORI_SOCIO.ATTIVO;
   const anniDisponibili = [ANNO_CORRENTE, ANNO_CORRENTE - 1, ANNO_CORRENTE - 2];
@@ -588,7 +896,7 @@ function SocioDetailModal({
       onClick={onClose}
     >
       <div
-        className="glass-modal rounded-2xl w-full max-w-2xl p-6 space-y-5 max-h-[90vh] overflow-y-auto"
+        className="glass-modal rounded-2xl w-full max-w-4xl p-6 space-y-5 max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
         style={{ textAlign: "left" }}
       >
@@ -606,7 +914,10 @@ function SocioDetailModal({
               </span>
             </div>
             <p className="text-xs text-gray-500 mt-0.5">
-              {socio.piano} · {fmt(socio.prezzoPiano)} · {socio.pagamento}
+              {socio.piano === "ALTRO" && socio.pianoDescrizione
+                ? `${socio.piano} (${socio.pianoDescrizione})`
+                : socio.piano}{" "}
+              · {fmt(socio.prezzoPiano)} · {socio.pagamento}
             </p>
           </div>
           <button
@@ -627,34 +938,91 @@ function SocioDetailModal({
           {socio.note && <DetailRow label="Note" value={socio.note} />}
         </div>
 
-        {/* Pagamenti mensili */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-bold text-gray-900">Pagamenti mensili</h3>
-            <select
-              value={anno}
-              onChange={(e) => setAnno(parseInt(e.target.value))}
-              className="border border-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white"
-            >
-              {anniDisponibili.map((a) => (
-                <option key={a} value={a}>
-                  {a}
-                </option>
-              ))}
-            </select>
-          </div>
+        {/* Year selector */}
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-gray-900">Pagamenti</h3>
+          <select
+            value={anno}
+            onChange={(e) => setAnno(parseInt(e.target.value))}
+            className="border border-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white"
+          >
+            {anniDisponibili.map((a) => (
+              <option key={a} value={a}>
+                {a}
+              </option>
+            ))}
+          </select>
+        </div>
 
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+        {/* Matricola row */}
+        <div className="rounded-xl border border-gray-200 p-3 bg-white/50">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-4 flex-wrap">
+              <div>
+                <p className="text-[10px] text-gray-500 uppercase tracking-wide font-semibold">
+                  Matricola
+                </p>
+                <p className="text-sm font-bold text-gray-900">
+                  {socio.matricolaGratuita
+                    ? "Gratuita"
+                    : fmt(socio.matricolaImporto)}
+                </p>
+              </div>
+              <label className="inline-flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={socio.matricolaPagata}
+                  disabled={socio.matricolaGratuita || saving === "matr"}
+                  onChange={() =>
+                    saveMatricola({ pagata: !socio.matricolaPagata })
+                  }
+                  className="w-4 h-4"
+                  style={{ accentColor: "#0ea5e9" }}
+                />
+                <span className="text-sm text-gray-700 font-medium">Pagata</span>
+              </label>
+            </div>
+            {socio.matricolaPagata && (
+              <input
+                type="text"
+                defaultValue={socio.matricolaMesePagamento ?? ""}
+                onBlur={(e) => {
+                  const v = e.target.value.trim();
+                  if (v !== (socio.matricolaMesePagamento ?? "")) {
+                    saveMatricola({ mesePagamento: v || null });
+                  }
+                }}
+                placeholder="Es. Gennaio 2026"
+                className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 w-48"
+              />
+            )}
+          </div>
+        </div>
+
+        {/* 12-column payments grid */}
+        <div>
+          <div className="grid grid-cols-12 gap-1">
             {MESI.map((mese, idx) => {
               const m = idx + 1;
-              const pagato = pagatoMese(m);
-              const loading = saving === m;
+              const p = pagamentoDi(m);
+              const pagato = p?.pagato ?? false;
+              const loading = saving === `m-${m}`;
+              const disabled =
+                isAnnuale &&
+                meseAnnualePagato !== null &&
+                meseAnnualePagato !== m;
+              const importoLabel = isAnnuale
+                ? pagato
+                  ? fmt(p?.importo ?? socio.prezzoPiano)
+                  : ""
+                : fmt(socio.prezzoPiano);
+
               return (
                 <button
                   key={m}
                   onClick={() => togglePagato(m)}
-                  disabled={loading}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium transition-all disabled:opacity-50"
+                  disabled={loading || disabled}
+                  className="flex flex-col items-center gap-1 px-1 py-2 rounded-lg border text-[10px] font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                   style={
                     pagato
                       ? {
@@ -669,8 +1037,11 @@ function SocioDetailModal({
                         }
                   }
                 >
+                  <span className="uppercase tracking-wide">
+                    {mese.slice(0, 3)}
+                  </span>
                   <span
-                    className="inline-flex items-center justify-center w-4 h-4 rounded border"
+                    className="inline-flex items-center justify-center w-5 h-5 rounded border"
                     style={
                       pagato
                         ? { background: "#22c55e", borderColor: "#22c55e" }
@@ -679,19 +1050,31 @@ function SocioDetailModal({
                   >
                     {pagato && <Check className="w-3 h-3 text-white" />}
                   </span>
-                  {mese.slice(0, 3)}
+                  <span className="text-[9px] text-gray-500 font-medium h-3">
+                    {importoLabel}
+                  </span>
                 </button>
               );
             })}
           </div>
 
+          {isAnnuale && meseAnnualePagato === null && (
+            <p className="text-[11px] text-gray-500 mt-2">
+              Piano annuale: clicca sul mese in cui è stato effettuato il pagamento.
+            </p>
+          )}
+
           <div className="grid grid-cols-2 gap-3 mt-4 bg-gray-50 rounded-xl p-3">
             <div>
               <p className="text-[10px] text-gray-500 uppercase tracking-wide">
-                Mesi pagati {anno}
+                {isAnnuale ? "Pagamento anno" : "Mesi pagati"} {anno}
               </p>
               <p className="text-sm font-bold text-gray-900">
-                {mesiPagati} / 12
+                {isAnnuale
+                  ? meseAnnualePagato
+                    ? `✓ ${MESI[meseAnnualePagato - 1]}`
+                    : "—"
+                  : `${mesiPagatiAnno.length} / 12`}
               </p>
             </div>
             <div>
@@ -700,6 +1083,10 @@ function SocioDetailModal({
               </p>
               <p className="text-sm font-bold" style={{ color: "#0ea5e9" }}>
                 {fmt(totaleAnno)}
+              </p>
+              <p className="text-[10px] text-gray-400 mt-0.5">
+                {fmt(totalePagamenti)} quote
+                {matricolaInAnno ? ` + ${fmt(totaleMatricola)} matricola` : ""}
               </p>
             </div>
           </div>
@@ -751,8 +1138,6 @@ function BuoniTab() {
   const [buoni, setBuoni] = useState<Buono[]>([]);
   const [search, setSearch] = useState("");
   const [statoFilter, setStatoFilter] = useState("");
-  const [pageSize, setPageSize] = useState(10);
-  const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Buono | null>(null);
 
@@ -775,11 +1160,6 @@ function BuoniTab() {
       (b.email ?? "").toLowerCase().includes(q)
     );
   });
-
-  useEffect(() => {
-    setPage(1);
-  }, [search, statoFilter, pageSize]);
-  const paged = filtered.slice((page - 1) * pageSize, page * pageSize);
 
   const openNew = () => {
     setEditing(null);
@@ -819,7 +1199,6 @@ function BuoniTab() {
               </option>
             ))}
           </select>
-          <PageSizeSelect pageSize={pageSize} onChange={setPageSize} />
         </div>
         <button
           onClick={openNew}
@@ -862,7 +1241,7 @@ function BuoniTab() {
                   </td>
                 </tr>
               )}
-              {paged.map((b) => {
+              {filtered.map((b) => {
                 const stato = STATO_COLORI_BUONO[b.stato] ?? STATO_COLORI_BUONO.Attivo;
                 const residue =
                   b.sessioniTotali !== null
@@ -933,16 +1312,6 @@ function BuoniTab() {
           </table>
         </div>
       </div>
-
-      {filtered.length > 0 && (
-        <PageNav
-          total={filtered.length}
-          page={page}
-          pageSize={pageSize}
-          onPage={setPage}
-          labelSuffix="buoni"
-        />
-      )}
 
       {showForm && (
         <BuonoFormModal

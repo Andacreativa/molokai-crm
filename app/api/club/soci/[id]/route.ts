@@ -31,6 +31,9 @@ export async function PATCH(
       ...(body.cellulare !== undefined && { cellulare: body.cellulare || null }),
       ...(body.email !== undefined && { email: body.email || null }),
       ...(body.piano !== undefined && { piano: body.piano }),
+      ...(body.pianoDescrizione !== undefined && {
+        pianoDescrizione: body.pianoDescrizione || null,
+      }),
       ...(body.prezzoPiano !== undefined && {
         prezzoPiano: parseFloat(body.prezzoPiano) || 0,
       }),
@@ -39,6 +42,20 @@ export async function PATCH(
       ...(body.stato !== undefined && { stato: body.stato }),
       ...(body.matricola !== undefined && {
         matricola: body.matricola || null,
+      }),
+      ...(body.matricolaImporto !== undefined && {
+        matricolaImporto: parseFloat(body.matricolaImporto) || 0,
+      }),
+      ...(body.matricolaGratuita !== undefined && {
+        matricolaGratuita: Boolean(body.matricolaGratuita),
+        // Quando si attiva "gratuita", azzera l'importo automaticamente
+        ...(Boolean(body.matricolaGratuita) && { matricolaImporto: 0 }),
+      }),
+      ...(body.matricolaPagata !== undefined && {
+        matricolaPagata: Boolean(body.matricolaPagata),
+      }),
+      ...(body.matricolaMesePagamento !== undefined && {
+        matricolaMesePagamento: body.matricolaMesePagamento || null,
       }),
       ...(body.note !== undefined && { note: body.note || null }),
     },
