@@ -6,66 +6,69 @@ datasource db {
   provider = "postgresql"
 }
 
+// ─── FATTURE ────────────────────────────────────────────────
+
 model Cliente {
-  id           Int       @id @default(autoincrement())
-  nome         String
-  paese        String    @default("Italia")
-  email        String?
-  telefono     String?
-  partitaIva   String?
-  via          String?
-  cap          String?
-  citta        String?
-  provincia    String?
-  iban         String?
-  tipoImposta  String?   @default("IGIC Exenta")
-  note         String?
-  createdAt    DateTime  @default(now())
-  fatture      Fattura[]
+  id          Int       @id @default(autoincrement())
+  nome        String
+  cognome     String?
+  email       String?
+  telefono    String?
+  dni         String?
+  partitaIva  String?
+  via         String?
+  cap         String?
+  citta       String?
+  provincia   String?
+  paese       String?   @default("Spagna")
+  iban        String?
+  note        String?
+  tipo        String    @default("privato") // privato | azienda
+  createdAt   DateTime  @default(now())
+  fatture     Fattura[]
 }
 
 model Fattura {
-  id            Int            @id @default(autoincrement())
-  numero        String?
-  data          DateTime?
-  clienteId     Int?
-  cliente       Cliente?       @relation(fields: [clienteId], references: [id], onDelete: SetNull)
-  azienda       String         @default("Spagna")
-  aziendaNota   String?
-  mese          Int
-  anno          Int            @default(2025)
-  importo       Float
-  tipoIva       String         @default("iva")
-  iva           Float          @default(21)
-  pagato        Boolean        @default(false)
-  metodo        String?
-  commerciale   String?
-  scadenza      DateTime?
-  createdAt     DateTime       @default(now())
-  altroIngresso AltroIngresso?
-  spesa         Spesa?
+  id               Int       @id @default(autoincrement())
+  numero           String?
+  data             DateTime?
+  scadenza         DateTime?
+  clienteId        Int?
+  cliente          Cliente?  @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  righe            String    // JSON: [{descrizione, quantita, prezzoUnitario}]
+  baseImponibile   Float
+  iva              Float     @default(21)
+  totale           Float
+  pagato           Boolean   @default(false)
+  metodoPagamento  String?   // transferencia | tarjeta | bizum | efectivo
+  mese             Int
+  anno             Int       @default(2026)
+  note             String?
+  createdAt        DateTime  @default(now())
+  spesa            Spesa?
 }
 
-model AltroIngresso {
-  id          Int       @id @default(autoincrement())
-  fonte       String
-  azienda     String    @default("Spagna")
-  aziendaNota String?
-  descrizione String?
-  mese        Int
-  anno        Int       @default(2025)
-  importo     Float
-  incassato   Boolean   @default(false)
-  dataIncasso DateTime?
-  fatturaId   Int?      @unique
-  fattura     Fattura?  @relation(fields: [fatturaId], references: [id], onDelete: Cascade)
-  createdAt   DateTime  @default(now())
+// ─── SPESE ──────────────────────────────────────────────────
+
+model Spesa {
+  id           Int      @id @default(autoincrement())
+  fornitore    String
+  categoria    String   // Scuola | Rappresentanza | MaterialeSportivo | Affitto | Utenze | Marketing | Altro
+  descrizione  String?
+  importo      Float
+  mese         Int
+  anno         Int      @default(2026)
+  ricevutaPath String?
+  note         String?
+  fatturaId    Int?     @unique
+  fattura      Fattura? @relation(fields: [fatturaId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
 }
 
 model SpesaFissa {
   id            Int      @id @default(autoincrement())
   tipo          String
-  cadenza       String
+  cadenza       String   // mensile | annuale | trimestrale
   dataPagamento String
   costo         Float    @default(0)
   costoMensile  Float    @default(0)
@@ -73,41 +76,210 @@ model SpesaFissa {
   createdAt     DateTime @default(now())
 }
 
-model Spesa {
-  id           Int      @id @default(autoincrement())
-  azienda      String   @default("Spagna")
-  aziendaNota  String?
-  fornitore    String
-  fornitoreId  Int?
-  categoria    String
-  descrizione  String?
-  note         String?
-  ricevutaPath String?
-  mese         Int
-  anno         Int      @default(2025)
-  importo      Float
-  fatturaId    Int?     @unique
-  fattura      Fattura? @relation(fields: [fatturaId], references: [id], onDelete: Cascade)
-  createdAt    DateTime @default(now())
+// ─── CLUB (SOCI + BUONI) ────────────────────────────────────
+
+model Socio {
+  id              Int                @id @default(autoincrement())
+  nome            String
+  cognome         String?
+  dni             String?
+  cellulare       String?
+  email           String?
+  piano           String             // PLAN VARADA | PLAN MATERIAL | ANNUALE
+  prezzoPiano     Float
+  pagamento       String             @default("MENSILE") // MENSILE | ANNUALE
+  iban            String?
+  stato           String             @default("ATTIVO") // ATTIVO | SOSPESO | CANCELLATO
+  matricola       String?
+  note            String?
+  createdAt       DateTime           @default(now())
+  pagamentiMensili PagamentoSocio[]
+  buoni           Buono[]
 }
 
-model Fornitore {
-  id          Int      @id @default(autoincrement())
-  nome        String
-  paese       String   @default("Italia")
-  email       String?
-  telefono    String?
-  partitaIva  String?
-  via         String?
-  cap         String?
-  citta       String?
-  provincia   String?
-  note        String?
-  createdAt   DateTime @default(now())
+model PagamentoSocio {
+  id        Int      @id @default(autoincrement())
+  socioId   Int
+  socio     Socio    @relation(fields: [socioId], references: [id], onDelete: Cascade)
+  anno      Int
+  mese      Int      // 1-12
+  pagato    Boolean  @default(false)
+  importo   Float?
+  data      DateTime?
+  createdAt DateTime @default(now())
+
+  @@unique([socioId, anno, mese])
 }
+
+model Buono {
+  id             Int      @id @default(autoincrement())
+  nome           String
+  cognome        String?
+  cellulare      String?
+  email          String?
+  socioId        Int?
+  socio          Socio?   @relation(fields: [socioId], references: [id], onDelete: SetNull)
+  tipoBuono      String   // BONO CLASE | PACK 4 SUP | PACK 8 SUP | CUSTOM
+  prezzoBuono    Float
+  pagato         Boolean  @default(false)
+  mesePagamento  String?
+  stato          String   @default("Attivo") // Attivo | Usato | Scaduto
+  sessioniTotali Int?
+  sessioniUsate  Int      @default(0)
+  note           String?
+  createdAt      DateTime @default(now())
+}
+
+// ─── PRENOTAZIONI ───────────────────────────────────────────
+
+model PrenotazioneFareHarbor {
+  id       Int   @id @default(autoincrement())
+  anno     Int   @default(2026)
+  mese     Int
+  sett1    Float @default(0)
+  sett2    Float @default(0)
+  sett3    Float @default(0)
+  sett4    Float @default(0)
+  totale   Float @default(0)
+
+  @@unique([anno, mese])
+}
+
+model PrenotazioneStripe {
+  id           Int   @id @default(autoincrement())
+  anno         Int   @default(2026)
+  mese         Int
+  lordo        Float @default(0)
+  commissioni  Float @default(0)
+  rimborsi     Float @default(0)
+  netto        Float @default(0)
+
+  @@unique([anno, mese])
+}
+
+model PrenotazioneGetYourGuide {
+  id           Int   @id @default(autoincrement())
+  anno         Int   @default(2026)
+  mese         Int
+  lordo        Float @default(0)
+  commissioni  Float @default(0)
+  netto        Float @default(0)
+
+  @@unique([anno, mese])
+}
+
+model PagamentoInScuola {
+  id        Int      @id @default(autoincrement())
+  data      DateTime
+  mese      Int
+  anno      Int      @default(2026)
+  importo   Float    @default(0)
+  note      String?
+  createdAt DateTime @default(now())
+}
+
+// ─── GRUPPI ─────────────────────────────────────────────────
+
+model Gruppo {
+  id            Int       @id @default(autoincrement())
+  nome          String    // es: Colegio La Salle Barceloneta
+  tipo          String    @default("scuola") // scuola | azienda | altro
+  contatto      String?
+  email         String?
+  telefono      String?
+  note          String?
+  createdAt     DateTime  @default(now())
+  sessioni      SessioneGruppo[]
+}
+
+model SessioneGruppo {
+  id             Int      @id @default(autoincrement())
+  gruppoId       Int
+  gruppo         Gruppo   @relation(fields: [gruppoId], references: [id], onDelete: Cascade)
+  data           DateTime
+  mese           Int
+  anno           Int      @default(2026)
+  partecipanti   Int
+  prezzoPP       Float
+  totale         Float    // calcolato: partecipanti * prezzoPP
+  note           String?
+  createdAt      DateTime @default(now())
+}
+
+// ─── COLLABORATORI ──────────────────────────────────────────
+
+model Collaboratore {
+  id          Int                      @id @default(autoincrement())
+  nome        String
+  cognome     String?
+  dni         String?
+  cellulare   String?
+  email       String?
+  iban        String?
+  ruolo       String                   // Istruttore Surf | Istruttore SUP | Insegnante Yoga | Fotografo | Receptionist | Altro
+  note        String?
+  attivo      Boolean                  @default(true)
+  tariffe     TariffaCollaboratore[]
+  sessioni    SessioneCollaboratore[]
+  pagamenti   PagamentoCollaboratore[]
+  anticipi    AnticipoColl[]
+  createdAt   DateTime                 @default(now())
+}
+
+model TariffaCollaboratore {
+  id               Int           @id @default(autoincrement())
+  collaboratoreId  Int
+  collaboratore    Collaboratore @relation(fields: [collaboratoreId], references: [id], onDelete: Cascade)
+  tipoAttivita     String        // Classe Gruppo | Classe Singola | Sessione Yoga | Giornata | Altro
+  tariffaOraria    Float
+  createdAt        DateTime      @default(now())
+
+  @@unique([collaboratoreId, tipoAttivita])
+}
+
+model SessioneCollaboratore {
+  id               Int           @id @default(autoincrement())
+  collaboratoreId  Int
+  collaboratore    Collaboratore @relation(fields: [collaboratoreId], references: [id], onDelete: Cascade)
+  data             DateTime
+  mese             Int
+  anno             Int           @default(2026)
+  tipoAttivita     String
+  ore              Float
+  costo            Float         // ore * tariffa
+  note             String?
+  createdAt        DateTime      @default(now())
+}
+
+model PagamentoCollaboratore {
+  id               Int           @id @default(autoincrement())
+  collaboratoreId  Int
+  collaboratore    Collaboratore @relation(fields: [collaboratoreId], references: [id], onDelete: Cascade)
+  anno             Int
+  mese             Int
+  dovuto           Float
+  pagato           Float         @default(0)
+  data             DateTime?
+  note             String?
+  createdAt        DateTime      @default(now())
+
+  @@unique([collaboratoreId, anno, mese])
+}
+
+model AnticipoColl {
+  id               Int           @id @default(autoincrement())
+  collaboratoreId  Int
+  collaboratore    Collaboratore @relation(fields: [collaboratoreId], references: [id], onDelete: Cascade)
+  mese             String
+  importo          Float
+  restituito       Boolean       @default(false)
+  createdAt        DateTime      @default(now())
+}
+
+// ─── DIPENDENTI ─────────────────────────────────────────────
 
 model Dipendente {
-  id               Int       @id @default(autoincrement())
+  id               Int                    @id @default(autoincrement())
   nome             String
   cognome          String?
   ruolo            String?
@@ -118,16 +290,16 @@ model Dipendente {
   cap              String?
   citta            String?
   provincia        String?
-  paese            String?   @default("Spagna")
+  paese            String?                @default("Spagna")
   telefono         String?
   email            String?
   iban             String?
   fotoPath         String?
-  nettoBustaPaga   Float     @default(0)
-  irpf             Float     @default(0)
-  irpfImporto      Float     @default(0)
-  seguridadSocial  Float     @default(0)
-  createdAt        DateTime  @default(now())
+  nettoBustaPaga   Float                  @default(0)
+  irpf             Float                  @default(0)
+  irpfImporto      Float                  @default(0)
+  seguridadSocial  Float                  @default(0)
+  createdAt        DateTime               @default(now())
   pagamenti        PagamentoDipendente[]
 }
 
@@ -137,70 +309,39 @@ model PagamentoDipendente {
   dipendente    Dipendente @relation(fields: [dipendenteId], references: [id], onDelete: Cascade)
   anno          Int
   mese          Int
-  tipo          String     // 'stipendio' | 'seguridad'
-  spesaId       Int?
+  tipo          String     // stipendio | seguridad
   createdAt     DateTime   @default(now())
 
   @@unique([dipendenteId, anno, mese, tipo])
 }
 
-model Contatto {
-  id         Int      @id @default(autoincrement())
-  nome       String
-  paese      String   @default("Italia")
-  email      String?
-  telefono   String?
-  partitaIva String?
-  via        String?
-  cap        String?
-  citta      String?
-  provincia  String?
-  note       String?
-  status     String   @default("lead")
-  createdAt  DateTime @default(now())
+// ─── PRODOTTI ───────────────────────────────────────────────
+
+model Prodotto {
+  id              Int             @id @default(autoincrement())
+  nome            String
+  categoria       String          // Esperienza | Lezione | Noleggio | Pack | Abbonamento
+  prezzoVendita   Float
+  costodiretto    Float           @default(0)  // costo collaboratore + materiale
+  margine         Float           @default(0)  // calcolato: prezzoVendita - costodiretto
+  canale          String          @default("FareHarbor") // FareHarbor | GYG | Cassa | Stripe | Diretto
+  durata          String?         // es: 1h30
+  stato           String          @default("Attivo") // Attivo | NonListato | Archiviato
+  note            String?
+  createdAt       DateTime        @default(now())
+  vendite         VenditaProdotto[]
 }
 
-model Lead {
-  id         Int           @id @default(autoincrement())
-  nome       String
-  azienda    String?
-  email      String?
-  telefono   String?
-  valore     Float?
-  stage      String        @default("nuovo")
-  note       String?
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
-  appunti    AppuntoCall[]
-  preventivi Preventivo[]
-}
-
-model AppuntoCall {
-  id        Int      @id @default(autoincrement())
-  leadId    Int
-  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  testo     String
-  createdAt DateTime @default(now())
-}
-
-model Preventivo {
-  id             Int       @id @default(autoincrement())
-  numero         String
-  nomeCliente    String
-  emailCliente   String?
-  aziendaCliente String?
-  azienda        String    @default("Spagna")
-  oggetto        String
-  voci           String
-  iva            Float     @default(21)
-  subtotale      Float     @default(0)
-  totale         Float     @default(0)
-  feeCommerciale Float     @default(0)
-  leadId         Int?
-  lead           Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  status         String    @default("attesa")
-  note           String?
-  condizioni     String?
-  dataScadenza   DateTime?
-  createdAt      DateTime  @default(now())
+model VenditaProdotto {
+  id          Int      @id @default(autoincrement())
+  prodottoId  Int
+  prodotto    Prodotto @relation(fields: [prodottoId], references: [id], onDelete: Cascade)
+  data        DateTime
+  mese        Int
+  anno        Int      @default(2026)
+  quantita    Int      @default(1)
+  importo     Float
+  canale      String?
+  note        String?
+  createdAt   DateTime @default(now())
 }
