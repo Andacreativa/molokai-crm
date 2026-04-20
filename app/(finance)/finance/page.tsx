@@ -68,7 +68,6 @@ export default function Dashboard() {
   const [azienda, setAzienda] = useState("");
 
   useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const run = async () => {
       try {
         const params = new URLSearchParams({ anno: String(anno) });
@@ -322,7 +321,7 @@ export default function Dashboard() {
           ) : (
             <ResponsiveContainer width="100%" height={220}>
               <PieChart>
-                {/* eslint-disable-next-line @typescript-eslint/no-deprecated */}
+                {}
                 <Pie
                   data={data.categorieSpese ?? []}
                   cx="50%"
@@ -333,7 +332,6 @@ export default function Dashboard() {
                   nameKey="name"
                 >
                   {(data.categorieSpese ?? []).map((entry, i) => (
-                    // eslint-disable-next-line @typescript-eslint/no-deprecated
                     <Cell
                       key={i}
                       fill={

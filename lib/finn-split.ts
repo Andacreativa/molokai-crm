@@ -14,6 +14,11 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 export const isFinnCommerciale = (commerciale: string | null | undefined) =>
   (commerciale ?? "").toLowerCase().includes("finn");
 
+export const isFinnRitenuta = (a: {
+  fonte?: string | null;
+  descrizione?: string | null;
+}) => a.fonte === "Finn" && a.descrizione === "Ritenuta spese gestione Anda";
+
 export async function applyFinnSplit(prisma: PrismaClient, f: FinnFattura) {
   const quota15 = round2(f.importo * 0.15);
   const quota85 = round2(f.importo * 0.85);

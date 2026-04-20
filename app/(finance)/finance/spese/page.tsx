@@ -8,7 +8,6 @@ import {
   Download,
   FileSpreadsheet,
   Paperclip,
-  ExternalLink,
 } from "lucide-react";
 import {
   fmt,
@@ -77,7 +76,6 @@ export default function SpesePage() {
   const [pageSize, setPageSize] = useState(10);
   const [page, setPage] = useState(1);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const load = async () => {
     const params = new URLSearchParams({ anno: String(anno) });
     if (azienda) params.set("azienda", azienda);

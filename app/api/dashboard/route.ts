@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { isFinnRitenuta } from "@/lib/finn-split";
 
 export async function GET(request: Request) {
   try {
@@ -32,8 +33,12 @@ export async function GET(request: Request) {
       }),
     ]);
 
+    // Escludi ritenute Finn dai calcoli (solo riferimento visivo in tabella)
+    const altriCalc = altri.filter((a) => !isFinnRitenuta(a));
+    const altriAnnoPrecCalc = altriAnnoPrec.filter((a) => !isFinnRitenuta(a));
+
     const totaleFatture = fatture.reduce((s: number, f) => s + f.importo, 0);
-    const totaleAltriIngressi = altri.reduce(
+    const totaleAltriIngressi = altriCalc.reduce(
       (s: number, a) => s + a.importo,
       0,
     );
@@ -66,7 +71,7 @@ export async function GET(request: Request) {
       const entrateFatture = fatture
         .filter((f) => f.mese === mese)
         .reduce((s: number, f) => s + f.importo, 0);
-      const entrateAltri = altri
+      const entrateAltri = altriCalc
         .filter((a) => a.mese === mese)
         .reduce((s: number, a) => s + a.importo, 0);
       const entrate = entrateFatture + entrateAltri;
@@ -76,7 +81,7 @@ export async function GET(request: Request) {
       const entratePrecFatture = fattureAnnoPrec
         .filter((f) => f.mese === mese)
         .reduce((s: number, f) => s + f.importo, 0);
-      const entratePrecAltri = altriAnnoPrec
+      const entratePrecAltri = altriAnnoPrecCalc
         .filter((a) => a.mese === mese)
         .reduce((s: number, a) => s + a.importo, 0);
       const entratePrec = entratePrecFatture + entratePrecAltri;
@@ -108,7 +113,7 @@ export async function GET(request: Request) {
       (s: number, f) => s + f.importo,
       0,
     );
-    const totAltriPrec = altriAnnoPrec.reduce(
+    const totAltriPrec = altriAnnoPrecCalc.reduce(
       (s: number, a) => s + a.importo,
       0,
     );

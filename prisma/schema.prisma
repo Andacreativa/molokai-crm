@@ -18,7 +18,7 @@ model Cliente {
   citta        String?
   provincia    String?
   iban         String?
-  tipoImposta  String?   @default("IGIC Exente")
+  tipoImposta  String?   @default("IGIC Exenta")
   note         String?
   createdAt    DateTime  @default(now())
   fatture      Fattura[]
@@ -32,7 +32,6 @@ model Fattura {
   cliente       Cliente?       @relation(fields: [clienteId], references: [id], onDelete: SetNull)
   azienda       String         @default("Spagna")
   aziendaNota   String?
-  descrizione   String?
   mese          Int
   anno          Int            @default(2025)
   importo       Float

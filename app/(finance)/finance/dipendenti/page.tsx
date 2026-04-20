@@ -90,7 +90,6 @@ export default function DipendentiPage() {
     }
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const load = async () => {
     const data = (await (
       await fetch(`/api/dipendenti?anno=${anno}`)

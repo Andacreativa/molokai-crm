@@ -17,6 +17,7 @@ import { fmt, MESI } from "@/lib/constants";
 import FiltriBar from "@/components/FiltriBar";
 import { useAnno } from "@/lib/anno-context";
 import { exportExcel, exportPDF } from "@/lib/export";
+import { isFinnRitenuta } from "@/lib/finn-split";
 
 interface MeseData {
   mese: number;
@@ -33,7 +34,6 @@ export default function BilancioPage() {
   const [azienda, setAzienda] = useState("");
 
   useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const run = async () => {
       const params = new URLSearchParams({ anno: String(anno) });
       if (azienda) params.set("azienda", azienda);
@@ -48,9 +48,14 @@ export default function BilancioPage() {
       const spese: { mese: number; importo: number }[] = Array.isArray(rawS)
         ? rawS
         : [];
-      const altri: { mese: number; importo: number }[] = Array.isArray(rawAltri)
-        ? rawAltri
-        : [];
+      const altriRaw: {
+        mese: number;
+        importo: number;
+        fonte?: string | null;
+        descrizione?: string | null;
+      }[] = Array.isArray(rawAltri) ? rawAltri : [];
+      // Escludi ritenute Finn dai totali
+      const altri = altriRaw.filter((a) => !isFinnRitenuta(a));
 
       const totFatture = fatture.reduce(
         (s: number, f) => s + (f?.importo ?? 0),
@@ -241,7 +246,6 @@ export default function BilancioPage() {
             <ReferenceLine y={0} stroke="#e2e8f0" strokeWidth={2} />
             <Bar dataKey="Bilancio" radius={[4, 4, 0, 0]}>
               {chartData.map((entry, i) => (
-                // eslint-disable-next-line @typescript-eslint/no-deprecated
                 <Bar
                   key={i}
                   dataKey="Bilancio"

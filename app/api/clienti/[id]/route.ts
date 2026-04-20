@@ -23,7 +23,7 @@ export async function PATCH(
       }),
       ...(body.iban !== undefined && { iban: body.iban || null }),
       ...(body.tipoImposta !== undefined && {
-        tipoImposta: body.tipoImposta || "IGIC Exente",
+        tipoImposta: body.tipoImposta || "IGIC Exenta",
       }),
       ...(body.note !== undefined && { note: body.note }),
     },

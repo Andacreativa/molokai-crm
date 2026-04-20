@@ -86,7 +86,7 @@ export const CATEGORIE_COLORI_CHART: Record<string, string> = {
 export const BRAND = "#e8308a";
 
 export const TIPO_IMPOSTA_OPTIONS = [
-  "IGIC Exente",
+  "IGIC Exenta",
   "IGIC 0%",
   "IGIC 7%",
   "IGIC 21%",
@@ -103,6 +103,10 @@ export function fmt(n: number | null | undefined): string {
   return `${negative ? "-" : ""}${intWithSep},${decPart} €`;
 }
 
-// Genera anni in ordine decrescente a partire dall'anno corrente
+// Anni disponibili dal 2024 all'anno corrente, ordine decrescente
 const ANNO_CORRENTE = new Date().getFullYear();
-export const ANNI = Array.from({ length: 5 }, (_, i) => ANNO_CORRENTE - i); // es. 2026,2025,2024,2023,2022
+const ANNO_MIN = 2024;
+export const ANNI = Array.from(
+  { length: Math.max(1, ANNO_CORRENTE - ANNO_MIN + 1) },
+  (_, i) => ANNO_CORRENTE - i,
+);

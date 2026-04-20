@@ -75,12 +75,12 @@ export default function ScadenzePage() {
   const [fatture, setFatture] = useState<Fattura[]>([]);
   const { anno, setAnno } = useAnno();
   const [filtroAzienda, setFiltroAzienda] = useState("");
+  const [filtroCliente, setFiltroCliente] = useState("");
   const [filtroStato, setFiltroStato] = useState<
     "tutte" | "scaduta" | "urgente" | "prossima"
   >("tutte");
   const [selected, setSelected] = useState<Set<number>>(new Set());
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const load = async () => {
     const params = new URLSearchParams({ anno: String(anno) });
     if (filtroAzienda) params.set("azienda", filtroAzienda);
@@ -109,13 +109,23 @@ export default function ScadenzePage() {
 
   const filtered = withStato
     .filter((f) => {
-      if (filtroStato === "tutte") return f.stato !== "ok";
-      return f.stato === filtroStato;
+      if (filtroStato === "tutte" ? f.stato === "ok" : f.stato !== filtroStato)
+        return false;
+      if (filtroCliente && f.cliente?.nome !== filtroCliente) return false;
+      return true;
     })
     .sort(
       (a, b) =>
         new Date(a.scadenza!).getTime() - new Date(b.scadenza!).getTime(),
     );
+
+  const clientiUnici = Array.from(
+    new Set(
+      (fatture ?? [])
+        .map((f) => f.cliente?.nome)
+        .filter((n): n is string => Boolean(n)),
+    ),
+  ).sort((a, b) => a.localeCompare(b, "it"));
 
   const scadute = withStato.filter((f) => f.stato === "scaduta");
   const urgenti = withStato.filter((f) => f.stato === "urgente");
@@ -241,6 +251,18 @@ export default function ScadenzePage() {
             {AZIENDE.map((a) => (
               <option key={a} value={a}>
                 {a}
+              </option>
+            ))}
+          </select>
+          <select
+            value={filtroCliente}
+            onChange={(e) => setFiltroCliente(e.target.value)}
+            className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-pink-300 max-w-[200px]"
+          >
+            <option value="">Tutti i clienti</option>
+            {clientiUnici.map((c) => (
+              <option key={c} value={c}>
+                {c}
               </option>
             ))}
           </select>

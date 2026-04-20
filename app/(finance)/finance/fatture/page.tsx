@@ -59,12 +59,35 @@ interface Fattura {
 
 type TipoIva = "igic_exenta" | "igic7";
 const TIPO_IVA_OPTIONS: { value: TipoIva; label: string }[] = [
-  { value: "igic_exenta", label: "IGIC Exente" },
+  { value: "igic_exenta", label: "IGIC Exenta" },
   { value: "igic7", label: "IGIC 7%" },
 ];
 
 const MESI_NUMS = Array.from({ length: 12 }, (_, i) => i + 1);
+
+const numeroKey = (n: string | null): number => {
+  if (!n) return -Infinity;
+  const digits = n.match(/\d+/g)?.join("") ?? "";
+  return digits ? parseInt(digits, 10) : -Infinity;
+};
+
+const nextNumero = (
+  fatture: { numero: string | null }[],
+  year: number,
+): string => {
+  let maxCounter = 0;
+  for (const f of fatture) {
+    if (!f.numero) continue;
+    const m = f.numero.match(/^F(\d{4})(\d+)$/);
+    if (!m || parseInt(m[1], 10) !== year) continue;
+    const counter = parseInt(m[2], 10);
+    if (counter > maxCounter) maxCounter = counter;
+  }
+  return `F${year}${maxCounter + 1}`;
+};
+
 const emptyForm = {
+  numero: "",
   clienteId: "",
   azienda: AZIENDE[0],
   aziendaNota: "",
@@ -93,7 +116,6 @@ export default function FatturePage() {
   const [page, setPage] = useState(1);
   const [showImport, setShowImport] = useState(false);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const load = async () => {
     const params = new URLSearchParams({ anno: String(anno) });
     if (azienda) params.set("azienda", azienda);
@@ -110,12 +132,13 @@ export default function FatturePage() {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ ...emptyForm, anno });
+    setForm({ ...emptyForm, anno, numero: nextNumero(fatture, anno) });
     setShowForm(true);
   };
   const openEdit = (f: Fattura) => {
     setEditing(f);
     setForm({
+      numero: f.numero || "",
       clienteId: f.clienteId != null ? String(f.clienteId) : "",
       azienda: f.azienda,
       aziendaNota: f.aziendaNota || "",
@@ -169,12 +192,14 @@ export default function FatturePage() {
     load();
   };
 
-  const filtered = (fatture ?? []).filter((f) => {
-    if (filtroMese && f.mese !== filtroMese) return false;
-    if (filtroPagato === "pagato" && !f.pagato) return false;
-    if (filtroPagato === "attesa" && f.pagato) return false;
-    return true;
-  });
+  const filtered = (fatture ?? [])
+    .filter((f) => {
+      if (filtroMese && f.mese !== filtroMese) return false;
+      if (filtroPagato === "pagato" && !f.pagato) return false;
+      if (filtroPagato === "attesa" && f.pagato) return false;
+      return true;
+    })
+    .sort((a, b) => numeroKey(b.numero) - numeroKey(a.numero));
 
   // Reset page se i filtri restringono il dataset
   useEffect(() => {
@@ -345,7 +370,7 @@ export default function FatturePage() {
             {paged.map((f, i) => (
               <tr
                 key={f.id}
-                className={`border-b border-gray-50 hover:bg-gray-50 transition-colors ${isScaduta(f) ? "bg-red-50" : isInScadenza(f) ? "bg-amber-50" : i % 2 === 1 ? "bg-[#F0F0F0]" : ""}`}
+                className={`border-b border-gray-50 transition-colors ${i % 2 === 1 ? "bg-[#F9F9F9]" : "bg-white"}`}
               >
                 <td className="px-4 py-3 text-sm font-mono font-medium text-gray-700 whitespace-nowrap">
                   {f.numero ?? "—"}
@@ -508,7 +533,6 @@ export default function FatturePage() {
                     />
                     <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={28}>
                       {data.map((d, i) => (
-                        // eslint-disable-next-line @typescript-eslint/no-deprecated
                         <Cell key={i} fill={d.color} />
                       ))}
                     </Bar>
@@ -560,6 +584,20 @@ export default function FatturePage() {
               {editing ? "Modifica Fattura" : "Nuova Fattura"}
             </h2>
             <div className="space-y-3">
+              <div>
+                <label className="text-xs font-medium text-gray-600 block mb-1">
+                  Numero Fattura
+                </label>
+                <input
+                  type="text"
+                  value={form.numero}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, numero: e.target.value }))
+                  }
+                  placeholder="Es. F202641"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-pink-300"
+                />
+              </div>
               <div>
                 <label className="text-xs font-medium text-gray-600 block mb-1">
                   Azienda *
@@ -707,7 +745,7 @@ export default function FatturePage() {
                 const imposta = (sub * pct) / 100;
                 const tot = sub + imposta;
                 const label =
-                  form.tipoIva === "igic7" ? "IGIC 7%" : "IGIC Exente";
+                  form.tipoIva === "igic7" ? "IGIC 7%" : "IGIC Exenta";
                 return (
                   <div className="bg-gray-50 rounded-lg p-3 space-y-1 text-sm">
                     <div className="flex justify-between text-gray-600">
@@ -753,7 +791,7 @@ export default function FatturePage() {
                   onChange={(e) =>
                     setForm((f) => ({ ...f, commerciale: e.target.value }))
                   }
-                  placeholder='Opzionale. Scrivi "Finn" per attivare lo split automatico 15%/85%'
+                  placeholder="Nome o sigla commerciale di riferimento"
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
                 />
               </div>

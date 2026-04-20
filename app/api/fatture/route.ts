@@ -32,7 +32,6 @@ export async function POST(request: Request) {
       clienteId: body.clienteId ?? null,
       azienda: body.azienda || "Spagna",
       aziendaNota: body.aziendaNota || null,
-      descrizione: body.descrizione || null,
       mese: body.mese,
       anno: body.anno || 2025,
       importo: parseFloat(body.importo),

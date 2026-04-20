@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Plus, Pencil, Trash2, Check, X } from "lucide-react";
 import { fmt, MESI, AZIENDE, AZIENDA_COLORI } from "@/lib/constants";
+import { isFinnRitenuta } from "@/lib/finn-split";
 
 export interface AltroIngresso {
   id: number;
@@ -47,7 +48,6 @@ export default function AltriIngressi({ anno, azienda, onChanged }: Props) {
   const PAGE_SIZE = 10;
   const [page, setPage] = useState(1);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const load = async () => {
     const params = new URLSearchParams({ anno: String(anno) });
     if (azienda) params.set("azienda", azienda);
@@ -127,8 +127,13 @@ export default function AltriIngressi({ anno, azienda, onChanged }: Props) {
   const filtered = (rows ?? []).filter(
     (r) => !filtroMese || r.mese === filtroMese,
   );
-  const totale = filtered.reduce((s: number, r) => s + (r?.importo ?? 0), 0);
-  const incassati = filtered
+  // Ritenute Finn: visibili in tabella ma escluse dai totali
+  const filteredCalc = filtered.filter((r) => !isFinnRitenuta(r));
+  const totale = filteredCalc.reduce(
+    (s: number, r) => s + (r?.importo ?? 0),
+    0,
+  );
+  const incassati = filteredCalc
     .filter((r) => r.incassato)
     .reduce((s: number, r) => s + (r?.importo ?? 0), 0);
 

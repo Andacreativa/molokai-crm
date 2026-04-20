@@ -102,7 +102,6 @@ export default function PreventiviPage() {
   const [voci, setVoci] = useState<Voce[]>([newVoce()]);
   const [filtroStatus, setFiltroStatus] = useState("tutti");
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const load = async () => {
     const [p, c]: any[] = await Promise.all([
       fetch("/api/preventivi").then((r) => r.json()),

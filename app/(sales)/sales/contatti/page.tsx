@@ -87,7 +87,6 @@ export default function ContattiPage() {
   const [search, setSearch] = useState("");
   const [filtroStatus, setFiltroStatus] = useState<string>("tutti");
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const load = async () => {
     const data = (await (await fetch("/api/contatti")).json()) as any;
     setContatti(Array.isArray(data) ? data : []);

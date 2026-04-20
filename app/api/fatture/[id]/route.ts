@@ -31,7 +31,6 @@ export async function PATCH(
       }),
       ...(body.azienda !== undefined && { azienda: body.azienda }),
       ...(body.aziendaNota !== undefined && { aziendaNota: body.aziendaNota }),
-      ...(body.descrizione !== undefined && { descrizione: body.descrizione }),
       ...(body.mese !== undefined && { mese: body.mese }),
       ...(body.anno !== undefined && { anno: body.anno }),
       ...(body.importo !== undefined && { importo: parseFloat(body.importo) }),

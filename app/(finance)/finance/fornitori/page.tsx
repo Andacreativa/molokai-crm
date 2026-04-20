@@ -73,7 +73,6 @@ export default function FornitoriPage() {
   const [pageSize, setPageSize] = useState(10);
   const [page, setPage] = useState(1);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const load = async () => {
     const annoCorrente = new Date().getFullYear();
     const [forn, spe]: any[] = await Promise.all([

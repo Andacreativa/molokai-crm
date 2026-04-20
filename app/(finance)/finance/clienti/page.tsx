@@ -39,7 +39,7 @@ const emptyForm = {
   citta: "",
   provincia: "",
   iban: "",
-  tipoImposta: "IGIC Exente",
+  tipoImposta: "IGIC Exenta",
   note: "",
 };
 
@@ -63,7 +63,6 @@ export default function ClientiPage() {
   const [pageSize, setPageSize] = useState(10);
   const [page, setPage] = useState(1);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const load = async () => {
     const data = (await (await fetch("/api/clienti")).json()) as any;
     setClienti(Array.isArray(data) ? data : []);
@@ -90,7 +89,7 @@ export default function ClientiPage() {
       citta: c.citta || "",
       provincia: c.provincia || "",
       iban: c.iban || "",
-      tipoImposta: c.tipoImposta || "IGIC Exente",
+      tipoImposta: c.tipoImposta || "IGIC Exenta",
       note: c.note || "",
     });
     setShowForm(true);
