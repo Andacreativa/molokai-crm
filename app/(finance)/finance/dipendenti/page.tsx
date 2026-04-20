@@ -258,22 +258,27 @@ export default function DipendentiPage() {
         <table className="w-full">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50">
-              {["Nome", "Netto busta paga", "IRPF (%)", "IRPF (€)", "Seguridad Social", ""].map(
-                (h, i) => (
-                  <th
-                    key={h}
-                    className={`text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 ${
-                      i === 0
-                        ? "text-left"
-                        : i === 4
-                          ? "text-right"
-                          : "text-right"
-                    }`}
-                  >
-                    {h}
-                  </th>
-                ),
-              )}
+              {[
+                "Nome",
+                "Netto busta paga",
+                "IRPF (%)",
+                "IRPF (€)",
+                "Seguridad Social",
+                "",
+              ].map((h, i) => (
+                <th
+                  key={h}
+                  className={`text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 ${
+                    i === 0
+                      ? "text-left"
+                      : i === 4
+                        ? "text-right"
+                        : "text-right"
+                  }`}
+                >
+                  {h}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody className="zebra">
@@ -358,8 +363,7 @@ export default function DipendentiPage() {
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="w-3 h-3 rounded-sm bg-blue-500" />
-                <strong className="text-gray-700">SS</strong> = Seguridad
-                Social
+                <strong className="text-gray-700">SS</strong> = Seguridad Social
               </span>
             </div>
           </div>
@@ -404,9 +408,15 @@ export default function DipendentiPage() {
               </thead>
               <tbody>
                 {dipendenti.map((d, rowIdx) => (
-                  <tr key={d.id} className={rowIdx % 2 === 1 ? "bg-[#F0F0F0]" : ""}>
-                    <td className="px-3 py-1.5 sticky left-0 z-10 border-b border-gray-50 whitespace-nowrap"
-                      style={{ background: rowIdx % 2 === 1 ? "#F0F0F0" : "#fff" }}
+                  <tr
+                    key={d.id}
+                    className={rowIdx % 2 === 1 ? "bg-[#F0F0F0]" : ""}
+                  >
+                    <td
+                      className="px-3 py-1.5 sticky left-0 z-10 border-b border-gray-50 whitespace-nowrap"
+                      style={{
+                        background: rowIdx % 2 === 1 ? "#F0F0F0" : "#fff",
+                      }}
                     >
                       <div className="flex items-center gap-2">
                         <Avatar

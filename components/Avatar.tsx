@@ -28,7 +28,8 @@ export function initials(nome: string, cognome?: string | null): string {
   if (ai) {
     // se cognome assente, prova seconda parte di nome (es. "Leonardo Mestre")
     const parts = a.split(/\s+/).filter(Boolean);
-    if (parts.length > 1) return (parts[0]![0]! + parts[parts.length - 1]![0]!).toUpperCase();
+    if (parts.length > 1)
+      return (parts[0]![0]! + parts[parts.length - 1]![0]!).toUpperCase();
     return ai;
   }
   return "?";
@@ -42,7 +43,13 @@ interface Props {
   className?: string;
 }
 
-export default function Avatar({ nome, cognome, fotoPath, size = 40, className }: Props) {
+export default function Avatar({
+  nome,
+  cognome,
+  fotoPath,
+  size = 40,
+  className,
+}: Props) {
   const seed = `${nome ?? ""}|${cognome ?? ""}`;
   const bg = avatarColor(seed);
   const text = initials(nome, cognome);

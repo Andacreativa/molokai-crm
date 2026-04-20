@@ -650,9 +650,7 @@ function FornitoreAutocomplete({
 
   const q = (value ?? "").toLowerCase().trim();
   const matches = q
-    ? fornitori
-        .filter((f) => f.nome.toLowerCase().includes(q))
-        .slice(0, 8)
+    ? fornitori.filter((f) => f.nome.toLowerCase().includes(q)).slice(0, 8)
     : fornitori.slice(0, 8);
 
   const selected = fornitoreId
