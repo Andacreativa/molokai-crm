@@ -52,28 +52,35 @@ model Fattura {
 // ─── SPESE ──────────────────────────────────────────────────
 
 model Spesa {
-  id           Int      @id @default(autoincrement())
-  fornitore    String
-  categoria    String   // Scuola | Rappresentanza | MaterialeSportivo | Affitto | Utenze | Marketing | Altro
-  descrizione  String?
-  importo      Float
-  mese         Int
-  anno         Int      @default(2026)
-  ricevutaPath String?
-  note         String?
-  fatturaId    Int?     @unique
-  fattura      Fattura? @relation(fields: [fatturaId], references: [id], onDelete: Cascade)
-  createdAt    DateTime @default(now())
+  id              Int      @id @default(autoincrement())
+  data            DateTime @default(now())
+  fornitore       String
+  categoria       String   // Scuola | Rappresentanza | Materiale Sportivo | Affitto | Utenze | Marketing | Assicurazione | Commercialista | Tasse | Altro
+  descrizione     String?
+  importo         Float
+  ivaDeducibile   Boolean  @default(true)
+  aliquotaIva     Float    @default(21)
+  ivaRecuperabile Float    @default(0)
+  mese            Int
+  anno            Int      @default(2026)
+  ricevutaPath    String?
+  note            String?
+  fatturaId       Int?     @unique
+  fattura         Fattura? @relation(fields: [fatturaId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
 }
 
 model SpesaFissa {
   id            Int      @id @default(autoincrement())
   tipo          String
+  categoria     String?
   cadenza       String   // mensile | annuale | trimestrale
   dataPagamento String
   costo         Float    @default(0)
   costoMensile  Float    @default(0)
   ordine        Int      @default(0)
+  attiva        Boolean  @default(true)
+  note          String?
   createdAt     DateTime @default(now())
 }
 
@@ -151,6 +158,13 @@ model PrenotazioneFareHarbor {
   @@unique([anno, mese])
 }
 
+model FareHarborConfig {
+  id            Int      @id @default(autoincrement())
+  anno          Int      @unique
+  refundReserve Float    @default(0)
+  updatedAt     DateTime @updatedAt
+}
+
 model PrenotazioneStripe {
   id           Int   @id @default(autoincrement())
   anno         Int   @default(2026)
@@ -179,10 +193,9 @@ model PagamentoInScuola {
   data          DateTime @unique
   mese          Int
   anno          Int      @default(2026)
-  importo       Float    @default(0)
-  nTransazioni  Int      @default(0)
-  rimborsi      Float    @default(0)
-  nRimborsi     Int      @default(0)
+  totaleGiorno  Float    @default(0)  // SALE dal CSV
+  totVendite    Float    @default(0)  // TOTALSALES dal CSV
+  rimborsi      Float    @default(0)  // REFUND dal CSV
   note          String?
   createdAt     DateTime @default(now())
 }
@@ -319,6 +332,7 @@ model PagamentoDipendente {
   anno          Int
   mese          Int
   tipo          String     // stipendio | seguridad
+  spesaId       Int?       // collegamento a Spesa creata automaticamente al toggle
   createdAt     DateTime   @default(now())
 
   @@unique([dipendenteId, anno, mese, tipo])

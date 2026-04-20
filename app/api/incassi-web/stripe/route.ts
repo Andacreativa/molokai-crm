@@ -16,8 +16,10 @@ export async function GET(request: Request) {
 }
 
 // POST upsert per (anno, mese).
-// Body: { anno, mese, lordo, commissioni, rimborsi }
-// Netto = lordo - commissioni - rimborsi
+// Body: { anno, mese, lordo, commissioni, rimborsi, netto? }
+// Se netto non fornito, calcolato come lordo - commissioni - rimborsi (UI manuale).
+// Se fornito (import CSV con Σ Net per-transaction), usato as-is per evitare
+// deriva floating-point.
 export async function POST(request: Request) {
   const body = await request.json();
   const anno = parseInt(body.anno);
@@ -28,7 +30,10 @@ export async function POST(request: Request) {
   const lordo = parseFloat(body.lordo) || 0;
   const commissioni = parseFloat(body.commissioni) || 0;
   const rimborsi = parseFloat(body.rimborsi) || 0;
-  const netto = round2(lordo - commissioni - rimborsi);
+  const netto =
+    body.netto !== undefined && body.netto !== null
+      ? round2(parseFloat(String(body.netto)) || 0)
+      : round2(lordo - commissioni - rimborsi);
 
   const row = await prisma.prenotazioneStripe.upsert({
     where: { anno_mese: { anno, mese } },

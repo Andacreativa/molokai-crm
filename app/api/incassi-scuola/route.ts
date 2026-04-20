@@ -3,10 +3,9 @@ import { prisma } from "@/lib/prisma";
 
 interface RigaCSV {
   data: string; // ISO YYYY-MM-DD o DD/MM/YYYY
-  nTransazioni?: number | string;
-  totaleSales?: number | string;
-  nRimborsi?: number | string;
-  totaleRimborsi?: number | string;
+  totaleGiorno?: number | string; // SALE
+  totVendite?: number | string;   // TOTALSALES
+  rimborsi?: number | string;     // REFUND
   note?: string;
 }
 
@@ -16,12 +15,10 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 function parseData(s: string): Date | null {
   const trimmed = s.trim();
   if (!trimmed) return null;
-  // ISO
   if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
     const d = new Date(trimmed);
     return isNaN(d.getTime()) ? null : d;
   }
-  // DD/MM/YYYY
   const m = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
   if (m) {
     const d = new Date(
@@ -70,10 +67,9 @@ export async function POST(request: Request) {
       results.errors.push(`Data non valida: "${r.data}"`);
       continue;
     }
-    const importo = round2(parseFloat(String(r.totaleSales ?? 0)) || 0);
-    const rimborsi = round2(parseFloat(String(r.totaleRimborsi ?? 0)) || 0);
-    const nTrans = parseInt(String(r.nTransazioni ?? 0)) || 0;
-    const nRef = parseInt(String(r.nRimborsi ?? 0)) || 0;
+    const totaleGiorno = round2(parseFloat(String(r.totaleGiorno ?? 0)) || 0);
+    const totVendite = round2(parseFloat(String(r.totVendite ?? 0)) || 0);
+    const rimborsi = round2(parseFloat(String(r.rimborsi ?? 0)) || 0);
     const mese = data.getMonth() + 1;
     const anno = data.getFullYear();
 
@@ -83,19 +79,17 @@ export async function POST(request: Request) {
         data,
         mese,
         anno,
-        importo,
+        totaleGiorno,
+        totVendite,
         rimborsi,
-        nTransazioni: nTrans,
-        nRimborsi: nRef,
         note: r.note || null,
       },
       update: {
         mese,
         anno,
-        importo,
+        totaleGiorno,
+        totVendite,
         rimborsi,
-        nTransazioni: nTrans,
-        nRimborsi: nRef,
         note: r.note || null,
       },
     });

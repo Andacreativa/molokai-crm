@@ -20,6 +20,11 @@ export const CATEGORIE_SPESA = [
   "Affitto",
   "Utenze",
   "Marketing",
+  "Assicurazione",
+  "Commercialista",
+  "Tasse",
+  "Stipendio",
+  "Seguridad Social",
   "Altro",
 ];
 
@@ -42,6 +47,11 @@ export const CATEGORIE_COLORI: Record<string, string> = {
   Affitto: "#E0E0E0", // grigio chiaro
   Utenze: "#FFF0A0", // giallo pastello (energia)
   Marketing: "#FFD6D6", // rosa chiaro
+  Assicurazione: "#C8E6F0", // azzurro tenue
+  Commercialista: "#D4E8A0", // verde oliva chiaro
+  Tasse: "#FFC9A0", // pesca pastello
+  Stipendio: "#BDE3F5", // azzurro stipendio
+  "Seguridad Social": "#FFAAAA", // rosso pastello
   Altro: "#EDEDED", // grigio neutro
 };
 
@@ -57,6 +67,11 @@ export const CATEGORIE_COLORI_CHART: Record<string, string> = {
   Affitto: "#AAAAAA",
   Utenze: "#F5D020",
   Marketing: "#FF6B6B",
+  Assicurazione: "#5BA9D8",
+  Commercialista: "#8DB84A",
+  Tasse: "#FF9940",
+  Stipendio: "#5BB8E8",
+  "Seguridad Social": "#FF6B6B",
   Altro: "#B0B0B0",
 };
 
@@ -116,7 +131,7 @@ export function fmt(n: number | null | undefined): string {
 
 // Anni disponibili dal 2024 all'anno corrente, ordine decrescente
 const ANNO_CORRENTE = new Date().getFullYear();
-const ANNO_MIN = 2024;
+const ANNO_MIN = 2026;
 export const ANNI = Array.from(
   { length: Math.max(1, ANNO_CORRENTE - ANNO_MIN + 1) },
   (_, i) => ANNO_CORRENTE - i,

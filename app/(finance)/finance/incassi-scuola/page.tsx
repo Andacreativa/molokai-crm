@@ -11,43 +11,53 @@ interface PagamentoScuola {
   data: string; // ISO
   mese: number;
   anno: number;
-  importo: number;
-  nTransazioni: number;
-  rimborsi: number;
-  nRimborsi: number;
+  totaleGiorno: number; // SALE
+  totVendite: number;   // TOTALSALES
+  rimborsi: number;     // REFUND
   note: string | null;
 }
 
 interface ParsedRow {
   data: string;
-  nTransazioni: number;
-  totaleSales: number;
-  nRimborsi: number;
-  totaleRimborsi: number;
+  totaleGiorno: number;
+  totVendite: number;
+  rimborsi: number;
 }
 
 // ─── CSV parsing ───────────────────────────────────────────────────────
 
 // Formato atteso: DATE;SALE;CURRENCY;TOTALSALES;REFUND;CURRENCY;TOTALREFUND
+// Salviamo: DATE (col 0), SALE (col 1), TOTALSALES (col 3), REFUND (col 4).
+// Le colonne CURRENCY e TOTALREFUND vengono ignorate.
 // Separatore: ;
-// Prima riga può essere header (la saltiamo se la prima colonna non parsa come data).
 function parseCSV(text: string): { rows: ParsedRow[]; errors: string[] } {
   const rows: ParsedRow[] = [];
   const errors: string[] = [];
   const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
 
+  // Parser numerico tollerante: "1.234,50" → 1234.50, "40.00" → 40.
+  // Ambiguità: "1.234" potrebbe essere 1234 (it) o 1.234 (en). Euristica:
+  // se c'è una sola occorrenza di "." e poi 1-2 cifre, trattala come decimale
+  // (formato inglese). Se ci sono virgole, trattale come decimali (italiano).
+  const cleanNum = (s: string) => {
+    const raw = s.trim();
+    if (!raw) return 0;
+    if (raw.includes(",")) {
+      return parseFloat(raw.replace(/\./g, "").replace(",", ".")) || 0;
+    }
+    return parseFloat(raw) || 0;
+  };
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const cols = line.split(";").map((c) => c.trim());
-    if (cols.length < 7) {
-      // Skip silently se è troppo corta (es. riga vuota o separatore diverso)
-      if (i === 0) continue; // probabile header
-      errors.push(`Riga ${i + 1}: attese 7 colonne, trovate ${cols.length}`);
+    if (cols.length < 5) {
+      if (i === 0) continue;
+      errors.push(`Riga ${i + 1}: attese ≥5 colonne, trovate ${cols.length}`);
       continue;
     }
-    const [dateStr, saleStr, , totalSalesStr, refundStr, , totalRefundStr] = cols;
+    const [dateStr, saleStr, , totalSalesStr, refundStr] = cols;
 
-    // Skip header (se prima colonna non è una data)
     const looksLikeDate =
       /^\d{4}-\d{2}-\d{2}/.test(dateStr) ||
       /^\d{1,2}\/\d{1,2}\/\d{4}/.test(dateStr);
@@ -57,15 +67,11 @@ function parseCSV(text: string): { rows: ParsedRow[]; errors: string[] } {
       continue;
     }
 
-    const cleanNum = (s: string) =>
-      parseFloat(s.replace(/\./g, "").replace(",", ".")) || 0;
-
     rows.push({
       data: dateStr,
-      nTransazioni: parseInt(saleStr) || 0,
-      totaleSales: cleanNum(totalSalesStr),
-      nRimborsi: parseInt(refundStr) || 0,
-      totaleRimborsi: cleanNum(totalRefundStr),
+      totaleGiorno: cleanNum(saleStr),
+      totVendite: cleanNum(totalSalesStr),
+      rimborsi: cleanNum(refundStr),
     });
   }
 
@@ -77,7 +83,8 @@ function parseCSV(text: string): { rows: ParsedRow[]; errors: string[] } {
 export default function IncassiScuolaPage() {
   const now = new Date();
   const [anno, setAnno] = useState(now.getFullYear());
-  const [mese, setMese] = useState(now.getMonth() + 1);
+  // mese === null → vista completa anno (no filter mese)
+  const [mese, setMese] = useState<number | null>(now.getMonth() + 1);
   const [rows, setRows] = useState<PagamentoScuola[]>([]);
   const [dragActive, setDragActive] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -87,11 +94,10 @@ export default function IncassiScuolaPage() {
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Fetch full-year: la tabella filtra per mese client-side, il box
+  // riepilogo usa tutte le righe dell'anno.
   const load = async () => {
-    const params = new URLSearchParams();
-    params.set("anno", String(anno));
-    params.set("mese", String(mese));
-    const res = await fetch(`/api/incassi-scuola?${params}`);
+    const res = await fetch(`/api/incassi-scuola?anno=${anno}`);
     const data = await res.json();
     setRows(Array.isArray(data) ? data : []);
   };
@@ -99,22 +105,36 @@ export default function IncassiScuolaPage() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [anno, mese]);
+  }, [anno]);
+
+  const rowsMese = useMemo(
+    () => (mese === null ? rows : rows.filter((r) => r.mese === mese)),
+    [rows, mese],
+  );
 
   const stats = useMemo(
     () =>
-      rows.reduce(
+      rowsMese.reduce(
         (acc, r) => ({
-          importo: acc.importo + r.importo,
+          totaleGiorno: acc.totaleGiorno + r.totaleGiorno,
+          totVendite: acc.totVendite + r.totVendite,
           rimborsi: acc.rimborsi + r.rimborsi,
-          nTransazioni: acc.nTransazioni + r.nTransazioni,
-          nRimborsi: acc.nRimborsi + r.nRimborsi,
         }),
-        { importo: 0, rimborsi: 0, nTransazioni: 0, nRimborsi: 0 },
+        { totaleGiorno: 0, totVendite: 0, rimborsi: 0 },
       ),
-    [rows],
+    [rowsMese],
   );
-  const netto = stats.importo - stats.rimborsi;
+
+  // IVA mese corrente: base = totale / 1.21, IVA = totale - base.
+  // "Totale incassato" = somma totaleGiorno (SALE) del mese selezionato.
+  const ivaTotale = Math.round(stats.totaleGiorno * 100) / 100;
+  const ivaBase = Math.round((ivaTotale / 1.21) * 100) / 100;
+  const ivaImporto = Math.round((ivaTotale - ivaBase) * 100) / 100;
+
+  // Riepilogo mensile (tutto l'anno) = somma totaleGiorno per mese
+  const totaliMensili = Array(12).fill(0) as number[];
+  for (const r of rows) totaliMensili[r.mese - 1] += r.totaleGiorno;
+  const totaleAnno = totaliMensili.reduce((a, b) => a + b, 0);
 
   const handleFile = async (file: File) => {
     setUploading(true);
@@ -155,6 +175,38 @@ export default function IncassiScuolaPage() {
     await fetch(`/api/incassi-scuola/${id}`, { method: "DELETE" });
     load();
   };
+
+  // Inline-edit helpers: update locale immediato (per IVA recap live), PUT on blur.
+  const updateRowLocal = (id: number, patch: Partial<PagamentoScuola>) => {
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  };
+
+  const saveField = async (
+    id: number,
+    field: "data" | "totaleGiorno" | "totVendite" | "rimborsi",
+    value: string,
+  ) => {
+    try {
+      const res = await fetch(`/api/incassi-scuola/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [field]: value }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || "Errore salvataggio");
+        load();
+        return;
+      }
+      const updated: PagamentoScuola = await res.json();
+      setRows((prev) => prev.map((r) => (r.id === id ? updated : r)));
+    } catch (e) {
+      alert(String(e));
+      load();
+    }
+  };
+
+  const isoDate = (d: string) => new Date(d).toISOString().slice(0, 10);
 
   return (
     <div className="space-y-6">
@@ -270,33 +322,75 @@ export default function IncassiScuolaPage() {
             </option>
           ))}
         </select>
-        <select
-          value={mese}
-          onChange={(e) => setMese(parseInt(e.target.value))}
-          className="text-sm font-medium px-3 py-2 rounded-xl border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 outline-none"
-        >
-          {MESI.map((m, idx) => (
-            <option key={m} value={idx + 1}>
-              {m}
-            </option>
-          ))}
-        </select>
+        <span className="text-xs text-gray-500">
+          {mese === null
+            ? "Tutti i mesi"
+            : `Filtro: ${MESI[mese - 1]} — clicca di nuovo sul mese per rimuovere`}
+        </span>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard label="Incassato" value={fmt(stats.importo)} />
-        <StatCard
-          label="Rimborsi"
-          value={fmt(stats.rimborsi)}
-          color="#ef4444"
-        />
-        <StatCard label="Netto" value={fmt(netto)} color="#0ea5e9" />
-        <StatCard
-          label="Transazioni"
-          value={`${stats.nTransazioni}${stats.nRimborsi > 0 ? ` (−${stats.nRimborsi} ref)` : ""}`}
-          color="#64748b"
-        />
+      {/* Riepilogo mensile incassi scuola (tutto l'anno) */}
+      <div className="glass-card rounded-2xl p-4">
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <h3 className="text-sm font-bold text-gray-900">
+            Riepilogo incassi mensili scuola
+          </h3>
+        </div>
+        <div className="grid grid-cols-6 sm:grid-cols-12 gap-1">
+          {MESI.map((meseNome, idx) => {
+            const m = idx + 1;
+            const tot = totaliMensili[idx];
+            const hasValue = tot > 0;
+            const isActive = mese === m;
+            // 3 stati visivi: attivo (blu pieno), con dati (blu chiaro), vuoto (bianco)
+            const cellStyle = isActive
+              ? { background: "#0ea5e9", borderColor: "#0284c7" }
+              : hasValue
+                ? { background: "#e0f2fe", borderColor: "#7dd3fc" }
+                : { background: "#fff", borderColor: "#e2e8f0" };
+            const labelColor = isActive
+              ? "#ffffff"
+              : hasValue
+                ? "#6b7280"
+                : "#9ca3af";
+            const valueColor = isActive
+              ? "#ffffff"
+              : hasValue
+                ? "#0369a1"
+                : "#cbd5e1";
+            return (
+              <button
+                key={meseNome}
+                type="button"
+                onClick={() => setMese(isActive ? null : m)}
+                className="flex flex-col items-center gap-1 px-1 py-2 rounded-lg border transition-all cursor-pointer hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
+                style={cellStyle}
+                title={isActive ? "Clicca per rimuovere il filtro" : `Filtra per ${meseNome}`}
+              >
+                <span
+                  className="text-[10px] uppercase tracking-wide font-semibold"
+                  style={{ color: labelColor }}
+                >
+                  {meseNome.slice(0, 3)}
+                </span>
+                <span
+                  className="text-xs font-bold"
+                  style={{ color: valueColor }}
+                >
+                  {hasValue ? fmt(tot).replace(" €", "") : "—"}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-200">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            Totale {anno}
+          </span>
+          <span className="text-lg font-bold" style={{ color: "#0ea5e9" }}>
+            {fmt(totaleAnno)}
+          </span>
+        </div>
       </div>
 
       {/* Tabella */}
@@ -305,11 +399,11 @@ export default function IncassiScuolaPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
-                {["Data", "Importo", "N° Trans.", "Rimborsi", "N° Ref.", "Netto", ""].map(
+                {["Data", "Totale Giorno", "Tot. Vendite", "Rimborsi", ""].map(
                   (h, i) => (
                     <th
                       key={h}
-                      className={`text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 ${i === 0 ? "text-left" : "text-right"}`}
+                      className={`text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 ${i === 0 || i === 4 ? "text-left" : "text-right"}`}
                     >
                       {h}
                     </th>
@@ -318,85 +412,230 @@ export default function IncassiScuolaPage() {
               </tr>
             </thead>
             <tbody className="zebra">
-              {rows.length === 0 && (
+              {rowsMese.length === 0 && (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={5}
                     className="text-center text-gray-400 py-12 text-sm"
                   >
                     <FileText className="w-10 h-10 mx-auto mb-2 opacity-40" />
-                    Nessun incasso per {MESI[mese - 1]} {anno}
+                    Nessun incasso per{" "}
+                    {mese === null ? anno : `${MESI[mese - 1]} ${anno}`}
                   </td>
                 </tr>
               )}
-              {rows.map((r) => {
-                const netto = r.importo - r.rimborsi;
-                return (
-                  <tr
-                    key={r.id}
-                    className="border-b border-gray-50 hover:bg-gray-50 transition-colors"
-                  >
-                    <td className="px-4 py-3 text-sm text-gray-900">
-                      {new Date(r.data).toLocaleDateString("it-IT")}
-                    </td>
-                    <td className="px-4 py-3 text-sm font-semibold text-right text-gray-900">
-                      {fmt(r.importo)}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-right text-gray-600">
-                      {r.nTransazioni}
-                    </td>
-                    <td
-                      className="px-4 py-3 text-sm font-semibold text-right"
-                      style={{ color: r.rimborsi > 0 ? "#ef4444" : "#cbd5e1" }}
+              {rowsMese.map((r) => (
+                <tr
+                  key={r.id}
+                  className="border-b border-gray-50 hover:bg-gray-50 transition-colors"
+                >
+                  <td className="px-2 py-1.5">
+                    <input
+                      type="date"
+                      value={isoDate(r.data)}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (!v) return;
+                        const d = new Date(v);
+                        updateRowLocal(r.id, {
+                          data: d.toISOString(),
+                          mese: d.getMonth() + 1,
+                          anno: d.getFullYear(),
+                        });
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.dataset.initial =
+                          e.currentTarget.value;
+                      }}
+                      onBlur={(e) => {
+                        const initial = e.currentTarget.dataset.initial;
+                        if (
+                          e.currentTarget.value &&
+                          e.currentTarget.value !== initial
+                        ) {
+                          saveField(r.id, "data", e.currentTarget.value);
+                        }
+                      }}
+                      className="w-full text-sm px-2 py-1.5 rounded-md border border-transparent hover:border-gray-200 focus:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-300 focus:bg-white bg-transparent"
+                    />
+                  </td>
+                  <td className="px-2 py-1.5">
+                    <EditableNumber
+                      value={r.totaleGiorno}
+                      onChange={(v) =>
+                        updateRowLocal(r.id, { totaleGiorno: v })
+                      }
+                      onSave={(v) =>
+                        saveField(r.id, "totaleGiorno", String(v))
+                      }
+                      color="#0ea5e9"
+                      bold
+                      currency
+                    />
+                  </td>
+                  <td className="px-2 py-1.5">
+                    <EditableNumber
+                      value={r.totVendite}
+                      onChange={(v) => updateRowLocal(r.id, { totVendite: v })}
+                      onSave={(v) => saveField(r.id, "totVendite", String(v))}
+                      integer
+                    />
+                  </td>
+                  <td className="px-2 py-1.5">
+                    <EditableNumber
+                      value={r.rimborsi}
+                      onChange={(v) => updateRowLocal(r.id, { rimborsi: v })}
+                      onSave={(v) => saveField(r.id, "rimborsi", String(v))}
+                      color={r.rimborsi > 0 ? "#ef4444" : undefined}
+                      currency
+                    />
+                  </td>
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={() => del(r.id)}
+                      className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                      title="Elimina"
                     >
-                      {r.rimborsi > 0 ? fmt(r.rimborsi) : "—"}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-right text-gray-600">
-                      {r.nRimborsi || "—"}
-                    </td>
-                    <td
-                      className="px-4 py-3 text-sm font-bold text-right"
-                      style={{ color: "#0ea5e9" }}
-                    >
-                      {fmt(netto)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={() => del(r.id)}
-                        className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                        title="Elimina"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* Riepilogo IVA mensile */}
+      <div className="glass-card rounded-2xl p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-bold text-gray-900">
+            Riepilogo IVA —{" "}
+            {mese === null ? `Anno ${anno}` : `${MESI[mese - 1]} ${anno}`}
+          </h3>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div
+            className="rounded-xl p-4"
+            style={{ background: "#f0f9ff", border: "1px solid #bae6fd" }}
+          >
+            <p className="text-[10px] text-gray-500 uppercase tracking-wide font-semibold">
+              Totale incassato
+            </p>
+            <p className="text-[10px] text-gray-400 mb-1">IVA inclusa</p>
+            <p className="text-xl font-bold" style={{ color: "#0ea5e9" }}>
+              {fmt(ivaTotale)}
+            </p>
+          </div>
+          <div
+            className="rounded-xl p-4"
+            style={{ background: "#f8fafc", border: "1px solid #e2e8f0" }}
+          >
+            <p className="text-[10px] text-gray-500 uppercase tracking-wide font-semibold">
+              Base imponibile
+            </p>
+            <p className="text-[10px] text-gray-400 mb-1">totale ÷ 1,21</p>
+            <p className="text-xl font-bold text-gray-900">{fmt(ivaBase)}</p>
+          </div>
+          <div
+            className="rounded-xl p-4"
+            style={{ background: "#fef9c3", border: "1px solid #fde047" }}
+          >
+            <p className="text-[10px] text-gray-500 uppercase tracking-wide font-semibold">
+              IVA 21%
+            </p>
+            <p className="text-[10px] text-gray-400 mb-1">totale − base</p>
+            <p className="text-xl font-bold" style={{ color: "#a16207" }}>
+              {fmt(ivaImporto)}
+            </p>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-function StatCard({
-  label,
+// ─── Editable number cell ──────────────────────────────────────────────
+
+function EditableNumber({
   value,
-  color = "#0f172a",
+  onChange,
+  onSave,
+  color,
+  bold,
+  integer,
+  currency,
 }: {
-  label: string;
-  value: string;
+  value: number;
+  onChange: (v: number) => void;
+  onSave: (v: number) => void;
   color?: string;
+  bold?: boolean;
+  // integer: step=1, niente simbolo €, parsing con parseInt
+  integer?: boolean;
+  // currency: display "€12,34" quando non focused, raw "12.34" in edit, parser IT/EN
+  currency?: boolean;
 }) {
+  const [editing, setEditing] = useState(false);
+  const [editValue, setEditValue] = useState("");
+  const savedRef = useRef(value);
+
+  const parse = (s: string): number => {
+    if (integer) return parseInt(s, 10) || 0;
+    const t = s.trim();
+    if (!t) return 0;
+    if (t.includes(",")) {
+      return parseFloat(t.replace(/\./g, "").replace(",", ".")) || 0;
+    }
+    return parseFloat(t) || 0;
+  };
+
+  const baseCls = `w-full text-sm text-right px-2 py-1.5 rounded-md border border-transparent hover:border-gray-200 focus:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-300 focus:bg-white bg-transparent ${bold ? "font-bold" : "font-semibold"}`;
+
+  if (currency) {
+    return (
+      <input
+        type="text"
+        inputMode="decimal"
+        value={editing ? editValue : fmt(value)}
+        onFocus={(e) => {
+          savedRef.current = value;
+          setEditing(true);
+          setEditValue(value.toFixed(2));
+          setTimeout(() => e.target.select(), 0);
+        }}
+        onChange={(e) => {
+          setEditValue(e.target.value);
+          onChange(parse(e.target.value));
+        }}
+        onBlur={() => {
+          setEditing(false);
+          const v = parse(editValue);
+          if (Math.abs(v - savedRef.current) > 0.005) onSave(v);
+        }}
+        className={baseCls}
+        style={color ? { color } : undefined}
+      />
+    );
+  }
+
   return (
-    <div className="glass-card rounded-2xl p-4">
-      <p className="text-[10px] text-gray-500 uppercase tracking-wide font-semibold">
-        {label}
-      </p>
-      <p className="text-xl font-bold mt-1 truncate" style={{ color }}>
-        {value}
-      </p>
-    </div>
+    <input
+      type="number"
+      step={integer ? "1" : "0.01"}
+      value={value}
+      onChange={(e) => onChange(parse(e.target.value))}
+      onFocus={(e) => {
+        e.currentTarget.dataset.initial = e.currentTarget.value;
+      }}
+      onBlur={(e) => {
+        const initial = e.currentTarget.dataset.initial;
+        if (e.currentTarget.value !== initial) {
+          onSave(parse(e.currentTarget.value));
+        }
+      }}
+      className={baseCls}
+      style={color ? { color } : undefined}
+    />
   );
 }

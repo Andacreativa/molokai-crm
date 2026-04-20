@@ -17,8 +17,9 @@ export async function GET(request: Request) {
 }
 
 // POST upsert per (anno, mese).
-// Body: { anno, mese, lordo }
-// Commissioni = lordo * 25%, Netto = lordo - commissioni.
+// Body: { anno, mese, lordo, commissioni?, netto? }
+// Se commissioni/netto non forniti, calcolati dal default 25% (UI manuale).
+// Se forniti (import Excel con dati per-booking), vengono usati come-sono.
 export async function POST(request: Request) {
   const body = await request.json();
   const anno = parseInt(body.anno);
@@ -27,8 +28,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "anno/mese non validi" }, { status: 400 });
   }
   const lordo = parseFloat(body.lordo) || 0;
-  const commissioni = round2(lordo * GYG_COMMISSION_RATE);
-  const netto = round2(lordo - commissioni);
+  const commissioni =
+    body.commissioni !== undefined && body.commissioni !== null
+      ? round2(parseFloat(String(body.commissioni)) || 0)
+      : round2(lordo * GYG_COMMISSION_RATE);
+  const netto =
+    body.netto !== undefined && body.netto !== null
+      ? round2(parseFloat(String(body.netto)) || 0)
+      : round2(lordo - commissioni);
 
   const row = await prisma.prenotazioneGetYourGuide.upsert({
     where: { anno_mese: { anno, mese } },

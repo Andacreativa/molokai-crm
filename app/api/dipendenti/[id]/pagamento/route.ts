@@ -56,15 +56,20 @@ export async function POST(
         ? `Stipendio mensile — ${dipendente.nome}`
         : `Seguridad Social — ${dipendente.nome}`;
 
+    // Data plausibile: ultimo giorno del mese (per ordinamento corretto in Spese)
+    const dataSpesa = new Date(anno, mese, 0);
     const spesa = await prisma.spesa.create({
       data: {
-        azienda: "Spagna",
+        data: dataSpesa,
         fornitore: dipendente.nome,
         categoria,
         descrizione,
         mese,
         anno,
         importo,
+        ivaDeducibile: false, // stipendi/seguridad: niente IVA recuperabile
+        aliquotaIva: 0,
+        ivaRecuperabile: 0,
       },
     });
 

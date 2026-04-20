@@ -1,7 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Pencil, Trash2, Download, X, Check } from "lucide-react";
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Download,
+  X,
+  Check,
+  Mail,
+  Phone,
+} from "lucide-react";
 import { fmt, TIPO_IMPOSTA_OPTIONS } from "@/lib/constants";
 import FiltriBar from "@/components/FiltriBar";
 import { PageSizeSelect, PageNav } from "@/components/Pagination";
@@ -23,6 +32,16 @@ interface Cliente {
   paese: string | null;
   email: string | null;
   telefono: string | null;
+  iban: string | null;
+  note: string | null;
+  tipo: string;
+  fatture?: Array<{
+    id: number;
+    numero: string | null;
+    data: string | null;
+    totale: number;
+    pagato: boolean;
+  }>;
 }
 
 interface Riga {
@@ -74,9 +93,48 @@ const addDays = (isoYmd: string, days: number) => {
   return d.toISOString().slice(0, 10);
 };
 
-// ─── Page ──────────────────────────────────────────────────────────────
+// ─── Page (tab switcher) ──────────────────────────────────────────────
 
 export default function FatturePage() {
+  const [tab, setTab] = useState<"fatture" | "clienti">("fatture");
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Fatture & Clienti</h1>
+        <p className="text-gray-500 text-sm mt-1">
+          Fatture emesse e anagrafica clienti
+        </p>
+      </div>
+
+      <div className="flex gap-1 border-b border-gray-200">
+        {(["fatture", "clienti"] as const).map((t) => {
+          const active = tab === t;
+          return (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className="px-4 py-2.5 text-sm font-semibold transition-all border-b-2 -mb-px"
+              style={
+                active
+                  ? { color: "#0ea5e9", borderColor: "#0ea5e9" }
+                  : { color: "#64748b", borderColor: "transparent" }
+              }
+            >
+              {t === "fatture" ? "Fatture" : "Clienti"}
+            </button>
+          );
+        })}
+      </div>
+
+      {tab === "fatture" ? <FattureTab /> : <ClientiTab />}
+    </div>
+  );
+}
+
+// ─── Fatture Tab ───────────────────────────────────────────────────────
+
+function FattureTab() {
   const [fatture, setFatture] = useState<Fattura[]>([]);
   const [clienti, setClienti] = useState<Cliente[]>([]);
   const [anno, setAnno] = useState<number>(new Date().getFullYear());
@@ -143,14 +201,11 @@ export default function FatturePage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Fatture</h1>
-          <p className="text-gray-500 text-sm mt-1">
-            {filtered.length} fatture · anno {anno}
-          </p>
-        </div>
+        <p className="text-gray-500 text-sm">
+          {filtered.length} fatture · anno {anno}
+        </p>
         <div className="flex items-center gap-3 flex-wrap">
           <FiltriBar anno={anno} onAnno={setAnno} />
           <select
@@ -179,7 +234,7 @@ export default function FatturePage() {
         type="text"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        placeholder="Cerca per numero o cliente..."
+        placeholder="Cerca per numero o azienda..."
         className="w-full max-w-sm border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white"
       />
 
@@ -724,6 +779,606 @@ function FatturaFormModal({
             className="glass-btn-primary flex-1 text-white text-sm font-medium py-2.5 rounded-xl disabled:opacity-50"
           >
             {editing ? "Salva Modifiche" : "Crea Fattura"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Clienti Tab ───────────────────────────────────────────────────────
+
+const PAESI = [
+  "Spagna",
+  "Italia",
+  "Francia",
+  "Germania",
+  "Portogallo",
+  "Regno Unito",
+  "Altro",
+];
+
+function ClientiTab() {
+  const [clienti, setClienti] = useState<Cliente[]>([]);
+  const [search, setSearch] = useState("");
+  const [tipoFiltro, setTipoFiltro] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<Cliente | null>(null);
+  const [detail, setDetail] = useState<Cliente | null>(null);
+
+  const load = async () => {
+    const res = await fetch("/api/clienti");
+    const data = await res.json();
+    setClienti(Array.isArray(data) ? data : []);
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const q = search.toLowerCase();
+  const filtered = clienti.filter((c) => {
+    if (tipoFiltro && c.tipo !== tipoFiltro) return false;
+    return (
+      (c.nome ?? "").toLowerCase().includes(q) ||
+      (c.cognome ?? "").toLowerCase().includes(q) ||
+      (c.email ?? "").toLowerCase().includes(q) ||
+      (c.partitaIva ?? "").toLowerCase().includes(q) ||
+      (c.dni ?? "").toLowerCase().includes(q)
+    );
+  });
+
+  const del = async (id: number) => {
+    if (
+      !confirm(
+        "Eliminare questo cliente? Le fatture collegate verranno scollegate (non eliminate).",
+      )
+    )
+      return;
+    await fetch(`/api/clienti/${id}`, { method: "DELETE" });
+    if (detail?.id === id) setDetail(null);
+    load();
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <p className="text-gray-500 text-sm">
+          {filtered.length} clienti in anagrafica
+        </p>
+        <div className="flex items-center gap-3 flex-wrap">
+          <select
+            value={tipoFiltro}
+            onChange={(e) => setTipoFiltro(e.target.value)}
+            className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white"
+          >
+            <option value="">Tutti i tipi</option>
+            <option value="privato">Privato</option>
+            <option value="azienda">Azienda</option>
+          </select>
+          <button
+            onClick={() => {
+              setEditing(null);
+              setShowForm(true);
+            }}
+            className="glass-btn-primary flex items-center gap-2 text-white text-sm font-medium px-4 py-2.5 rounded-xl"
+          >
+            <Plus className="w-4 h-4" /> Aggiungi Cliente
+          </button>
+        </div>
+      </div>
+
+      <input
+        type="text"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Cerca per nome, email, P.IVA, DNI..."
+        className="w-full max-w-sm border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white"
+      />
+
+      <div className="glass-card rounded-2xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50">
+                {["Nome", "Cognome", "Email", "Telefono", "DNI / P.IVA", "Tipo", ""].map(
+                  (h) => (
+                    <th
+                      key={h}
+                      className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 text-left"
+                    >
+                      {h}
+                    </th>
+                  ),
+                )}
+              </tr>
+            </thead>
+            <tbody className="zebra">
+              {filtered.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={7}
+                    className="text-center text-gray-400 py-12 text-sm"
+                  >
+                    Nessun cliente trovato
+                  </td>
+                </tr>
+              )}
+              {filtered.map((c) => (
+                <tr
+                  key={c.id}
+                  className="border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer"
+                  onClick={() => setDetail(c)}
+                >
+                  <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                    {c.nome}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-700">
+                    {c.cognome ?? "—"}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-700">
+                    {c.email ?? "—"}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-700">
+                    {c.telefono ?? "—"}
+                  </td>
+                  <td className="px-4 py-3 text-xs text-gray-600 font-mono">
+                    {c.partitaIva || c.dni || "—"}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold capitalize"
+                      style={
+                        c.tipo === "azienda"
+                          ? { background: "#e0f2fe", color: "#0369a1" }
+                          : { background: "#f1f5f9", color: "#475569" }
+                      }
+                    >
+                      {c.tipo}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center gap-2 justify-end">
+                      <button
+                        onClick={() => {
+                          setEditing(c);
+                          setShowForm(true);
+                        }}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-sky-600 hover:bg-sky-50 transition-colors"
+                        title="Modifica"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => del(c.id)}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        title="Elimina"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {detail && (
+        <ClienteDetailModal
+          cliente={detail}
+          onClose={() => setDetail(null)}
+          onEdit={() => {
+            const c = detail;
+            setDetail(null);
+            setEditing(c);
+            setShowForm(true);
+          }}
+        />
+      )}
+
+      {showForm && (
+        <ClienteFormModal
+          editing={editing}
+          onClose={() => setShowForm(false)}
+          onSaved={() => {
+            setShowForm(false);
+            load();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Cliente Form Modal ────────────────────────────────────────────────
+
+function ClienteFormModal({
+  editing,
+  onClose,
+  onSaved,
+}: {
+  editing: Cliente | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [form, setForm] = useState({
+    nome: editing?.nome ?? "",
+    cognome: editing?.cognome ?? "",
+    dni: editing?.dni ?? "",
+    email: editing?.email ?? "",
+    telefono: editing?.telefono ?? "",
+    partitaIva: editing?.partitaIva ?? "",
+    via: editing?.via ?? "",
+    cap: editing?.cap ?? "",
+    citta: editing?.citta ?? "",
+    paese: editing?.paese ?? "Spagna",
+    iban: editing?.iban ?? "",
+    tipo: editing?.tipo ?? "privato",
+    note: editing?.note ?? "",
+  });
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    if (!form.nome.trim()) return;
+    setSaving(true);
+    try {
+      if (editing) {
+        await fetch(`/api/clienti/${editing.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(form),
+        });
+      } else {
+        await fetch("/api/clienti", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(form),
+        });
+      }
+      onSaved();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const Input = (
+    k: keyof typeof form,
+    label: string,
+    placeholder = "",
+    type = "text",
+  ) => (
+    <div>
+      <label className="text-xs font-medium text-gray-600 block mb-1">
+        {label}
+      </label>
+      <input
+        type={type}
+        value={form[k] as string}
+        onChange={(e) => setForm((f) => ({ ...f, [k]: e.target.value }))}
+        placeholder={placeholder}
+        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
+      />
+    </div>
+  );
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="glass-modal rounded-2xl w-full max-w-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+        style={{ textAlign: "left" }}
+      >
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-gray-900">
+            {editing ? "Modifica Cliente" : "Nuovo Cliente"}
+          </h2>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          {Input("nome", "Nome / Ragione Sociale *", "Mario / Acme SL")}
+          {Input("cognome", "Cognome", "Rossi")}
+          {Input("dni", "DNI / NIE", "X1234567Y")}
+          {Input("partitaIva", "Partita IVA / NIF", "B12345678")}
+          {Input("email", "Email", "info@cliente.es", "email")}
+          {Input("telefono", "Telefono", "+34 600...", "tel")}
+
+          <div>
+            <label className="text-xs font-medium text-gray-600 block mb-1">
+              Tipo
+            </label>
+            <select
+              value={form.tipo}
+              onChange={(e) => setForm((f) => ({ ...f, tipo: e.target.value }))}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white capitalize"
+            >
+              <option value="privato">Privato</option>
+              <option value="azienda">Azienda</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600 block mb-1">
+              Paese
+            </label>
+            <select
+              value={form.paese}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, paese: e.target.value }))
+              }
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white"
+            >
+              {PAESI.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {Input("via", "Via", "Carrer ...")}
+          <div className="grid grid-cols-2 gap-3">
+            {Input("cap", "CAP", "08003")}
+            {Input("citta", "Città", "Barcelona")}
+          </div>
+
+          <div className="col-span-2">
+            <label className="text-xs font-medium text-gray-600 block mb-1">
+              IBAN
+            </label>
+            <input
+              type="text"
+              value={form.iban}
+              onChange={(e) => setForm((f) => ({ ...f, iban: e.target.value }))}
+              placeholder="ES91 ..."
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 font-mono"
+            />
+          </div>
+
+          <div className="col-span-2">
+            <label className="text-xs font-medium text-gray-600 block mb-1">
+              Note
+            </label>
+            <textarea
+              value={form.note}
+              onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
+              rows={2}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 resize-none"
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-3 pt-2">
+          <button
+            onClick={onClose}
+            className="flex-1 border border-gray-200 text-gray-600 text-sm font-medium py-2.5 rounded-xl hover:bg-gray-50"
+          >
+            Annulla
+          </button>
+          <button
+            onClick={save}
+            disabled={saving || !form.nome.trim()}
+            className="glass-btn-primary flex-1 text-white text-sm font-medium py-2.5 rounded-xl disabled:opacity-50"
+          >
+            {editing ? "Salva Modifiche" : "Aggiungi"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Cliente Detail Modal ──────────────────────────────────────────────
+
+function ClienteDetailModal({
+  cliente,
+  onClose,
+  onEdit,
+}: {
+  cliente: Cliente;
+  onClose: () => void;
+  onEdit: () => void;
+}) {
+  const fatture = cliente.fatture ?? [];
+  const totale = fatture.reduce((s, f) => s + f.totale, 0);
+  const incassato = fatture
+    .filter((f) => f.pagato)
+    .reduce((s, f) => s + f.totale, 0);
+  const daIncassare = totale - incassato;
+
+  const indirizzo = [cliente.via, cliente.cap, cliente.citta, cliente.paese]
+    .filter(Boolean)
+    .join(", ");
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="glass-modal rounded-2xl w-full max-w-2xl p-6 space-y-5 max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+        style={{ textAlign: "left" }}
+      >
+        <div className="flex items-start justify-between">
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-lg font-bold text-gray-900">
+                {cliente.nome} {cliente.cognome ?? ""}
+              </h2>
+              <span
+                className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold capitalize"
+                style={
+                  cliente.tipo === "azienda"
+                    ? { background: "#e0f2fe", color: "#0369a1" }
+                    : { background: "#f1f5f9", color: "#475569" }
+                }
+              >
+                {cliente.tipo}
+              </span>
+            </div>
+            {(cliente.partitaIva || cliente.dni) && (
+              <p className="text-xs text-gray-500 mt-0.5 font-mono">
+                {cliente.partitaIva || cliente.dni}
+              </p>
+            )}
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Anagrafica */}
+        <div className="bg-white/60 rounded-xl p-4 space-y-2">
+          {cliente.email && (
+            <div className="flex items-center gap-2 text-sm text-gray-700">
+              <Mail className="w-4 h-4 text-gray-400" />
+              <a
+                href={`mailto:${cliente.email}`}
+                className="hover:text-sky-600"
+              >
+                {cliente.email}
+              </a>
+            </div>
+          )}
+          {cliente.telefono && (
+            <div className="flex items-center gap-2 text-sm text-gray-700">
+              <Phone className="w-4 h-4 text-gray-400" />
+              <a
+                href={`tel:${cliente.telefono}`}
+                className="hover:text-sky-600"
+              >
+                {cliente.telefono}
+              </a>
+            </div>
+          )}
+          {indirizzo && (
+            <p className="text-sm text-gray-700">{indirizzo}</p>
+          )}
+          {cliente.iban && (
+            <p className="text-xs text-gray-500 font-mono">
+              IBAN: {cliente.iban}
+            </p>
+          )}
+          {cliente.note && (
+            <p className="text-xs text-gray-500 pt-2 border-t border-gray-100">
+              {cliente.note}
+            </p>
+          )}
+        </div>
+
+        {/* Fatture stats */}
+        <div className="grid grid-cols-3 gap-3 bg-gray-50 rounded-xl p-3">
+          <div>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wide">
+              Fatturato
+            </p>
+            <p className="text-sm font-bold text-gray-900">{fmt(totale)}</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wide">
+              Incassato
+            </p>
+            <p className="text-sm font-bold" style={{ color: "#22c55e" }}>
+              {fmt(incassato)}
+            </p>
+          </div>
+          <div>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wide">
+              Da incassare
+            </p>
+            <p className="text-sm font-bold" style={{ color: "#f59e0b" }}>
+              {fmt(daIncassare)}
+            </p>
+          </div>
+        </div>
+
+        {/* Fatture collegate */}
+        <div>
+          <h3 className="text-sm font-bold text-gray-900 mb-2">
+            Fatture collegate ({fatture.length})
+          </h3>
+          {fatture.length === 0 ? (
+            <p className="text-xs text-gray-400 italic">
+              Nessuna fattura per questo cliente
+            </p>
+          ) : (
+            <div className="rounded-xl border border-gray-100 overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="text-left px-3 py-2 text-[11px] font-semibold text-gray-500 uppercase">
+                      Numero
+                    </th>
+                    <th className="text-left px-3 py-2 text-[11px] font-semibold text-gray-500 uppercase">
+                      Data
+                    </th>
+                    <th className="text-right px-3 py-2 text-[11px] font-semibold text-gray-500 uppercase">
+                      Totale
+                    </th>
+                    <th className="text-left px-3 py-2 text-[11px] font-semibold text-gray-500 uppercase">
+                      Stato
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="zebra">
+                  {fatture.map((f) => (
+                    <tr key={f.id} className="border-t border-gray-100">
+                      <td className="px-3 py-2 font-mono text-xs">
+                        {f.numero ?? "—"}
+                      </td>
+                      <td className="px-3 py-2 text-xs text-gray-700">
+                        {f.data
+                          ? new Date(f.data).toLocaleDateString("it-IT")
+                          : "—"}
+                      </td>
+                      <td className="px-3 py-2 text-right font-semibold">
+                        {fmt(f.totale)}
+                      </td>
+                      <td className="px-3 py-2">
+                        <span
+                          className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                          style={
+                            f.pagato
+                              ? { background: "#dcfce7", color: "#166534" }
+                              : { background: "#fef3c7", color: "#92400e" }
+                          }
+                        >
+                          {f.pagato ? "Pagata" : "Non pagata"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        <div className="flex gap-3 pt-2">
+          <button
+            onClick={onClose}
+            className="flex-1 border border-gray-200 text-gray-600 text-sm font-medium py-2.5 rounded-xl hover:bg-gray-50"
+          >
+            Chiudi
+          </button>
+          <button
+            onClick={onEdit}
+            className="glass-btn-primary flex-1 text-white text-sm font-medium py-2.5 rounded-xl"
+          >
+            Modifica Cliente
           </button>
         </div>
       </div>

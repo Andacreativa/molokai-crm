@@ -223,7 +223,7 @@ export default function DipendentiPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Dipendenti</h1>
           <p className="text-gray-500 text-sm mt-1">
-            {dipendenti.length} dipendenti in anagrafica · anno {anno}
+            {dipendenti.length} dipendenti in anagrafica · anno {anno} · stagione attiva Lug→Dic
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -231,7 +231,7 @@ export default function DipendentiPage() {
             value={anno}
             onChange={(e) => setAnno(parseInt(e.target.value))}
             className="text-sm font-semibold px-3 py-1.5 rounded-xl border-none outline-none cursor-pointer"
-            style={{ background: "#e8308a", color: "#ffffff" }}
+            style={{ background: "#0ea5e9", color: "#ffffff" }}
           >
             {[2026, 2025, 2024, 2023, 2022].map((a) => (
               <option

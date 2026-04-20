@@ -10,7 +10,7 @@ import {
   FileDown,
   FileSpreadsheet,
 } from "lucide-react";
-import { fmt, MESI } from "@/lib/constants";
+import { fmt, MESI, ANNI } from "@/lib/constants";
 import { exportPDF, exportExcel } from "@/lib/export";
 
 // ─── Types ────────────────────────────────────────────────────────────────
@@ -178,7 +178,7 @@ function SociTab() {
 
   // Riepilogo incassi mensili (anno selezionato)
   const [annoRiepilogo, setAnnoRiepilogo] = useState(ANNO_CORRENTE);
-  const anniDisponibili = [ANNO_CORRENTE, ANNO_CORRENTE - 1, ANNO_CORRENTE - 2];
+  const anniDisponibili = ANNI;
   const totaliMensili = Array(12).fill(0) as number[];
   for (const s of soci) {
     for (const p of s.pagamentiMensili ?? []) {
@@ -888,7 +888,7 @@ function SocioDetailModal({
   const totaleAnno = totalePagamenti + totaleMatricola;
 
   const stato = STATO_COLORI_SOCIO[socio.stato] ?? STATO_COLORI_SOCIO.ATTIVO;
-  const anniDisponibili = [ANNO_CORRENTE, ANNO_CORRENTE - 1, ANNO_CORRENTE - 2];
+  const anniDisponibili = ANNI;
 
   return (
     <div
