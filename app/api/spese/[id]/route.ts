@@ -3,7 +3,11 @@ import { prisma } from "@/lib/prisma";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-function computeIva(importo: number, aliquota: number, deducibile: boolean): number {
+function computeIva(
+  importo: number,
+  aliquota: number,
+  deducibile: boolean,
+): number {
   if (!deducibile || aliquota <= 0) return 0;
   const rate = aliquota / 100;
   return round2((importo / (1 + rate)) * rate);
@@ -30,7 +34,8 @@ export async function PUT(
   const { id } = await params;
   const rowId = parseInt(id);
   const before = await prisma.spesa.findUnique({ where: { id: rowId } });
-  if (!before) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!before)
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await request.json();
 

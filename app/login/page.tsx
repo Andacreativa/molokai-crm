@@ -41,11 +41,19 @@ function LoginForm() {
       onSubmit={submit}
       className="glass-card rounded-2xl w-full max-w-sm p-8 space-y-5"
     >
-      <div className="text-center space-y-1">
-        <h1 className="text-2xl font-bold text-gray-900">
-          CRM WakeUP Labs! España
-        </h1>
-        <p className="text-sm text-gray-500">Accedi alla dashboard</p>
+      <div className="text-center space-y-3">
+        <img
+          src="/logo-molokai.png"
+          alt="Molokai"
+          className="w-20 h-20 mx-auto"
+          style={{ objectFit: "contain" }}
+        />
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold text-gray-900">
+            Molokai Barcelona
+          </h1>
+          <p className="text-sm text-gray-500">Gestionale Interno</p>
+        </div>
       </div>
 
       <div className="space-y-3">
@@ -60,7 +68,7 @@ function LoginForm() {
             autoComplete="username"
             autoFocus
             required
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300 bg-white"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white"
           />
         </div>
         <div>
@@ -74,7 +82,7 @@ function LoginForm() {
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password"
               required
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300 bg-white"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white"
             />
             <button
               type="button"

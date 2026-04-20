@@ -4,8 +4,8 @@ import { prisma } from "@/lib/prisma";
 interface RigaCSV {
   data: string; // ISO YYYY-MM-DD o DD/MM/YYYY
   totaleGiorno?: number | string; // SALE
-  totVendite?: number | string;   // TOTALSALES
-  rimborsi?: number | string;     // REFUND
+  totVendite?: number | string; // TOTALSALES
+  rimborsi?: number | string; // REFUND
   note?: string;
 }
 
@@ -21,11 +21,7 @@ function parseData(s: string): Date | null {
   }
   const m = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
   if (m) {
-    const d = new Date(
-      parseInt(m[3]),
-      parseInt(m[2]) - 1,
-      parseInt(m[1]),
-    );
+    const d = new Date(parseInt(m[3]), parseInt(m[2]) - 1, parseInt(m[1]));
     return isNaN(d.getTime()) ? null : d;
   }
   return null;

@@ -23,7 +23,10 @@ export async function POST(request: Request) {
   const anno = parseInt(body.anno);
   const mese = parseInt(body.mese);
   if (!anno || !mese || mese < 1 || mese > 12) {
-    return NextResponse.json({ error: "anno/mese non validi" }, { status: 400 });
+    return NextResponse.json(
+      { error: "anno/mese non validi" },
+      { status: 400 },
+    );
   }
   const sett1 = parseFloat(body.sett1) || 0;
   const sett2 = parseFloat(body.sett2) || 0;

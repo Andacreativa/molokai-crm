@@ -5,7 +5,11 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 
 // IVA recuperabile da importo lordo (IVA inclusa).
 // Se non deducibile o aliquota=0, ritorna 0.
-function computeIva(importo: number, aliquota: number, deducibile: boolean): number {
+function computeIva(
+  importo: number,
+  aliquota: number,
+  deducibile: boolean,
+): number {
   if (!deducibile || aliquota <= 0) return 0;
   const rate = aliquota / 100;
   return round2((importo / (1 + rate)) * rate);

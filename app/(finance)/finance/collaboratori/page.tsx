@@ -1,14 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import {
-  Plus,
-  Pencil,
-  Trash2,
-  X,
-  Check,
-  Briefcase,
-} from "lucide-react";
+import { Plus, Pencil, Trash2, X, Check, Briefcase } from "lucide-react";
 import { fmt, MESI, ANNI, RUOLI_COLLABORATORE } from "@/lib/constants";
 
 // ─── Types ─────────────────────────────────────────────────────────────
@@ -96,10 +89,10 @@ export default function CollaboratoriPage() {
   }, []);
 
   const editing = editingId
-    ? collab.find((c) => c.id === editingId) ?? null
+    ? (collab.find((c) => c.id === editingId) ?? null)
     : null;
   const detail = detailId
-    ? collab.find((c) => c.id === detailId) ?? null
+    ? (collab.find((c) => c.id === detailId) ?? null)
     : null;
 
   // Stats per collaboratore (anno selezionato)
@@ -127,7 +120,11 @@ export default function CollaboratoriPage() {
   );
 
   const del = async (id: number) => {
-    if (!confirm("Eliminare questo collaboratore? Verranno rimossi tariffe, sessioni, pagamenti, anticipi."))
+    if (
+      !confirm(
+        "Eliminare questo collaboratore? Verranno rimossi tariffe, sessioni, pagamenti, anticipi.",
+      )
+    )
       return;
     await fetch(`/api/collaboratori/${id}`, { method: "DELETE" });
     if (detailId === id) setDetailId(null);
@@ -328,7 +325,10 @@ export default function CollaboratoriPage() {
                         {c.attivo ? "Attivo" : "Non attivo"}
                       </span>
                     </td>
-                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                    <td
+                      className="px-4 py-3"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <div className="flex items-center gap-1 justify-end">
                         <button
                           onClick={() => {
@@ -779,18 +779,10 @@ function CollaboratoreDetailModal({
         </div>
 
         {tab === "sessioni" && (
-          <SessioniTab
-            collab={collab}
-            anno={anno}
-            onChanged={onChanged}
-          />
+          <SessioniTab collab={collab} anno={anno} onChanged={onChanged} />
         )}
         {tab === "pagamenti" && (
-          <PagamentiTab
-            collab={collab}
-            anno={anno}
-            onChanged={onChanged}
-          />
+          <PagamentiTab collab={collab} anno={anno} onChanged={onChanged} />
         )}
         {tab === "profilo" && <ProfiloTab collab={collab} />}
 
@@ -837,7 +829,7 @@ function SessioniTab({
   const [saving, setSaving] = useState(false);
 
   const editingSessione = editingId
-    ? collab.sessioni.find((s) => s.id === editingId) ?? null
+    ? (collab.sessioni.find((s) => s.id === editingId) ?? null)
     : null;
   useEffect(() => {
     if (editingSessione) {
@@ -947,8 +939,8 @@ function SessioniTab({
         </div>
         {tipiDisponibili.length === 0 && (
           <p className="text-xs text-amber-700 bg-amber-100 px-3 py-2 rounded">
-            ⚠️ Nessuna tariffa configurata. Aggiungile dal tab &ldquo;Profilo &amp;
-            Tariffe&rdquo; prima di registrare sessioni.
+            ⚠️ Nessuna tariffa configurata. Aggiungile dal tab &ldquo;Profilo
+            &amp; Tariffe&rdquo; prima di registrare sessioni.
           </p>
         )}
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
@@ -959,9 +951,7 @@ function SessioniTab({
             <input
               type="date"
               value={form.data}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, data: e.target.value }))
-              }
+              onChange={(e) => setForm((f) => ({ ...f, data: e.target.value }))}
               className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white"
             />
           </div>
@@ -1028,9 +1018,7 @@ function SessioniTab({
         <div className="flex justify-end">
           <button
             onClick={save}
-            disabled={
-              saving || !form.tipoAttivita || ore <= 0 || !form.data
-            }
+            disabled={saving || !form.tipoAttivita || ore <= 0 || !form.data}
             className="glass-btn-primary flex items-center gap-2 text-white text-sm font-medium px-4 py-2 rounded-xl disabled:opacity-50"
           >
             <Plus className="w-4 h-4" />
@@ -1100,7 +1088,9 @@ function SessioniTab({
               <tr
                 key={s.id}
                 className="border-t border-gray-100"
-                style={editingId === s.id ? { background: "#fef9c3" } : undefined}
+                style={
+                  editingId === s.id ? { background: "#fef9c3" } : undefined
+                }
               >
                 <td className="px-3 py-2 text-xs text-gray-700">
                   {new Date(s.data).toLocaleDateString("it-IT")}

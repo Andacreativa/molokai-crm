@@ -186,11 +186,7 @@ function SociTab() {
         totaliMensili[p.mese - 1] += p.importo ?? s.prezzoPiano;
       }
     }
-    if (
-      s.matricolaPagata &&
-      !s.matricolaGratuita &&
-      s.matricolaMesePagamento
-    ) {
+    if (s.matricolaPagata && !s.matricolaGratuita && s.matricolaMesePagamento) {
       const lower = s.matricolaMesePagamento.toLowerCase();
       const meseMat = MESI.findIndex((m) => lower.startsWith(m.toLowerCase()));
       const annoMatch = s.matricolaMesePagamento.match(/\d{4}/);
@@ -211,7 +207,8 @@ function SociTab() {
     setShowForm(true);
   };
   const del = async (id: number) => {
-    if (!confirm("Eliminare questo socio? Verranno rimossi anche i pagamenti.")) return;
+    if (!confirm("Eliminare questo socio? Verranno rimossi anche i pagamenti."))
+      return;
     await fetch(`/api/club/soci/${id}`, { method: "DELETE" });
     if (detail?.id === id) setDetail(null);
     load();
@@ -226,7 +223,7 @@ function SociTab() {
     s.matricolaGratuita
       ? "Gratuita"
       : s.matricolaPagata
-        ? s.matricolaMesePagamento ?? "Sì"
+        ? (s.matricolaMesePagamento ?? "Sì")
         : "No";
 
   const today = new Date().toISOString().slice(0, 10);
@@ -396,41 +393,61 @@ function SociTab() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
-                {["Nome", "Cognome", "Piano", "Prezzo", "Pagamento", "Stato", "Cellulare", "Email", ""].map(
-                  (h) => (
-                    <th
-                      key={h}
-                      className={`text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 ${h === "Prezzo" ? "text-right" : "text-left"}`}
-                    >
-                      {h}
-                    </th>
-                  ),
-                )}
+                {[
+                  "Nome",
+                  "Cognome",
+                  "Piano",
+                  "Prezzo",
+                  "Pagamento",
+                  "Stato",
+                  "Cellulare",
+                  "Email",
+                  "",
+                ].map((h) => (
+                  <th
+                    key={h}
+                    className={`text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 ${h === "Prezzo" ? "text-right" : "text-left"}`}
+                  >
+                    {h}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody className="zebra">
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="text-center text-gray-400 py-12 text-sm">
+                  <td
+                    colSpan={9}
+                    className="text-center text-gray-400 py-12 text-sm"
+                  >
                     Nessun socio trovato
                   </td>
                 </tr>
               )}
               {filtered.map((s) => {
-                const stato = STATO_COLORI_SOCIO[s.stato] ?? STATO_COLORI_SOCIO.ATTIVO;
+                const stato =
+                  STATO_COLORI_SOCIO[s.stato] ?? STATO_COLORI_SOCIO.ATTIVO;
                 return (
                   <tr
                     key={s.id}
                     className="border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer"
                     onClick={() => setDetail(s)}
                   >
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{s.nome}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{s.cognome ?? "—"}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{s.piano}</td>
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                      {s.nome}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      {s.cognome ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      {s.piano}
+                    </td>
                     <td className="px-4 py-3 text-sm font-semibold text-gray-900 text-right">
                       {fmt(s.prezzoPiano)}
                     </td>
-                    <td className="px-4 py-3 text-xs text-gray-600">{s.pagamento}</td>
+                    <td className="px-4 py-3 text-xs text-gray-600">
+                      {s.pagamento}
+                    </td>
                     <td className="px-4 py-3">
                       <span
                         className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold"
@@ -439,9 +456,16 @@ function SociTab() {
                         {s.stato}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{s.cellulare ?? "—"}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{s.email ?? "—"}</td>
-                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      {s.cellulare ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      {s.email ?? "—"}
+                    </td>
+                    <td
+                      className="px-4 py-3"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <div className="flex items-center gap-2 justify-end">
                         <button
                           onClick={() => openEdit(s)}
@@ -562,9 +586,16 @@ function SocioFormModal({
     }
   };
 
-  const Input = (k: keyof typeof form, label: string, placeholder = "", type = "text") => (
+  const Input = (
+    k: keyof typeof form,
+    label: string,
+    placeholder = "",
+    type = "text",
+  ) => (
     <div>
-      <label className="text-xs font-medium text-gray-600 block mb-1">{label}</label>
+      <label className="text-xs font-medium text-gray-600 block mb-1">
+        {label}
+      </label>
       <input
         type={type}
         value={form[k]}
@@ -606,7 +637,9 @@ function SocioFormModal({
           {Input("email", "Email", "info@...", "email")}
 
           <div>
-            <label className="text-xs font-medium text-gray-600 block mb-1">Piano</label>
+            <label className="text-xs font-medium text-gray-600 block mb-1">
+              Piano
+            </label>
             <select
               value={form.piano}
               onChange={(e) => {
@@ -614,7 +647,9 @@ function SocioFormModal({
                 setForm((f) => ({
                   ...f,
                   piano: nuovoPiano,
-                  prezzoPiano: String(PIANI_PREZZI[nuovoPiano] ?? f.prezzoPiano),
+                  prezzoPiano: String(
+                    PIANI_PREZZI[nuovoPiano] ?? f.prezzoPiano,
+                  ),
                 }));
               }}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white"
@@ -646,10 +681,14 @@ function SocioFormModal({
           )}
 
           <div>
-            <label className="text-xs font-medium text-gray-600 block mb-1">Pagamento</label>
+            <label className="text-xs font-medium text-gray-600 block mb-1">
+              Pagamento
+            </label>
             <select
               value={form.pagamento}
-              onChange={(e) => setForm((f) => ({ ...f, pagamento: e.target.value }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, pagamento: e.target.value }))
+              }
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white"
             >
               {PAGAMENTI.map((p) => (
@@ -661,10 +700,14 @@ function SocioFormModal({
           </div>
 
           <div>
-            <label className="text-xs font-medium text-gray-600 block mb-1">Stato</label>
+            <label className="text-xs font-medium text-gray-600 block mb-1">
+              Stato
+            </label>
             <select
               value={form.stato}
-              onChange={(e) => setForm((f) => ({ ...f, stato: e.target.value }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, stato: e.target.value }))
+              }
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white"
             >
               {STATI_SOCIO.map((s) => (
@@ -676,7 +719,9 @@ function SocioFormModal({
           </div>
 
           <div className="col-span-2">
-            <label className="text-xs font-medium text-gray-600 block mb-1">IBAN</label>
+            <label className="text-xs font-medium text-gray-600 block mb-1">
+              IBAN
+            </label>
             <input
               type="text"
               value={form.iban}
@@ -715,13 +760,17 @@ function SocioFormModal({
                       setForm((f) => ({
                         ...f,
                         matricolaGratuita: e.target.checked,
-                        matricolaImporto: e.target.checked ? "0" : f.matricolaImporto,
+                        matricolaImporto: e.target.checked
+                          ? "0"
+                          : f.matricolaImporto,
                       }))
                     }
                     className="w-4 h-4"
                     style={{ accentColor: "#0ea5e9" }}
                   />
-                  <span className="text-sm text-gray-700">Matricola gratuita</span>
+                  <span className="text-sm text-gray-700">
+                    Matricola gratuita
+                  </span>
                 </label>
               </div>
               <div>
@@ -731,12 +780,17 @@ function SocioFormModal({
                     checked={form.matricolaPagata}
                     disabled={form.matricolaGratuita}
                     onChange={(e) =>
-                      setForm((f) => ({ ...f, matricolaPagata: e.target.checked }))
+                      setForm((f) => ({
+                        ...f,
+                        matricolaPagata: e.target.checked,
+                      }))
                     }
                     className="w-4 h-4"
                     style={{ accentColor: "#0ea5e9" }}
                   />
-                  <span className="text-sm text-gray-700 font-medium">Pagata</span>
+                  <span className="text-sm text-gray-700 font-medium">
+                    Pagata
+                  </span>
                 </label>
               </div>
               {form.matricolaPagata && (
@@ -762,7 +816,9 @@ function SocioFormModal({
           </div>
 
           <div className="col-span-2">
-            <label className="text-xs font-medium text-gray-600 block mb-1">Note</label>
+            <label className="text-xs font-medium text-gray-600 block mb-1">
+              Note
+            </label>
             <textarea
               value={form.note}
               onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
@@ -817,7 +873,7 @@ function SocioDetailModal({
 
   // Per soci annuali: il mese già pagato (se esiste) blocca gli altri.
   const meseAnnualePagato = isAnnuale
-    ? pagamenti.find((p) => p.anno === anno && p.pagato)?.mese ?? null
+    ? (pagamenti.find((p) => p.anno === anno && p.pagato)?.mese ?? null)
     : null;
 
   const togglePagato = async (mese: number) => {
@@ -979,7 +1035,9 @@ function SocioDetailModal({
                   className="w-4 h-4"
                   style={{ accentColor: "#0ea5e9" }}
                 />
-                <span className="text-sm text-gray-700 font-medium">Pagata</span>
+                <span className="text-sm text-gray-700 font-medium">
+                  Pagata
+                </span>
               </label>
             </div>
             {socio.matricolaPagata && (
@@ -1060,7 +1118,8 @@ function SocioDetailModal({
 
           {isAnnuale && meseAnnualePagato === null && (
             <p className="text-[11px] text-gray-500 mt-2">
-              Piano annuale: clicca sul mese in cui è stato effettuato il pagamento.
+              Piano annuale: clicca sul mese in cui è stato effettuato il
+              pagamento.
             </p>
           )}
 
@@ -1125,7 +1184,9 @@ function DetailRow({
       <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
         {label}
       </span>
-      <span className={`text-sm text-gray-800 break-words ${mono ? "font-mono" : ""}`}>
+      <span
+        className={`text-sm text-gray-800 break-words ${mono ? "font-mono" : ""}`}
+      >
         {value || <span className="text-gray-300">—</span>}
       </span>
     </div>
@@ -1236,13 +1297,17 @@ function BuoniTab() {
             <tbody className="zebra">
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="text-center text-gray-400 py-12 text-sm">
+                  <td
+                    colSpan={8}
+                    className="text-center text-gray-400 py-12 text-sm"
+                  >
                     Nessun buono trovato
                   </td>
                 </tr>
               )}
               {filtered.map((b) => {
-                const stato = STATO_COLORI_BUONO[b.stato] ?? STATO_COLORI_BUONO.Attivo;
+                const stato =
+                  STATO_COLORI_BUONO[b.stato] ?? STATO_COLORI_BUONO.Attivo;
                 const residue =
                   b.sessioniTotali !== null
                     ? Math.max(0, b.sessioniTotali - b.sessioniUsate)
@@ -1253,9 +1318,15 @@ function BuoniTab() {
                     className="border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer"
                     onClick={() => openEdit(b)}
                   >
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{b.nome}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{b.cognome ?? "—"}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{b.tipoBuono}</td>
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                      {b.nome}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      {b.cognome ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      {b.tipoBuono}
+                    </td>
                     <td className="px-4 py-3 text-sm font-semibold text-gray-900 text-right">
                       {fmt(b.prezzoBuono)}
                     </td>
@@ -1285,9 +1356,14 @@ function BuoniTab() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700 text-right">
-                      {residue !== null ? `${residue} / ${b.sessioniTotali}` : "—"}
+                      {residue !== null
+                        ? `${residue} / ${b.sessioniTotali}`
+                        : "—"}
                     </td>
-                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                    <td
+                      className="px-4 py-3"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <div className="flex items-center gap-2 justify-end">
                         <button
                           onClick={() => openEdit(b)}
@@ -1348,7 +1424,9 @@ function BuonoFormModal({
     pagato: editing?.pagato ?? false,
     mesePagamento: editing?.mesePagamento ?? "",
     stato: editing?.stato ?? "Attivo",
-    sessioniTotali: String(editing?.sessioniTotali ?? SESSIONI_DEFAULT["BONO CLASE"] ?? ""),
+    sessioniTotali: String(
+      editing?.sessioniTotali ?? SESSIONI_DEFAULT["BONO CLASE"] ?? "",
+    ),
     sessioniUsate: String(editing?.sessioniUsate ?? 0),
     note: editing?.note ?? "",
   });
@@ -1360,7 +1438,8 @@ function BuonoFormModal({
       const next = { ...f, tipoBuono: tipo };
       if (!editing) {
         const def = SESSIONI_DEFAULT[tipo];
-        next.sessioniTotali = def !== null && def !== undefined ? String(def) : "";
+        next.sessioniTotali =
+          def !== null && def !== undefined ? String(def) : "";
       }
       return next;
     });
@@ -1372,7 +1451,8 @@ function BuonoFormModal({
     const payload = {
       ...form,
       prezzoBuono: parseFloat(form.prezzoBuono) || 0,
-      sessioniTotali: form.sessioniTotali === "" ? null : parseInt(form.sessioniTotali),
+      sessioniTotali:
+        form.sessioniTotali === "" ? null : parseInt(form.sessioniTotali),
       sessioniUsate: parseInt(form.sessioniUsate) || 0,
     };
     try {
@@ -1395,9 +1475,16 @@ function BuonoFormModal({
     }
   };
 
-  const Input = (k: keyof typeof form, label: string, placeholder = "", type = "text") => (
+  const Input = (
+    k: keyof typeof form,
+    label: string,
+    placeholder = "",
+    type = "text",
+  ) => (
     <div>
-      <label className="text-xs font-medium text-gray-600 block mb-1">{label}</label>
+      <label className="text-xs font-medium text-gray-600 block mb-1">
+        {label}
+      </label>
       <input
         type={type}
         value={form[k] as string}
@@ -1437,7 +1524,9 @@ function BuonoFormModal({
           {Input("email", "Email", "info@...", "email")}
 
           <div>
-            <label className="text-xs font-medium text-gray-600 block mb-1">Tipo Bono</label>
+            <label className="text-xs font-medium text-gray-600 block mb-1">
+              Tipo Bono
+            </label>
             <select
               value={form.tipoBuono}
               onChange={(e) => onTipoChange(e.target.value)}
@@ -1460,7 +1549,9 @@ function BuonoFormModal({
               <input
                 type="checkbox"
                 checked={form.pagato}
-                onChange={(e) => setForm((f) => ({ ...f, pagato: e.target.checked }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, pagato: e.target.checked }))
+                }
                 className="w-4 h-4 rounded"
                 style={{ accentColor: "#0ea5e9" }}
               />
@@ -1470,10 +1561,14 @@ function BuonoFormModal({
           </div>
 
           <div>
-            <label className="text-xs font-medium text-gray-600 block mb-1">Stato</label>
+            <label className="text-xs font-medium text-gray-600 block mb-1">
+              Stato
+            </label>
             <select
               value={form.stato}
-              onChange={(e) => setForm((f) => ({ ...f, stato: e.target.value }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, stato: e.target.value }))
+              }
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white"
             >
               {STATI_BUONO.map((s) => (
@@ -1485,7 +1580,9 @@ function BuonoFormModal({
           </div>
 
           <div className="col-span-2">
-            <label className="text-xs font-medium text-gray-600 block mb-1">Note</label>
+            <label className="text-xs font-medium text-gray-600 block mb-1">
+              Note
+            </label>
             <textarea
               value={form.note}
               onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}

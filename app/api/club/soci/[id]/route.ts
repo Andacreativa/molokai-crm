@@ -28,7 +28,9 @@ export async function PATCH(
       ...(body.nome !== undefined && { nome: body.nome }),
       ...(body.cognome !== undefined && { cognome: body.cognome || null }),
       ...(body.dni !== undefined && { dni: body.dni || null }),
-      ...(body.cellulare !== undefined && { cellulare: body.cellulare || null }),
+      ...(body.cellulare !== undefined && {
+        cellulare: body.cellulare || null,
+      }),
       ...(body.email !== undefined && { email: body.email || null }),
       ...(body.piano !== undefined && { piano: body.piano }),
       ...(body.pianoDescrizione !== undefined && {

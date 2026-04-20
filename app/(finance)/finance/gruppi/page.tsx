@@ -1,7 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Pencil, Trash2, X, Users2, School, Briefcase } from "lucide-react";
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  X,
+  Users2,
+  School,
+  Briefcase,
+} from "lucide-react";
 import { fmt, MESI, ANNI } from "@/lib/constants";
 
 // ─── Types ─────────────────────────────────────────────────────────────
@@ -73,10 +81,10 @@ export default function GruppiPage() {
 
   // Derived: editing/detail get re-found after each load → state riflette i dati freschi
   const editing = editingId
-    ? gruppi.find((g) => g.id === editingId) ?? null
+    ? (gruppi.find((g) => g.id === editingId) ?? null)
     : null;
   const detail = detailId
-    ? gruppi.find((g) => g.id === detailId) ?? null
+    ? (gruppi.find((g) => g.id === detailId) ?? null)
     : null;
 
   const sessioniNell_anno = (g: Gruppo) =>
@@ -103,7 +111,10 @@ export default function GruppiPage() {
   );
 
   const del = async (id: number) => {
-    if (!confirm("Eliminare questo gruppo? Verranno rimosse anche le sessioni.")) return;
+    if (
+      !confirm("Eliminare questo gruppo? Verranno rimosse anche le sessioni.")
+    )
+      return;
     await fetch(`/api/gruppi/${id}`, { method: "DELETE" });
     if (detailId === id) setDetailId(null);
     load();
@@ -259,10 +270,7 @@ export default function GruppiPage() {
               )}
               {gruppi.map((g) => {
                 const sessioni = sessioniFiltrate(g);
-                const totaleGruppo = sessioni.reduce(
-                  (s, x) => s + x.totale,
-                  0,
-                );
+                const totaleGruppo = sessioni.reduce((s, x) => s + x.totale, 0);
                 const tipoColor = TIPO_COLOR[g.tipo] ?? TIPO_COLOR.altro;
                 const TipoIcon = TIPO_ICON[g.tipo] ?? Users2;
                 return (
@@ -301,7 +309,10 @@ export default function GruppiPage() {
                     >
                       {fmt(totaleGruppo)}
                     </td>
-                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                    <td
+                      className="px-4 py-3"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <div className="flex items-center gap-1 justify-end">
                         <button
                           onClick={() => {
@@ -564,7 +575,7 @@ function GruppoDetailModal({
 
   // Quando si seleziona una sessione da modificare, popola la form.
   const editingSessione = editingSessioneId
-    ? gruppo.sessioni.find((s) => s.id === editingSessioneId) ?? null
+    ? (gruppo.sessioni.find((s) => s.id === editingSessioneId) ?? null)
     : null;
   useEffect(() => {
     if (editingSessione) {
@@ -603,14 +614,11 @@ function GruppoDetailModal({
     };
     try {
       if (editingSessione) {
-        await fetch(
-          `/api/gruppi/${gruppo.id}/sessioni/${editingSessione.id}`,
-          {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          },
-        );
+        await fetch(`/api/gruppi/${gruppo.id}/sessioni/${editingSessione.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
       } else {
         await fetch(`/api/gruppi/${gruppo.id}/sessioni`, {
           method: "POST",

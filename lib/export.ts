@@ -188,9 +188,7 @@ export async function exportFatturaPDF(
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.setTextColor(...DARK);
-  const nomeCliente = c
-    ? `${c.nome}${c.cognome ? " " + c.cognome : ""}`
-    : "—";
+  const nomeCliente = c ? `${c.nome}${c.cognome ? " " + c.cognome : ""}` : "—";
   doc.text(nomeCliente, col1X, boxY + 5);
 
   doc.setFont("helvetica", "normal");

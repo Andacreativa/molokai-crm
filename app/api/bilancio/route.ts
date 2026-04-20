@@ -199,9 +199,7 @@ export async function GET(request: Request) {
   const totaleEntrate = round2(
     mensili.reduce((s, m) => s + m.entrate.totale, 0),
   );
-  const totaleUscite = round2(
-    mensili.reduce((s, m) => s + m.uscite.totale, 0),
-  );
+  const totaleUscite = round2(mensili.reduce((s, m) => s + m.uscite.totale, 0));
   const bilancioAnno = round2(totaleEntrate - totaleUscite);
 
   // ─── Breakdown per categoria ────────────────────────────────────────
@@ -236,7 +234,11 @@ export async function GET(request: Request) {
     mesiAttiviFisse,
     mensili,
     cumulativoMensile,
-    totali: { entrate: totaleEntrate, uscite: totaleUscite, bilancio: bilancioAnno },
+    totali: {
+      entrate: totaleEntrate,
+      uscite: totaleUscite,
+      bilancio: bilancioAnno,
+    },
     breakdown: { entrate: breakdownEntrate, uscite: breakdownUscite },
   });
 }

@@ -14,7 +14,9 @@ async function main() {
       matricolaMesePagamento: "Gennaio 2026",
     },
   });
-  console.log(`✅  Aggiornati ${result.count} soci (matricolaPagata=true, mese="Gennaio 2026")`);
+  console.log(
+    `✅  Aggiornati ${result.count} soci (matricolaPagata=true, mese="Gennaio 2026")`,
+  );
 }
 
 main()

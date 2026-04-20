@@ -75,11 +75,13 @@ export default function IncassiWebPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-gray-200">
-        {([
-          ["fareharbor", "FareHarbor"],
-          ["stripe", "Stripe"],
-          ["gyg", "Get Your Guide"],
-        ] as const).map(([key, label]) => {
+        {(
+          [
+            ["fareharbor", "FareHarbor"],
+            ["stripe", "Stripe"],
+            ["gyg", "Get Your Guide"],
+          ] as const
+        ).map(([key, label]) => {
           const active = tab === key;
           return (
             <button
@@ -98,7 +100,9 @@ export default function IncassiWebPage() {
         })}
       </div>
 
-      {tab === "fareharbor" && <FareHarborTab anno={anno} onSaved={bumpReload} />}
+      {tab === "fareharbor" && (
+        <FareHarborTab anno={anno} onSaved={bumpReload} />
+      )}
       {tab === "stripe" && <StripeTab anno={anno} onSaved={bumpReload} />}
       {tab === "gyg" && <GYGTab anno={anno} onSaved={bumpReload} />}
     </div>
@@ -142,9 +146,9 @@ function RiepilogoBoxWeb({
   reloadToken: number;
 }) {
   // Righe generiche: tutti e 3 gli endpoint hanno `mese` e almeno uno tra `totale`/`netto`.
-  const [rows, setRows] = useState<Array<{ mese: number } & Record<string, number>>>(
-    [],
-  );
+  const [rows, setRows] = useState<
+    Array<{ mese: number } & Record<string, number>>
+  >([]);
   const { endpoint, valueKey, title } = TAB_CONFIG[tab];
 
   useEffect(() => {
@@ -319,15 +323,20 @@ function FareHarborTab({
                     <td className="px-4 py-2 text-sm font-medium text-gray-900">
                       {mese}
                     </td>
-                    {(["sett1", "sett2", "sett3", "sett4"] as const).map((k) => (
-                      <td key={k} className="px-2 py-1 text-right">
-                        <EuroInput
-                          value={r[k]}
-                          onSave={(v) => save(m, { [k]: v })}
-                        />
-                      </td>
-                    ))}
-                    <td className="px-4 py-2 text-sm font-bold text-right" style={{ color: "#0ea5e9" }}>
+                    {(["sett1", "sett2", "sett3", "sett4"] as const).map(
+                      (k) => (
+                        <td key={k} className="px-2 py-1 text-right">
+                          <EuroInput
+                            value={r[k]}
+                            onSave={(v) => save(m, { [k]: v })}
+                          />
+                        </td>
+                      ),
+                    )}
+                    <td
+                      className="px-4 py-2 text-sm font-bold text-right"
+                      style={{ color: "#0ea5e9" }}
+                    >
                       {fmt(r.totale)}
                     </td>
                   </tr>
@@ -407,9 +416,7 @@ function FareHarborTab({
           }
 
           if (skippedNotSucceeded > 0) {
-            errors.push(
-              `${skippedNotSucceeded} payout non-Succeeded saltati`,
-            );
+            errors.push(`${skippedNotSucceeded} payout non-Succeeded saltati`);
           }
           if (skippedOtherYear > 0) {
             errors.push(`${skippedOtherYear} payout di altri anni saltati`);
@@ -430,13 +437,7 @@ function FareHarborTab({
 
 // ─── Stripe Tab ────────────────────────────────────────────────────────
 
-function StripeTab({
-  anno,
-  onSaved,
-}: {
-  anno: number;
-  onSaved?: () => void;
-}) {
+function StripeTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
   const [rows, setRows] = useState<StripeRow[]>([]);
   const [saving, setSaving] = useState<number | null>(null);
 
@@ -511,7 +512,11 @@ function StripeTab({
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
         <StatCard label={`Lordo ${anno}`} value={totals.lordo} />
-        <StatCard label="Commissioni" value={totals.commissioni} color="#64748b" />
+        <StatCard
+          label="Commissioni"
+          value={totals.commissioni}
+          color="#64748b"
+        />
         <StatCard label="Rimborsi" value={totals.rimborsi} color="#ef4444" />
         <StatCard label="Netto" value={totals.netto} color="#0ea5e9" />
       </div>
@@ -548,7 +553,10 @@ function StripeTab({
                       {mese}
                     </td>
                     <td className="px-2 py-1 text-right">
-                      <EuroInput value={r.lordo} onSave={(v) => save(m, { lordo: v })} />
+                      <EuroInput
+                        value={r.lordo}
+                        onSave={(v) => save(m, { lordo: v })}
+                      />
                     </td>
                     <td className="px-2 py-1 text-right">
                       <EuroInput
@@ -562,7 +570,10 @@ function StripeTab({
                         onSave={(v) => save(m, { rimborsi: v })}
                       />
                     </td>
-                    <td className="px-4 py-2 text-sm font-bold text-right" style={{ color: "#0ea5e9" }}>
+                    <td
+                      className="px-4 py-2 text-sm font-bold text-right"
+                      style={{ color: "#0ea5e9" }}
+                    >
                       {fmt(r.netto)}
                     </td>
                   </tr>
@@ -665,13 +676,7 @@ function StripeTab({
 
 // ─── GYG Tab ───────────────────────────────────────────────────────────
 
-function GYGTab({
-  anno,
-  onSaved,
-}: {
-  anno: number;
-  onSaved?: () => void;
-}) {
+function GYGTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
   const [rows, setRows] = useState<GYGRow[]>([]);
   const [saving, setSaving] = useState<number | null>(null);
 
@@ -735,7 +740,11 @@ function GYGTab({
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <StatCard label={`Lordo ${anno}`} value={totals.lordo} />
-        <StatCard label="Commissioni (25%)" value={totals.commissioni} color="#64748b" />
+        <StatCard
+          label="Commissioni (25%)"
+          value={totals.commissioni}
+          color="#64748b"
+        />
         <StatCard label="Netto" value={totals.netto} color="#0ea5e9" />
       </div>
 
@@ -774,7 +783,10 @@ function GYGTab({
                     <td className="px-4 py-2 text-sm text-gray-600 text-right">
                       {fmt(r.commissioni)}
                     </td>
-                    <td className="px-4 py-2 text-sm font-bold text-right" style={{ color: "#0ea5e9" }}>
+                    <td
+                      className="px-4 py-2 text-sm font-bold text-right"
+                      style={{ color: "#0ea5e9" }}
+                    >
                       {fmt(r.netto)}
                     </td>
                   </tr>
@@ -868,9 +880,7 @@ function GYGTab({
             );
           }
           if (skippedNoDate > 0) {
-            errors.push(
-              `${skippedNoDate} righe senza Activity Date valida`,
-            );
+            errors.push(`${skippedNoDate} righe senza Activity Date valida`);
           }
           return { payloads, errors };
         }}
@@ -961,7 +971,9 @@ function RefundReserveCard({ anno }: { anno: number }) {
 
   useEffect(() => {
     (async () => {
-      const res = await fetch(`/api/incassi-web/fareharbor/reserve?anno=${anno}`);
+      const res = await fetch(
+        `/api/incassi-web/fareharbor/reserve?anno=${anno}`,
+      );
       const data = await res.json();
       setValue(Number(data?.refundReserve) || 0);
     })();
@@ -1028,7 +1040,9 @@ function parseMese(v: unknown): number | null {
     if (v >= 1 && v <= 12) return Math.floor(v);
     return null;
   }
-  const s = String(v ?? "").trim().toLowerCase();
+  const s = String(v ?? "")
+    .trim()
+    .toLowerCase();
   if (!s) return null;
   const n = parseInt(s, 10);
   if (!isNaN(n) && n >= 1 && n <= 12) return n;
@@ -1133,9 +1147,7 @@ function ExcelUploadBox({
         errors.push(
           `${failed.length} richieste fallite: ${failed
             .slice(0, 3)
-            .map((r) =>
-              r.status === "rejected" ? String(r.reason) : "",
-            )
+            .map((r) => (r.status === "rejected" ? String(r.reason) : ""))
             .join("; ")}`,
         );
       }

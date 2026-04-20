@@ -292,7 +292,9 @@ export default function BilancioPage() {
                 >
                   {fmt(data.totali.bilancio)}
                 </td>
-                <td className="px-4 py-3 text-sm text-right text-gray-400">—</td>
+                <td className="px-4 py-3 text-sm text-right text-gray-400">
+                  —
+                </td>
               </tr>
             </tbody>
           </table>

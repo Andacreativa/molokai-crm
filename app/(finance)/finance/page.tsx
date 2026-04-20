@@ -463,7 +463,10 @@ function KPI({
   label: string;
   value: string;
   color: string;
-  icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
+  icon: React.ComponentType<{
+    className?: string;
+    style?: React.CSSProperties;
+  }>;
 }) {
   return (
     <div className="glass-card rounded-2xl p-4">
@@ -520,7 +523,10 @@ function ChannelCard({
   label: string;
   value: number;
   color: string;
-  icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
+  icon: React.ComponentType<{
+    className?: string;
+    style?: React.CSSProperties;
+  }>;
 }) {
   return (
     <div className="glass-card rounded-xl p-3 flex items-center gap-3">

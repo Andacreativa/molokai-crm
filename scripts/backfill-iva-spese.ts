@@ -25,12 +25,12 @@ async function main() {
       where: { id: s.id },
       data: { ivaRecuperabile: v },
     });
-    console.log(
-      `✓  ${s.fornitore} (€${s.importo}) → IVA €${v.toFixed(2)}`,
-    );
+    console.log(`✓  ${s.fornitore} (€${s.importo}) → IVA €${v.toFixed(2)}`);
     updated++;
   }
-  console.log(`\n✅  Backfill completato: ${updated}/${all.length} spese aggiornate\n`);
+  console.log(
+    `\n✅  Backfill completato: ${updated}/${all.length} spese aggiornate\n`,
+  );
 }
 
 main()

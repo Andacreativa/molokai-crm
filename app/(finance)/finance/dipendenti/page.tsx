@@ -223,7 +223,8 @@ export default function DipendentiPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Dipendenti</h1>
           <p className="text-gray-500 text-sm mt-1">
-            {dipendenti.length} dipendenti in anagrafica · anno {anno} · stagione attiva Lug→Dic
+            {dipendenti.length} dipendenti in anagrafica · anno {anno} ·
+            stagione attiva Lug→Dic
           </p>
         </div>
         <div className="flex items-center gap-3">

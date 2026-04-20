@@ -31,9 +31,7 @@ export async function PUT(
     const pagata = Boolean(body.pagata);
     const data: Record<string, unknown> = {
       matricolaPagata: pagata,
-      matricolaMesePagamento: pagata
-        ? body.mesePagamento || null
-        : null,
+      matricolaMesePagamento: pagata ? body.mesePagamento || null : null,
     };
     if (body.importo !== undefined && body.importo !== "") {
       data.matricolaImporto = parseFloat(body.importo) || 0;
@@ -78,7 +76,9 @@ export async function PUT(
 
   const socio = await prisma.socio.findUnique({
     where: { id: socioId },
-    include: { pagamentiMensili: { orderBy: [{ anno: "desc" }, { mese: "asc" }] } },
+    include: {
+      pagamentiMensili: { orderBy: [{ anno: "desc" }, { mese: "asc" }] },
+    },
   });
   return NextResponse.json(socio);
 }

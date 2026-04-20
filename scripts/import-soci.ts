@@ -166,7 +166,9 @@ async function main() {
       where: { nome: s.nome, cognome: s.cognome },
     });
     if (existing) {
-      console.log(`⏭   ${s.nome} ${s.cognome} già presente (id=${existing.id}), skip`);
+      console.log(
+        `⏭   ${s.nome} ${s.cognome} già presente (id=${existing.id}), skip`,
+      );
       skipped++;
       continue;
     }
@@ -206,7 +208,9 @@ async function main() {
     created++;
   }
 
-  console.log(`\n✅  Fatto. Creati: ${created}, skipped: ${skipped}, pagamenti: ${paymentsCreated}\n`);
+  console.log(
+    `\n✅  Fatto. Creati: ${created}, skipped: ${skipped}, pagamenti: ${paymentsCreated}\n`,
+  );
 }
 
 main()

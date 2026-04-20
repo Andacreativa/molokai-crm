@@ -25,7 +25,9 @@ export async function GET() {
 // body: { ...anagrafica, tariffe?: [{tipoAttivita, tariffaOraria}] }
 export async function POST(request: Request) {
   const body = await request.json();
-  const tariffe: TariffaInput[] = Array.isArray(body.tariffe) ? body.tariffe : [];
+  const tariffe: TariffaInput[] = Array.isArray(body.tariffe)
+    ? body.tariffe
+    : [];
 
   const collab = await prisma.collaboratore.create({
     data: {

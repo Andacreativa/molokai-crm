@@ -165,7 +165,8 @@ function FattureTab() {
   const filtered = fatture.filter((f) => {
     if (statusFilter === "pagate" && !f.pagato) return false;
     if (statusFilter === "scadute" && f.pagato) return false;
-    const nome = `${f.cliente?.nome ?? ""} ${f.cliente?.cognome ?? ""}`.toLowerCase();
+    const nome =
+      `${f.cliente?.nome ?? ""} ${f.cliente?.cognome ?? ""}`.toLowerCase();
     return (f.numero ?? "").toLowerCase().includes(q) || nome.includes(q);
   });
 
@@ -243,7 +244,9 @@ function FattureTab() {
           <p className="text-[10px] text-gray-500 uppercase tracking-wide font-semibold">
             Fatturato {anno}
           </p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{fmt(totaleFatturato)}</p>
+          <p className="text-2xl font-bold text-gray-900 mt-1">
+            {fmt(totaleFatturato)}
+          </p>
         </div>
         <div className="glass-card rounded-2xl p-4">
           <p className="text-[10px] text-gray-500 uppercase tracking-wide font-semibold">
@@ -291,7 +294,10 @@ function FattureTab() {
             <tbody className="zebra">
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="text-center text-gray-400 py-12 text-sm">
+                  <td
+                    colSpan={9}
+                    className="text-center text-gray-400 py-12 text-sm"
+                  >
                     Nessuna fattura trovata
                   </td>
                 </tr>
@@ -309,18 +315,24 @@ function FattureTab() {
                       {f.numero ?? "—"}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700">
-                      {f.data ? new Date(f.data).toLocaleDateString("it-IT") : "—"}
+                      {f.data
+                        ? new Date(f.data).toLocaleDateString("it-IT")
+                        : "—"}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-900">{nome}</td>
                     <td className="px-4 py-3 text-sm text-gray-700 text-right">
                       {fmt(f.baseImponibile)}
                     </td>
-                    <td className="px-4 py-3 text-xs text-gray-500 text-right">{f.iva}%</td>
+                    <td className="px-4 py-3 text-xs text-gray-500 text-right">
+                      {f.iva}%
+                    </td>
                     <td className="px-4 py-3 text-sm font-bold text-gray-900 text-right">
                       {fmt(f.totale)}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700">
-                      {f.scadenza ? new Date(f.scadenza).toLocaleDateString("it-IT") : "—"}
+                      {f.scadenza
+                        ? new Date(f.scadenza).toLocaleDateString("it-IT")
+                        : "—"}
                     </td>
                     <td className="px-4 py-3">
                       <button
@@ -482,7 +494,9 @@ function FatturaFormModal({
   const totale = round2(baseImponibile + ivaImporto);
 
   const updateRiga = (i: number, patch: Partial<Riga>) => {
-    setRighe((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+    setRighe((prev) =>
+      prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)),
+    );
   };
   const addRiga = () =>
     setRighe((prev) => [
@@ -546,7 +560,9 @@ function FatturaFormModal({
       >
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold text-gray-900">
-            {editing ? `Modifica ${editing.numero ?? "Fattura"}` : "Nuova Fattura"}
+            {editing
+              ? `Modifica ${editing.numero ?? "Fattura"}`
+              : "Nuova Fattura"}
           </h2>
           <button
             onClick={onClose}
@@ -660,7 +676,9 @@ function FatturaFormModal({
                 <input
                   type="text"
                   value={r.descrizione}
-                  onChange={(e) => updateRiga(i, { descrizione: e.target.value })}
+                  onChange={(e) =>
+                    updateRiga(i, { descrizione: e.target.value })
+                  }
                   placeholder="Descrizione"
                   className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
                 />
@@ -707,7 +725,9 @@ function FatturaFormModal({
             <p className="text-[10px] text-gray-500 uppercase tracking-wide">
               Base imponibile
             </p>
-            <p className="text-sm font-bold text-gray-900">{fmt(baseImponibile)}</p>
+            <p className="text-sm font-bold text-gray-900">
+              {fmt(baseImponibile)}
+            </p>
           </div>
           <div>
             <p className="text-[10px] text-gray-500 uppercase tracking-wide">
@@ -757,7 +777,9 @@ function FatturaFormModal({
         </div>
 
         <div>
-          <label className="text-xs font-medium text-gray-600 block mb-1">Note</label>
+          <label className="text-xs font-medium text-gray-600 block mb-1">
+            Note
+          </label>
           <textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
@@ -881,16 +903,22 @@ function ClientiTab() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
-                {["Nome", "Cognome", "Email", "Telefono", "DNI / P.IVA", "Tipo", ""].map(
-                  (h) => (
-                    <th
-                      key={h}
-                      className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 text-left"
-                    >
-                      {h}
-                    </th>
-                  ),
-                )}
+                {[
+                  "Nome",
+                  "Cognome",
+                  "Email",
+                  "Telefono",
+                  "DNI / P.IVA",
+                  "Tipo",
+                  "",
+                ].map((h) => (
+                  <th
+                    key={h}
+                    className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 text-left"
+                  >
+                    {h}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody className="zebra">
@@ -937,7 +965,10 @@ function ClientiTab() {
                       {c.tipo}
                     </span>
                   </td>
-                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                  <td
+                    className="px-4 py-3"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <div className="flex items-center gap-2 justify-end">
                       <button
                         onClick={() => {
@@ -1264,9 +1295,7 @@ function ClienteDetailModal({
               </a>
             </div>
           )}
-          {indirizzo && (
-            <p className="text-sm text-gray-700">{indirizzo}</p>
-          )}
+          {indirizzo && <p className="text-sm text-gray-700">{indirizzo}</p>}
           {cliente.iban && (
             <p className="text-xs text-gray-500 font-mono">
               IBAN: {cliente.iban}

@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Upload, Trash2, FileText, CheckCircle2, AlertTriangle } from "lucide-react";
+import {
+  Upload,
+  Trash2,
+  FileText,
+  CheckCircle2,
+  AlertTriangle,
+} from "lucide-react";
 import { fmt, MESI, ANNI } from "@/lib/constants";
 
 // ─── Types ─────────────────────────────────────────────────────────────
@@ -12,8 +18,8 @@ interface PagamentoScuola {
   mese: number;
   anno: number;
   totaleGiorno: number; // SALE
-  totVendite: number;   // TOTALSALES
-  rimborsi: number;     // REFUND
+  totVendite: number; // TOTALSALES
+  rimborsi: number; // REFUND
   note: string | null;
 }
 
@@ -286,8 +292,7 @@ export default function IncassiScuolaPage() {
           <div className="flex-1">
             <p className="text-sm font-semibold">
               {result.ok} righe importate
-              {result.errors.length > 0 &&
-                `, ${result.errors.length} errori`}
+              {result.errors.length > 0 && `, ${result.errors.length} errori`}
             </p>
             {result.errors.length > 0 && (
               <ul className="text-xs mt-1 space-y-0.5 opacity-80">
@@ -365,7 +370,11 @@ export default function IncassiScuolaPage() {
                 onClick={() => setMese(isActive ? null : m)}
                 className="flex flex-col items-center gap-1 px-1 py-2 rounded-lg border transition-all cursor-pointer hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
                 style={cellStyle}
-                title={isActive ? "Clicca per rimuovere il filtro" : `Filtra per ${meseNome}`}
+                title={
+                  isActive
+                    ? "Clicca per rimuovere il filtro"
+                    : `Filtra per ${meseNome}`
+                }
               >
                 <span
                   className="text-[10px] uppercase tracking-wide font-semibold"
@@ -444,8 +453,7 @@ export default function IncassiScuolaPage() {
                         });
                       }}
                       onFocus={(e) => {
-                        e.currentTarget.dataset.initial =
-                          e.currentTarget.value;
+                        e.currentTarget.dataset.initial = e.currentTarget.value;
                       }}
                       onBlur={(e) => {
                         const initial = e.currentTarget.dataset.initial;
@@ -465,9 +473,7 @@ export default function IncassiScuolaPage() {
                       onChange={(v) =>
                         updateRowLocal(r.id, { totaleGiorno: v })
                       }
-                      onSave={(v) =>
-                        saveField(r.id, "totaleGiorno", String(v))
-                      }
+                      onSave={(v) => saveField(r.id, "totaleGiorno", String(v))}
                       color="#0ea5e9"
                       bold
                       currency

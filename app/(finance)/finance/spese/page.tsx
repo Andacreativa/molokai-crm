@@ -557,10 +557,7 @@ export default function SpesePage() {
       )}
 
       {/* Sezione Spese Fisse */}
-      <SpeseFisseSection
-        speseFisse={speseFisse}
-        onChanged={loadFisse}
-      />
+      <SpeseFisseSection speseFisse={speseFisse} onChanged={loadFisse} />
     </div>
   );
 }
@@ -675,7 +672,11 @@ function SpesaFormModal({
       >
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold text-gray-900">
-            {editing ? "Modifica Spesa" : prefill ? "Spesa da Scontrino" : "Nuova Spesa"}
+            {editing
+              ? "Modifica Spesa"
+              : prefill
+                ? "Spesa da Scontrino"
+                : "Nuova Spesa"}
           </h2>
           <button
             onClick={onClose}
@@ -692,8 +693,8 @@ function SpesaFormModal({
           >
             <Sparkles className="w-4 h-4 shrink-0 mt-0.5" />
             <span>
-              Dati estratti automaticamente dallo scontrino. Verifica e
-              correggi prima di salvare.
+              Dati estratti automaticamente dallo scontrino. Verifica e correggi
+              prima di salvare.
             </span>
           </div>
         )}
@@ -970,7 +971,7 @@ function SpeseFisseSection({
               )}
               {speseFisse.map((s) => {
                 const bg = s.categoria
-                  ? CATEGORIE_COLORI[s.categoria] ?? "#EDEDED"
+                  ? (CATEGORIE_COLORI[s.categoria] ?? "#EDEDED")
                   : "#EDEDED";
                 return (
                   <tr
@@ -999,7 +1000,10 @@ function SpeseFisseSection({
                     <td className="px-4 py-3 text-sm text-gray-700 text-right">
                       {fmt(s.costo)}
                     </td>
-                    <td className="px-4 py-3 text-sm font-bold text-right" style={{ color: "#0ea5e9" }}>
+                    <td
+                      className="px-4 py-3 text-sm font-bold text-right"
+                      style={{ color: "#0ea5e9" }}
+                    >
                       {fmt(s.costoMensile)}
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-600">

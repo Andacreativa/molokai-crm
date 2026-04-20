@@ -27,7 +27,9 @@ export async function PATCH(
     data: {
       ...(body.nome !== undefined && { nome: body.nome }),
       ...(body.cognome !== undefined && { cognome: body.cognome || null }),
-      ...(body.cellulare !== undefined && { cellulare: body.cellulare || null }),
+      ...(body.cellulare !== undefined && {
+        cellulare: body.cellulare || null,
+      }),
       ...(body.email !== undefined && { email: body.email || null }),
       ...(body.socioId !== undefined && {
         socioId: body.socioId ? parseInt(body.socioId) : null,

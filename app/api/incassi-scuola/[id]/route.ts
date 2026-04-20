@@ -12,11 +12,7 @@ function parseData(s: string): Date | null {
   }
   const m = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
   if (m) {
-    const d = new Date(
-      parseInt(m[3]),
-      parseInt(m[2]) - 1,
-      parseInt(m[1]),
-    );
+    const d = new Date(parseInt(m[3]), parseInt(m[2]) - 1, parseInt(m[1]));
     return isNaN(d.getTime()) ? null : d;
   }
   return null;

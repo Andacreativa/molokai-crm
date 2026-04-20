@@ -11,7 +11,13 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 
 // ─── FareHarbor ────────────────────────────────────────────────────────
 // totale = sett1+sett2+sett3+sett4 (ricalcolato)
-const FH_DATA: Array<{ mese: number; sett1: number; sett2: number; sett3: number; sett4: number }> = [
+const FH_DATA: Array<{
+  mese: number;
+  sett1: number;
+  sett2: number;
+  sett3: number;
+  sett4: number;
+}> = [
   { mese: 1, sett1: 0, sett2: 0, sett3: 60, sett4: 20 },
   { mese: 2, sett1: 0, sett2: 0, sett3: 0, sett4: 0 },
   { mese: 3, sett1: 0, sett2: 97.5, sett3: 0, sett4: 55.59 },
@@ -20,7 +26,12 @@ const FH_DATA: Array<{ mese: number; sett1: number; sett2: number; sett3: number
 
 // ─── Stripe ────────────────────────────────────────────────────────────
 // netto = lordo - commissioni - rimborsi (commissioni fornite, non derivate)
-const STRIPE_DATA: Array<{ mese: number; lordo: number; commissioni: number; rimborsi: number }> = [
+const STRIPE_DATA: Array<{
+  mese: number;
+  lordo: number;
+  commissioni: number;
+  rimborsi: number;
+}> = [
   { mese: 1, lordo: 130, commissioni: 2.98, rimborsi: 0 },
   { mese: 2, lordo: 15, commissioni: 0.54, rimborsi: 0 },
   { mese: 3, lordo: 0, commissioni: 0, rimborsi: 0 },
