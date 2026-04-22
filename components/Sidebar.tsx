@@ -14,6 +14,7 @@ import {
   School,
   Briefcase,
   Package,
+  Package2,
   Home,
   LogOut,
   Menu,
@@ -43,7 +44,10 @@ const navGroups = [
     { href: "/finance/collaboratori", label: "Collaboratori", icon: Briefcase },
     { href: "/finance/dipendenti", label: "Dipendenti", icon: UserCog },
   ],
-  [{ href: "/finance/prodotti", label: "Prodotti", icon: Package }],
+  [
+    { href: "/finance/prodotti", label: "Prodotti", icon: Package },
+    { href: "/finance/inventario", label: "Inventario", icon: Package2 },
+  ],
 ];
 
 export default function Sidebar() {

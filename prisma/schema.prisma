@@ -338,6 +338,49 @@ model PagamentoDipendente {
   @@unique([dipendenteId, anno, mese, tipo])
 }
 
+// ─── INVENTARIO ─────────────────────────────────────────────
+
+model CategoriaInventario {
+  id        Int              @id @default(autoincrement())
+  nome      String           @unique
+  ordine    Int              @default(0)
+  createdAt DateTime         @default(now())
+  items     InventarioItem[]
+}
+
+model InventarioItem {
+  id            Int                 @id @default(autoincrement())
+  categoriaId   Int
+  categoria     CategoriaInventario @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
+  marca         String?
+  modello       String?
+  taglia        String?
+  lunghezza     String?
+  volume        String?
+  numeroSerie   String?
+  colore        String?
+  quantita      Int                 @default(1)
+  stato         String              @default("Nuovo")
+  note          String?
+  dataAcquisto  DateTime?
+  costoAcquisto Float?
+  createdAt     DateTime            @default(now())
+}
+
+// ─── ALTRI INGRESSI ─────────────────────────────────────────
+
+model AltroIngresso {
+  id          Int       @id @default(autoincrement())
+  fonte       String
+  descrizione String?
+  mese        Int
+  anno        Int       @default(2026)
+  importo     Float
+  incassato   Boolean   @default(false)
+  dataIncasso DateTime?
+  createdAt   DateTime  @default(now())
+}
+
 // ─── PRODOTTI ───────────────────────────────────────────────
 
 model Prodotto {

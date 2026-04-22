@@ -14,7 +14,10 @@ export async function POST(request: Request) {
   const cliente = await prisma.cliente.create({
     data: {
       nome: body.nome,
-      paese: body.paese || "Italia",
+      cognome: body.cognome || null,
+      dni: body.dni || null,
+      tipo: body.tipo || "privato",
+      paese: body.paese || "Spagna",
       email: body.email || null,
       telefono: body.telefono || null,
       partitaIva: body.partitaIva || null,

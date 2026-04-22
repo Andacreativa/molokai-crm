@@ -25,6 +25,8 @@ export const CATEGORIE_SPESA = [
   "Tasse",
   "Stipendio",
   "Seguridad Social",
+  "Rimborsi Soci",
+  "Ritiro Contante",
   "Altro",
 ];
 
@@ -52,6 +54,8 @@ export const CATEGORIE_COLORI: Record<string, string> = {
   Tasse: "#FFC9A0", // pesca pastello
   Stipendio: "#BDE3F5", // azzurro stipendio
   "Seguridad Social": "#FFAAAA", // rosso pastello
+  "Rimborsi Soci": "#FFE0B3", // arancio pastello
+  "Ritiro Contante": "#C8C8A0", // oliva pastello (cash)
   Altro: "#EDEDED", // grigio neutro
 };
 
@@ -72,6 +76,8 @@ export const CATEGORIE_COLORI_CHART: Record<string, string> = {
   Tasse: "#FF9940",
   Stipendio: "#5BB8E8",
   "Seguridad Social": "#FF6B6B",
+  "Rimborsi Soci": "#FFA94D",
+  "Ritiro Contante": "#8B9B5A",
   Altro: "#B0B0B0",
 };
 

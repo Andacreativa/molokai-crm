@@ -27,6 +27,7 @@ interface MeseDetail {
     gyg: number;
     cassa: number;
     gruppi: number;
+    altri: number;
     totale: number;
   };
   uscite: {
@@ -59,6 +60,7 @@ const ENTRATA_COLORS: Record<string, string> = {
   "Get Your Guide": "#f59e0b",
   Cassa: "#06b6d4",
   Gruppi: "#ec4899",
+  "Altri Ingressi": "#10b981",
 };
 
 const USCITA_COLORS: Record<string, string> = {

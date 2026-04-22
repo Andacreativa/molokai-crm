@@ -58,6 +58,7 @@ export async function GET(request: Request) {
     gyg,
     cassa,
     sessioniGruppi,
+    altriIngressi,
     spese,
     speseFisse,
     pagamentiCollab,
@@ -74,6 +75,7 @@ export async function GET(request: Request) {
     prisma.prenotazioneGetYourGuide.findMany({ where: { anno } }),
     prisma.pagamentoInScuola.findMany({ where: { anno } }),
     prisma.sessioneGruppo.findMany({ where: { anno } }),
+    prisma.altroIngresso.findMany({ where: { anno, incassato: true } }),
     prisma.spesa.findMany({ where: { anno } }),
     prisma.spesaFissa.findMany({ where: { attiva: true } }),
     prisma.pagamentoCollaboratore.findMany({ where: { anno } }),
@@ -117,6 +119,7 @@ export async function GET(request: Request) {
     "Get Your Guide": 0,
     Cassa: 0,
     Gruppi: 0,
+    "Altri Ingressi": 0,
   };
 
   for (const s of soci) {
@@ -159,6 +162,10 @@ export async function GET(request: Request) {
   for (const s of sessioniGruppi) {
     entratePerMese[s.mese - 1] += s.totale;
     breakdownEntrate.Gruppi += s.totale;
+  }
+  for (const a of altriIngressi) {
+    entratePerMese[a.mese - 1] += a.importo;
+    breakdownEntrate["Altri Ingressi"] += a.importo;
   }
 
   // Uscite

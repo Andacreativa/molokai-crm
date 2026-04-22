@@ -11,7 +11,7 @@ import {
   Mail,
   Phone,
 } from "lucide-react";
-import { fmt, TIPO_IMPOSTA_OPTIONS } from "@/lib/constants";
+import { fmt, TIPO_IMPOSTA_OPTIONS, MESI, ANNI } from "@/lib/constants";
 import FiltriBar from "@/components/FiltriBar";
 import { PageSizeSelect, PageNav } from "@/components/Pagination";
 import { exportFatturaPDF } from "@/lib/export";
@@ -96,19 +96,25 @@ const addDays = (isoYmd: string, days: number) => {
 // ─── Page (tab switcher) ──────────────────────────────────────────────
 
 export default function FatturePage() {
-  const [tab, setTab] = useState<"fatture" | "clienti">("fatture");
+  const [tab, setTab] = useState<"fatture" | "clienti" | "altri">("fatture");
+
+  const tabLabel: Record<typeof tab, string> = {
+    fatture: "Fatture",
+    clienti: "Clienti",
+    altri: "Altri Ingressi",
+  };
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Fatture & Clienti</h1>
         <p className="text-gray-500 text-sm mt-1">
-          Fatture emesse e anagrafica clienti
+          Fatture emesse, anagrafica clienti e altri ingressi
         </p>
       </div>
 
       <div className="flex gap-1 border-b border-gray-200">
-        {(["fatture", "clienti"] as const).map((t) => {
+        {(["fatture", "clienti", "altri"] as const).map((t) => {
           const active = tab === t;
           return (
             <button
@@ -121,13 +127,15 @@ export default function FatturePage() {
                   : { color: "#64748b", borderColor: "transparent" }
               }
             >
-              {t === "fatture" ? "Fatture" : "Clienti"}
+              {tabLabel[t]}
             </button>
           );
         })}
       </div>
 
-      {tab === "fatture" ? <FattureTab /> : <ClientiTab />}
+      {tab === "fatture" && <FattureTab />}
+      {tab === "clienti" && <ClientiTab />}
+      {tab === "altri" && <AltriIngressiTab />}
     </div>
   );
 }
@@ -1408,6 +1416,503 @@ function ClienteDetailModal({
             className="glass-btn-primary flex-1 text-white text-sm font-medium py-2.5 rounded-xl"
           >
             Modifica Cliente
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Altri Ingressi Tab ────────────────────────────────────────────────
+
+interface AltroIngresso {
+  id: number;
+  fonte: string;
+  descrizione: string | null;
+  mese: number;
+  anno: number;
+  importo: number;
+  incassato: boolean;
+  dataIncasso: string | null;
+}
+
+function AltriIngressiTab() {
+  const [anno, setAnno] = useState<number>(new Date().getFullYear());
+  const [rows, setRows] = useState<AltroIngresso[]>([]);
+  const [meseFiltro, setMeseFiltro] = useState<number | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<AltroIngresso | null>(null);
+
+  const load = async () => {
+    const res = await fetch(`/api/altri-ingressi?anno=${anno}`);
+    const data = await res.json();
+    setRows(Array.isArray(data) ? data : []);
+  };
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anno]);
+
+  const filtered = meseFiltro
+    ? rows.filter((r) => r.mese === meseFiltro)
+    : rows;
+
+  const totaliMensili = useMemo(() => {
+    const t = new Array(12).fill(0);
+    for (const r of rows) t[r.mese - 1] += r.importo;
+    return t;
+  }, [rows]);
+
+  const totaleAnno = rows.reduce((s, r) => s + r.importo, 0);
+  const incassatoAnno = rows
+    .filter((r) => r.incassato)
+    .reduce((s, r) => s + r.importo, 0);
+  const daIncassareAnno = totaleAnno - incassatoAnno;
+
+  const toggleIncassato = async (r: AltroIngresso) => {
+    await fetch(`/api/altri-ingressi/${r.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ incassato: !r.incassato }),
+    });
+    load();
+  };
+
+  const del = async (id: number) => {
+    if (!confirm("Eliminare questo ingresso?")) return;
+    await fetch(`/api/altri-ingressi/${id}`, { method: "DELETE" });
+    load();
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <p className="text-gray-500 text-sm">
+          {filtered.length} voci
+          {meseFiltro ? ` · ${MESI[meseFiltro - 1]}` : ""} · anno {anno}
+        </p>
+        <div className="flex items-center gap-3 flex-wrap">
+          <select
+            value={anno}
+            onChange={(e) => setAnno(parseInt(e.target.value))}
+            className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white"
+          >
+            {ANNI.map((a) => (
+              <option key={a} value={a}>
+                {a}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => {
+              setEditing(null);
+              setShowForm(true);
+            }}
+            className="glass-btn-primary flex items-center gap-2 text-white text-sm font-medium px-4 py-2.5 rounded-xl"
+          >
+            <Plus className="w-4 h-4" /> Aggiungi Ingresso
+          </button>
+        </div>
+      </div>
+
+      {/* KPI */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="glass-card rounded-2xl p-4">
+          <p className="text-[10px] text-gray-500 uppercase tracking-wide font-semibold">
+            Totale {anno}
+          </p>
+          <p className="text-2xl font-bold text-gray-900 mt-1">
+            {fmt(totaleAnno)}
+          </p>
+        </div>
+        <div className="glass-card rounded-2xl p-4">
+          <p className="text-[10px] text-gray-500 uppercase tracking-wide font-semibold">
+            Incassato
+          </p>
+          <p className="text-2xl font-bold mt-1" style={{ color: "#22c55e" }}>
+            {fmt(incassatoAnno)}
+          </p>
+        </div>
+        <div className="glass-card rounded-2xl p-4">
+          <p className="text-[10px] text-gray-500 uppercase tracking-wide font-semibold">
+            Da incassare
+          </p>
+          <p className="text-2xl font-bold mt-1" style={{ color: "#f59e0b" }}>
+            {fmt(daIncassareAnno)}
+          </p>
+        </div>
+      </div>
+
+      {/* Riepilogo mensile */}
+      <div className="glass-card rounded-2xl p-4">
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <h3 className="text-sm font-bold text-gray-900">
+            Riepilogo altri ingressi mensili
+          </h3>
+          {meseFiltro !== null && (
+            <button
+              onClick={() => setMeseFiltro(null)}
+              className="text-xs text-sky-600 hover:text-sky-700 font-medium"
+            >
+              Rimuovi filtro mese
+            </button>
+          )}
+        </div>
+        <div className="grid grid-cols-6 sm:grid-cols-12 gap-1">
+          {MESI.map((meseNome, idx) => {
+            const m = idx + 1;
+            const tot = totaliMensili[idx];
+            const hasValue = tot > 0;
+            const isActive = meseFiltro === m;
+            const cellStyle = isActive
+              ? { background: "#0ea5e9", borderColor: "#0284c7" }
+              : hasValue
+                ? { background: "#e0f2fe", borderColor: "#7dd3fc" }
+                : { background: "#fff", borderColor: "#e2e8f0" };
+            const labelColor = isActive
+              ? "#ffffff"
+              : hasValue
+                ? "#6b7280"
+                : "#9ca3af";
+            const valueColor = isActive
+              ? "#ffffff"
+              : hasValue
+                ? "#0369a1"
+                : "#cbd5e1";
+            return (
+              <button
+                key={meseNome}
+                type="button"
+                onClick={() => setMeseFiltro(isActive ? null : m)}
+                className="flex flex-col items-center gap-1 px-1 py-2 rounded-lg border transition-all cursor-pointer hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
+                style={cellStyle}
+                title={
+                  isActive
+                    ? "Clicca per rimuovere il filtro"
+                    : `Filtra per ${meseNome}`
+                }
+              >
+                <span
+                  className="text-[10px] uppercase tracking-wide font-semibold"
+                  style={{ color: labelColor }}
+                >
+                  {meseNome.slice(0, 3)}
+                </span>
+                <span
+                  className="text-[11px] font-bold whitespace-nowrap"
+                  style={{ color: valueColor }}
+                >
+                  {hasValue ? fmt(tot) : "—"}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="glass-card rounded-2xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50">
+                {[
+                  "Fonte",
+                  "Descrizione",
+                  "Mese",
+                  "Anno",
+                  "Importo",
+                  "Incassato",
+                  "",
+                ].map((h) => (
+                  <th
+                    key={h}
+                    className={`text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 ${h === "Importo" ? "text-right" : h === "Incassato" ? "text-center" : "text-left"}`}
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="zebra">
+              {filtered.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={7}
+                    className="text-center text-gray-400 py-12 text-sm"
+                  >
+                    Nessun ingresso trovato
+                  </td>
+                </tr>
+              )}
+              {filtered.map((r) => (
+                <tr
+                  key={r.id}
+                  className="border-b border-gray-50 hover:bg-gray-50 transition-colors"
+                >
+                  <td className="px-4 py-3 text-sm font-semibold text-gray-900">
+                    {r.fonte}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-700">
+                    {r.descrizione || "—"}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-600">
+                    {MESI[r.mese - 1]}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-600">{r.anno}</td>
+                  <td className="px-4 py-3 text-sm font-bold text-gray-900 text-right">
+                    {fmt(r.importo)}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <button
+                      onClick={() => toggleIncassato(r)}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold transition-colors"
+                      style={
+                        r.incassato
+                          ? { background: "#dcfce7", color: "#166534" }
+                          : { background: "#fef3c7", color: "#92400e" }
+                      }
+                    >
+                      {r.incassato ? (
+                        <>
+                          <Check className="w-3 h-3" /> Incassato
+                        </>
+                      ) : (
+                        <>
+                          <X className="w-3 h-3" /> In attesa
+                        </>
+                      )}
+                    </button>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2 justify-end">
+                      <button
+                        onClick={() => {
+                          setEditing(r);
+                          setShowForm(true);
+                        }}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-sky-600 hover:bg-sky-50 transition-colors"
+                        title="Modifica"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => del(r.id)}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        title="Elimina"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {showForm && (
+        <AltroIngressoFormModal
+          editing={editing}
+          defaultAnno={anno}
+          onClose={() => setShowForm(false)}
+          onSaved={() => {
+            setShowForm(false);
+            load();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Altro Ingresso Form Modal ─────────────────────────────────────────
+
+function AltroIngressoFormModal({
+  editing,
+  defaultAnno,
+  onClose,
+  onSaved,
+}: {
+  editing: AltroIngresso | null;
+  defaultAnno: number;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [form, setForm] = useState({
+    fonte: editing?.fonte ?? "",
+    descrizione: editing?.descrizione ?? "",
+    mese: editing?.mese ?? new Date().getMonth() + 1,
+    anno: editing?.anno ?? defaultAnno,
+    importo: editing ? String(editing.importo) : "",
+    incassato: editing?.incassato ?? false,
+  });
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    if (!form.fonte.trim() || !form.importo) return;
+    setSaving(true);
+    try {
+      const payload = {
+        fonte: form.fonte.trim(),
+        descrizione: form.descrizione || null,
+        mese: form.mese,
+        anno: form.anno,
+        importo: parseFloat(form.importo) || 0,
+        incassato: form.incassato,
+      };
+      if (editing) {
+        await fetch(`/api/altri-ingressi/${editing.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      } else {
+        await fetch("/api/altri-ingressi", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      }
+      onSaved();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="glass-modal rounded-2xl w-full max-w-md p-6 space-y-4"
+        onClick={(e) => e.stopPropagation()}
+        style={{ textAlign: "left" }}
+      >
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-gray-900">
+            {editing ? "Modifica Ingresso" : "Nuovo Ingresso"}
+          </h2>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs font-medium text-gray-600 block mb-1">
+              Fonte *
+            </label>
+            <input
+              type="text"
+              value={form.fonte}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, fonte: e.target.value }))
+              }
+              placeholder="Es. Interessi bancari, Rimborso, Sponsorizzazione…"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600 block mb-1">
+              Descrizione
+            </label>
+            <input
+              type="text"
+              value={form.descrizione}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, descrizione: e.target.value }))
+              }
+              placeholder="Note sulla voce"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
+            />
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="text-xs font-medium text-gray-600 block mb-1">
+                Mese *
+              </label>
+              <select
+                value={form.mese}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, mese: parseInt(e.target.value) }))
+                }
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white"
+              >
+                {MESI.map((m, i) => (
+                  <option key={m} value={i + 1}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 block mb-1">
+                Anno *
+              </label>
+              <select
+                value={form.anno}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, anno: parseInt(e.target.value) }))
+                }
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white"
+              >
+                {ANNI.map((a) => (
+                  <option key={a} value={a}>
+                    {a}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 block mb-1">
+                Importo (€) *
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={form.importo}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, importo: e.target.value }))
+                }
+                placeholder="0.00"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 text-right"
+              />
+            </div>
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.incassato}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, incassato: e.target.checked }))
+              }
+              className="w-4 h-4"
+              style={{ accentColor: "#0ea5e9" }}
+            />
+            <span className="text-sm text-gray-700">Già incassato</span>
+          </label>
+        </div>
+
+        <div className="flex gap-3 pt-2">
+          <button
+            onClick={onClose}
+            className="flex-1 border border-gray-200 text-gray-600 text-sm font-medium py-2.5 rounded-xl hover:bg-gray-50"
+          >
+            Annulla
+          </button>
+          <button
+            onClick={save}
+            disabled={saving || !form.fonte.trim() || !form.importo}
+            className="glass-btn-primary flex-1 text-white text-sm font-medium py-2.5 rounded-xl disabled:opacity-50"
+          >
+            {editing ? "Salva Modifiche" : "Aggiungi"}
           </button>
         </div>
       </div>

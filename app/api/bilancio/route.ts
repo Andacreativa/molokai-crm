@@ -42,6 +42,7 @@ interface MeseDetail {
     gyg: number;
     cassa: number;
     gruppi: number;
+    altri: number;
     totale: number;
   };
   uscite: {
@@ -74,6 +75,7 @@ export async function GET(request: Request) {
     gyg,
     cassa,
     sessioniGruppi,
+    altriIngressi,
     spese,
     speseFisse,
     pagamentiCollab,
@@ -87,6 +89,7 @@ export async function GET(request: Request) {
     prisma.prenotazioneGetYourGuide.findMany({ where: { anno } }),
     prisma.pagamentoInScuola.findMany({ where: { anno } }),
     prisma.sessioneGruppo.findMany({ where: { anno } }),
+    prisma.altroIngresso.findMany({ where: { anno, incassato: true } }),
     prisma.spesa.findMany({ where: { anno } }),
     prisma.spesaFissa.findMany({ where: { attiva: true } }),
     prisma.pagamentoCollaboratore.findMany({ where: { anno } }),
@@ -103,6 +106,7 @@ export async function GET(request: Request) {
       gyg: 0,
       cassa: 0,
       gruppi: 0,
+      altri: 0,
       totale: 0,
     },
     uscite: { spese: 0, speseFisse: 0, collaboratori: 0, totale: 0 },
@@ -156,6 +160,11 @@ export async function GET(request: Request) {
     mensili[s.mese - 1].entrate.gruppi += s.totale;
   }
 
+  // Altri ingressi (solo incassati, coerente con Buoni.pagato)
+  for (const a of altriIngressi) {
+    mensili[a.mese - 1].entrate.altri += a.importo;
+  }
+
   // Spese variabili (include Stipendio/Seguridad creati auto da pagamenti dipendenti)
   for (const sp of spese) {
     mensili[sp.mese - 1].uscite.spese += sp.importo;
@@ -185,7 +194,8 @@ export async function GET(request: Request) {
         m.entrate.stripe +
         m.entrate.gyg +
         m.entrate.cassa +
-        m.entrate.gruppi,
+        m.entrate.gruppi +
+        m.entrate.altri,
     );
     m.uscite.totale = round2(
       m.uscite.spese + m.uscite.speseFisse + m.uscite.collaboratori,
@@ -211,6 +221,7 @@ export async function GET(request: Request) {
     "Get Your Guide": round2(mensili.reduce((s, m) => s + m.entrate.gyg, 0)),
     Cassa: round2(mensili.reduce((s, m) => s + m.entrate.cassa, 0)),
     Gruppi: round2(mensili.reduce((s, m) => s + m.entrate.gruppi, 0)),
+    "Altri Ingressi": round2(mensili.reduce((s, m) => s + m.entrate.altri, 0)),
   };
 
   // Spese per categoria (somma di Spesa.importo raggruppato)

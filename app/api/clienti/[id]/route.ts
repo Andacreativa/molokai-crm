@@ -11,10 +11,15 @@ export async function PATCH(
     where: { id: parseInt(id) },
     data: {
       ...(body.nome !== undefined && { nome: body.nome }),
+      ...(body.cognome !== undefined && { cognome: body.cognome || null }),
+      ...(body.dni !== undefined && { dni: body.dni || null }),
+      ...(body.tipo !== undefined && { tipo: body.tipo || "privato" }),
       ...(body.paese !== undefined && { paese: body.paese }),
-      ...(body.email !== undefined && { email: body.email }),
-      ...(body.telefono !== undefined && { telefono: body.telefono }),
-      ...(body.partitaIva !== undefined && { partitaIva: body.partitaIva }),
+      ...(body.email !== undefined && { email: body.email || null }),
+      ...(body.telefono !== undefined && { telefono: body.telefono || null }),
+      ...(body.partitaIva !== undefined && {
+        partitaIva: body.partitaIva || null,
+      }),
       ...(body.via !== undefined && { via: body.via || null }),
       ...(body.cap !== undefined && { cap: body.cap || null }),
       ...(body.citta !== undefined && { citta: body.citta || null }),
@@ -25,7 +30,7 @@ export async function PATCH(
       ...(body.tipoImposta !== undefined && {
         tipoImposta: body.tipoImposta || "IVA 21%",
       }),
-      ...(body.note !== undefined && { note: body.note }),
+      ...(body.note !== undefined && { note: body.note || null }),
     },
   });
   return NextResponse.json(cliente);
