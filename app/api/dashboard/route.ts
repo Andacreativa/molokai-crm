@@ -74,7 +74,7 @@ export async function GET(request: Request) {
     prisma.prenotazioneStripe.findMany({ where: { anno } }),
     prisma.prenotazioneGetYourGuide.findMany({ where: { anno } }),
     prisma.pagamentoInScuola.findMany({ where: { anno } }),
-    prisma.sessioneGruppo.findMany({ where: { anno } }),
+    prisma.sessioneGruppo.findMany({ where: { anno, incassato: true } }),
     prisma.altroIngresso.findMany({ where: { anno, incassato: true } }),
     prisma.spesa.findMany({ where: { anno } }),
     prisma.spesaFissa.findMany({ where: { attiva: true } }),

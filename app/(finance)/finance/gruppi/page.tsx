@@ -9,6 +9,7 @@ import {
   Users2,
   School,
   Briefcase,
+  Check,
 } from "lucide-react";
 import { fmt, MESI, ANNI } from "@/lib/constants";
 
@@ -23,6 +24,7 @@ interface SessioneGruppo {
   partecipanti: number;
   prezzoPP: number;
   totale: number;
+  incassato: boolean;
   note: string | null;
 }
 
@@ -95,12 +97,12 @@ export default function GruppiPage() {
       (s) => meseFiltro === null || s.mese === meseFiltro,
     );
 
-  // Totali mensili (tutti i gruppi, anno selezionato)
+  // Totali mensili incassati (tutti i gruppi, anno selezionato, solo sessioni incassate)
   const totaliMensili = useMemo(() => {
     const arr = Array(12).fill(0) as number[];
     for (const g of gruppi) {
       for (const s of g.sessioni) {
-        if (s.anno === anno) arr[s.mese - 1] += s.totale;
+        if (s.anno === anno && s.incassato) arr[s.mese - 1] += s.totale;
       }
     }
     return arr.map((v) => Math.round(v * 100) / 100);
@@ -270,7 +272,9 @@ export default function GruppiPage() {
               )}
               {gruppi.map((g) => {
                 const sessioni = sessioniFiltrate(g);
-                const totaleGruppo = sessioni.reduce((s, x) => s + x.totale, 0);
+                const totaleGruppo = sessioni
+                  .filter((s) => s.incassato)
+                  .reduce((s, x) => s + x.totale, 0);
                 const tipoColor = TIPO_COLOR[g.tipo] ?? TIPO_COLOR.altro;
                 const TipoIcon = TIPO_ICON[g.tipo] ?? Users2;
                 return (
@@ -642,9 +646,20 @@ function GruppoDetailModal({
     onChanged();
   };
 
-  // Stats: anno selezionato
+  const toggleIncassato = async (s: SessioneGruppo) => {
+    await fetch(`/api/gruppi/${gruppo.id}/sessioni/${s.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ incassato: !s.incassato }),
+    });
+    onChanged();
+  };
+
+  // Stats: anno selezionato (totale incassato = solo sessioni incassate)
   const sessioniAnno = gruppo.sessioni.filter((s) => s.anno === anno);
-  const totaleAnno = sessioniAnno.reduce((a, b) => a + b.totale, 0);
+  const totaleAnno = sessioniAnno
+    .filter((s) => s.incassato)
+    .reduce((a, b) => a + b.totale, 0);
 
   const tipoColor = TIPO_COLOR[gruppo.tipo] ?? TIPO_COLOR.altro;
 
@@ -820,6 +835,7 @@ function GruppoDetailModal({
                     "Partecipanti",
                     "Prezzo/pp",
                     "Totale",
+                    "Incassato",
                     "Note",
                     "",
                   ].map((h) => (
@@ -828,7 +844,9 @@ function GruppoDetailModal({
                       className={`px-3 py-2 text-[11px] font-semibold text-gray-500 uppercase ${
                         ["Partecipanti", "Prezzo/pp", "Totale"].includes(h)
                           ? "text-right"
-                          : "text-left"
+                          : h === "Incassato"
+                            ? "text-center"
+                            : "text-left"
                       }`}
                     >
                       {h}
@@ -840,7 +858,7 @@ function GruppoDetailModal({
                 {gruppo.sessioni.length === 0 && (
                   <tr>
                     <td
-                      colSpan={6}
+                      colSpan={7}
                       className="text-center text-gray-400 py-6 text-xs italic"
                     >
                       Nessuna sessione registrata
@@ -876,6 +894,33 @@ function GruppoDetailModal({
                           style={{ color: "#0ea5e9" }}
                         >
                           {fmt(s.totale)}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <button
+                            type="button"
+                            onClick={() => toggleIncassato(s)}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold transition-colors"
+                            style={
+                              s.incassato
+                                ? { background: "#dcfce7", color: "#166534" }
+                                : { background: "#f1f5f9", color: "#64748b" }
+                            }
+                            title={
+                              s.incassato
+                                ? "Clicca per contrassegnare come non incassato"
+                                : "Clicca per contrassegnare come incassato"
+                            }
+                          >
+                            {s.incassato ? (
+                              <>
+                                <Check className="w-3 h-3" /> Sì
+                              </>
+                            ) : (
+                              <>
+                                <X className="w-3 h-3" /> No
+                              </>
+                            )}
+                          </button>
                         </td>
                         <td className="px-3 py-2 text-xs text-gray-500 max-w-[180px] truncate">
                           {s.note ?? ""}

@@ -35,6 +35,9 @@ export async function PUT(
       partecipanti: newPartecipanti,
       prezzoPP: newPrezzoPP,
       totale: round2(newPartecipanti * newPrezzoPP),
+      ...(body.incassato !== undefined && {
+        incassato: Boolean(body.incassato),
+      }),
       ...(body.note !== undefined && { note: body.note || null }),
     },
   });

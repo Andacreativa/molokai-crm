@@ -224,6 +224,7 @@ model SessioneGruppo {
   partecipanti   Int
   prezzoPP       Float
   totale         Float    // calcolato: partecipanti * prezzoPP
+  incassato      Boolean  @default(false)
   note           String?
   createdAt      DateTime @default(now())
 }
