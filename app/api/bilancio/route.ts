@@ -36,6 +36,7 @@ interface MeseDetail {
   mese: number;
   entrate: {
     soci: number;
+    matricole: number;
     buoni: number;
     fareharbor: number;
     stripe: number;
@@ -100,6 +101,7 @@ export async function GET(request: Request) {
     mese: i + 1,
     entrate: {
       soci: 0,
+      matricole: 0,
       buoni: 0,
       fareharbor: 0,
       stripe: 0,
@@ -122,7 +124,7 @@ export async function GET(request: Request) {
     if (s.matricolaPagata && !s.matricolaGratuita) {
       const parsed = parseMeseAnnoStringa(s.matricolaMesePagamento);
       if (parsed && parsed.anno === anno) {
-        mensili[parsed.mese - 1].entrate.soci += s.matricolaImporto;
+        mensili[parsed.mese - 1].entrate.matricole += s.matricolaImporto;
       }
     }
   }
@@ -189,6 +191,7 @@ export async function GET(request: Request) {
   for (const m of mensili) {
     m.entrate.totale = round2(
       m.entrate.soci +
+        m.entrate.matricole +
         m.entrate.buoni +
         m.entrate.fareharbor +
         m.entrate.stripe +
@@ -215,6 +218,7 @@ export async function GET(request: Request) {
   // ─── Breakdown per categoria ────────────────────────────────────────
   const breakdownEntrate = {
     Soci: round2(mensili.reduce((s, m) => s + m.entrate.soci, 0)),
+    Matricole: round2(mensili.reduce((s, m) => s + m.entrate.matricole, 0)),
     Buoni: round2(mensili.reduce((s, m) => s + m.entrate.buoni, 0)),
     FareHarbor: round2(mensili.reduce((s, m) => s + m.entrate.fareharbor, 0)),
     Stripe: round2(mensili.reduce((s, m) => s + m.entrate.stripe, 0)),

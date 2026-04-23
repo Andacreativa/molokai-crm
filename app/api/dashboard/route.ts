@@ -113,6 +113,7 @@ export async function GET(request: Request) {
   // Soci pagamenti + matricole
   const breakdownEntrate = {
     Soci: 0,
+    Matricole: 0,
     Buoni: 0,
     FareHarbor: 0,
     Stripe: 0,
@@ -132,7 +133,7 @@ export async function GET(request: Request) {
       const parsed = parseMeseAnnoStringa(s.matricolaMesePagamento);
       if (parsed && parsed.anno === anno) {
         entratePerMese[parsed.mese - 1] += s.matricolaImporto;
-        breakdownEntrate.Soci += s.matricolaImporto;
+        breakdownEntrate.Matricole += s.matricolaImporto;
       }
     }
   }

@@ -21,6 +21,7 @@ interface MeseDetail {
   mese: number;
   entrate: {
     soci: number;
+    matricole: number;
     buoni: number;
     fareharbor: number;
     stripe: number;
@@ -54,6 +55,7 @@ interface BilancioData {
 // Palette per i grafici
 const ENTRATA_COLORS: Record<string, string> = {
   Soci: "#0ea5e9",
+  Matricole: "#38bdf8",
   Buoni: "#0284c7",
   FareHarbor: "#22c55e",
   Stripe: "#8b5cf6",

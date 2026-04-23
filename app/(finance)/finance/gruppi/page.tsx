@@ -37,6 +37,8 @@ interface Gruppo {
   telefono: string | null;
   note: string | null;
   sessioni: SessioneGruppo[];
+  totaleIncassato?: number;
+  daIncassare?: number;
 }
 
 const TIPI_GRUPPO = ["scuola", "azienda", "altro"];
@@ -73,13 +75,14 @@ export default function GruppiPage() {
   const [detailId, setDetailId] = useState<number | null>(null);
 
   const load = async () => {
-    const res = await fetch("/api/gruppi");
+    const res = await fetch(`/api/gruppi?anno=${anno}`);
     const data = await res.json();
     setGruppi(Array.isArray(data) ? data : []);
   };
   useEffect(() => {
     load();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anno]);
 
   // Derived: editing/detail get re-found after each load → state riflette i dati freschi
   const editing = editingId
@@ -242,13 +245,16 @@ export default function GruppiPage() {
                   "Contatto",
                   "Email",
                   "N° Sessioni",
+                  "Da Incassare",
                   "Totale Incassato",
                   "",
                 ].map((h) => (
                   <th
                     key={h}
                     className={`text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 ${
-                      h === "Totale Incassato" || h === "N° Sessioni"
+                      ["N° Sessioni", "Da Incassare", "Totale Incassato"].includes(
+                        h,
+                      )
                         ? "text-right"
                         : "text-left"
                     }`}
@@ -262,7 +268,7 @@ export default function GruppiPage() {
               {gruppi.length === 0 && (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     className="text-center text-gray-400 py-12 text-sm"
                   >
                     <Users2 className="w-10 h-10 mx-auto mb-2 opacity-40" />
@@ -272,6 +278,9 @@ export default function GruppiPage() {
               )}
               {gruppi.map((g) => {
                 const sessioni = sessioniFiltrate(g);
+                const daIncassare = sessioni
+                  .filter((s) => !s.incassato)
+                  .reduce((s, x) => s + x.totale, 0);
                 const totaleGruppo = sessioni
                   .filter((s) => s.incassato)
                   .reduce((s, x) => s + x.totale, 0);
@@ -306,6 +315,12 @@ export default function GruppiPage() {
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700 text-right">
                       {sessioni.length}
+                    </td>
+                    <td
+                      className="px-4 py-3 text-sm font-bold text-right"
+                      style={{ color: daIncassare > 0 ? "#f59e0b" : "#cbd5e1" }}
+                    >
+                      {daIncassare > 0 ? fmt(daIncassare) : "—"}
                     </td>
                     <td
                       className="px-4 py-3 text-sm font-bold text-right"
