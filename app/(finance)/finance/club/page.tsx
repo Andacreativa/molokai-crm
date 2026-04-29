@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Plus,
   Pencil,
@@ -9,6 +9,9 @@ import {
   Check,
   FileDown,
   FileSpreadsheet,
+  Upload,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
 import { fmt, MESI, ANNI } from "@/lib/constants";
 import { exportPDF, exportExcel } from "@/lib/export";
@@ -146,6 +149,7 @@ function SociTab() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Socio | null>(null);
   const [detail, setDetail] = useState<Socio | null>(null);
+  const [showImport, setShowImport] = useState(false);
 
   const load = async () => {
     const res = await fetch("/api/club/soci");
@@ -317,6 +321,14 @@ function SociTab() {
             <FileSpreadsheet className="w-4 h-4" /> Excel
           </button>
           <button
+            onClick={() => setShowImport(true)}
+            className="glass-btn-secondary flex items-center gap-2 text-gray-700 text-sm font-medium px-4 py-2.5 rounded-xl"
+            title="Importa soci da CSV Google Form"
+          >
+            <Upload className="w-4 h-4" style={{ color: "#0ea5e9" }} /> Importa
+            da Google Form
+          </button>
+          <button
             onClick={openNew}
             className="glass-btn-primary flex items-center gap-2 text-white text-sm font-medium px-4 py-2.5 rounded-xl"
           >
@@ -413,6 +425,7 @@ function SociTab() {
                   "Stato",
                   "Cellulare",
                   "Email",
+                  "Matricola",
                   "",
                 ].map((h) => (
                   <th
@@ -428,7 +441,7 @@ function SociTab() {
               {filtered.length === 0 && (
                 <tr>
                   <td
-                    colSpan={9}
+                    colSpan={10}
                     className="text-center text-gray-400 py-12 text-sm"
                   >
                     Nessun socio trovato
@@ -472,6 +485,9 @@ function SociTab() {
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700">
                       {s.email ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-600 font-mono">
+                      {s.matricola ?? "—"}
                     </td>
                     <td
                       className="px-4 py-3"
@@ -521,6 +537,17 @@ function SociTab() {
           onClose={() => setShowForm(false)}
           onSaved={() => {
             setShowForm(false);
+            load();
+          }}
+        />
+      )}
+
+      {showImport && (
+        <GoogleFormImportModal
+          existingSoci={soci}
+          onClose={() => setShowImport(false)}
+          onImported={() => {
+            setShowImport(false);
             load();
           }}
         />
@@ -1618,6 +1645,507 @@ function BuonoFormModal({
             {editing ? "Salva Modifiche" : "Aggiungi"}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Google Form Import Modal ──────────────────────────────────────────────
+
+interface ParsedSocioRow {
+  id: string;
+  selected: boolean;
+  duplicato: boolean;
+  data: string;
+  email: string;
+  pianoRaw: string;
+  piano: string;
+  prezzoPiano: number;
+  pagamentoRaw: string;
+  pagamento: "MENSILE" | "ANNUALE";
+  iban: string;
+  dni: string;
+  cellulare: string;
+  nome: string;
+  cognome: string;
+}
+
+function parsePiano(raw: string): { piano: string; prezzoPiano: number } {
+  const parts = raw.split(/[-–—]/);
+  const namePart = (parts[0] ?? "").trim();
+  const pricePart = (parts.slice(1).join("-") ?? "").trim();
+  const cleaned = pricePart.replace(/[€\s]/g, "").replace(",", ".");
+  const prezzoPiano = parseFloat(cleaned) || 0;
+  const lower = namePart.toLowerCase();
+  let piano: string;
+  if (lower.includes("anual") || lower.includes("annuale")) piano = "ANNUALE";
+  else if (lower.includes("varada")) piano = "PLAN VARADA";
+  else if (lower.includes("material")) piano = "PLAN MATERIAL";
+  else piano = namePart.toUpperCase() || "ALTRO";
+  return { piano, prezzoPiano };
+}
+
+function parsePagamento(raw: string): "MENSILE" | "ANNUALE" {
+  const lower = (raw ?? "").toLowerCase();
+  if (lower.includes("anual") || lower.includes("annual")) return "ANNUALE";
+  return "MENSILE";
+}
+
+function splitName(full: string): { nome: string; cognome: string } {
+  const tokens = (full ?? "").trim().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return { nome: "", cognome: "" };
+  if (tokens.length === 1) return { nome: tokens[0], cognome: "" };
+  return { nome: tokens[0], cognome: tokens.slice(1).join(" ") };
+}
+
+const pickField = (
+  row: Record<string, unknown>,
+  ...keys: string[]
+): string => {
+  const norm = Object.fromEntries(
+    Object.entries(row).map(([k, v]) => [k.toLowerCase().trim(), v]),
+  );
+  for (const k of keys) {
+    const v = norm[k.toLowerCase().trim()];
+    if (v !== undefined && v !== null && String(v).trim() !== "") {
+      return String(v).trim();
+    }
+  }
+  return "";
+};
+
+function GoogleFormImportModal({
+  existingSoci,
+  onClose,
+  onImported,
+}: {
+  existingSoci: Socio[];
+  onClose: () => void;
+  onImported: () => void;
+}) {
+  const [file, setFile] = useState<File | null>(null);
+  const [dragActive, setDragActive] = useState(false);
+  const [parsing, setParsing] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [rows, setRows] = useState<ParsedSocioRow[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<{ ok: number; skipped: number } | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const existingEmails = new Set(
+    existingSoci
+      .map((s) => (s.email ?? "").toLowerCase().trim())
+      .filter(Boolean),
+  );
+  // Fallback dedup per soci esistenti senza email: chiave nome|cognome
+  // case-insensitive. Se il CSV porta uno stesso nome+cognome di un socio
+  // già nel DB, lo segna come duplicato anche se l'email differisce o
+  // l'esistente non ne ha una.
+  const fullNameKey = (n: string, c: string) =>
+    `${n.toLowerCase().trim()}|${c.toLowerCase().trim()}`;
+  const existingNames = new Set(
+    existingSoci
+      .map((s) => fullNameKey(s.nome ?? "", s.cognome ?? ""))
+      .filter((k) => k !== "|"),
+  );
+
+  const reset = () => {
+    setFile(null);
+    setRows([]);
+    setError(null);
+    setResult(null);
+  };
+
+  const selectFile = async (f: File | null | undefined) => {
+    if (!f) return;
+    if (!/\.(csv|xlsx|xls)$/i.test(f.name)) {
+      setError("Formato non supportato. Usa CSV, XLSX o XLS.");
+      return;
+    }
+    setError(null);
+    setResult(null);
+    setFile(f);
+    await parseFile(f);
+  };
+
+  const parseFile = async (f: File) => {
+    setParsing(true);
+    try {
+      const XLSX = await import("xlsx");
+      const isCsv = /\.csv$/i.test(f.name);
+      const wb = isCsv
+        ? XLSX.read(await f.text(), { type: "string", cellDates: true })
+        : XLSX.read(await f.arrayBuffer(), { type: "array", cellDates: true });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      if (!ws) {
+        setError("File vuoto.");
+        return;
+      }
+      const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, {
+        raw: false,
+        dateNF: "yyyy-mm-dd",
+        defval: "",
+      });
+
+      const parsed: ParsedSocioRow[] = [];
+      for (let i = 0; i < raw.length; i++) {
+        const r = raw[i];
+        const email = pickField(r, "Nome utente", "Email", "email").toLowerCase();
+        const fullName = pickField(r, "Nombre y Apellido", "Nombre", "Nome");
+        const pianoRaw = pickField(r, "Tipo de Plan", "Tipo Plan", "Plan");
+        const pagamentoRaw = pickField(r, "Método de Pago", "Metodo de Pago", "Metodo Pagamento");
+        const ibanRaw = pickField(r, "Introduce tu IBAN", "IBAN", "iban");
+        const dniRaw = pickField(r, "Introduce tu DNI/NIE", "DNI", "DNI/NIE");
+        const cellulareRaw = pickField(r, "Introduce tu número de móvil", "Móvil", "Movil", "Telefono", "Cellulare");
+        const dataRaw = pickField(r, "Informazioni cronologiche", "Marca temporal", "Timestamp");
+
+        if (!fullName && !email) continue;
+
+        const { piano, prezzoPiano } = parsePiano(pianoRaw);
+        const { nome, cognome } = splitName(fullName);
+        const dupByEmail = email && existingEmails.has(email.toLowerCase().trim());
+        const dupByName = nome && existingNames.has(fullNameKey(nome, cognome));
+        const dup = dupByEmail || dupByName;
+        parsed.push({
+          id: `row-${i}`,
+          selected: !dup,
+          duplicato: !!dup,
+          data: dataRaw,
+          email,
+          pianoRaw,
+          piano,
+          prezzoPiano,
+          pagamentoRaw,
+          pagamento: parsePagamento(pagamentoRaw),
+          iban: ibanRaw.toUpperCase().replace(/\s+/g, " ").trim(),
+          dni: dniRaw,
+          cellulare: cellulareRaw,
+          nome,
+          cognome,
+        });
+      }
+
+      if (parsed.length === 0) {
+        setError("Nessuna riga valida nel file.");
+        setRows([]);
+        return;
+      }
+      setRows(parsed);
+    } catch (e) {
+      setError(String(e instanceof Error ? e.message : e));
+    } finally {
+      setParsing(false);
+    }
+  };
+
+  const updateRow = (id: string, patch: Partial<ParsedSocioRow>) =>
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+
+  const toggleAll = (selected: boolean) =>
+    setRows((prev) => prev.map((r) => ({ ...r, selected: selected && !r.duplicato })));
+
+  const doImport = async () => {
+    const toSend = rows.filter((r) => r.selected && !r.duplicato);
+    if (toSend.length === 0) return;
+    setImporting(true);
+    setError(null);
+    try {
+      const responses = await Promise.allSettled(
+        toSend.map((r) =>
+          fetch("/api/club/soci", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              nome: r.nome,
+              cognome: r.cognome || null,
+              email: r.email || null,
+              dni: r.dni || null,
+              cellulare: r.cellulare || null,
+              piano: r.piano,
+              prezzoPiano: r.prezzoPiano,
+              pagamento: r.pagamento,
+              iban: r.iban || null,
+              stato: "ATTIVO",
+              matricolaImporto: 50,
+            }),
+          }).then(async (res) => {
+            if (!res.ok) throw new Error(`${res.status}`);
+            return true;
+          }),
+        ),
+      );
+      const ok = responses.filter((x) => x.status === "fulfilled").length;
+      const skipped = rows.length - ok;
+      setResult({ ok, skipped });
+      if (ok > 0) onImported();
+    } catch (e) {
+      setError(String(e instanceof Error ? e.message : e));
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const selectedCount = rows.filter((r) => r.selected && !r.duplicato).length;
+  const dupCount = rows.filter((r) => r.duplicato).length;
+  const busy = parsing || importing;
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+      onClick={busy ? undefined : onClose}
+    >
+      <div
+        className="glass-modal rounded-2xl w-full max-w-5xl p-6 space-y-4 max-h-[92vh] overflow-hidden flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+        style={{ textAlign: "left" }}
+      >
+        <div className="flex items-center justify-between flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <Upload className="w-5 h-5" style={{ color: "#0ea5e9" }} />
+            <h2 className="text-lg font-bold text-gray-900">Importa da Google Form</h2>
+          </div>
+          <button
+            onClick={onClose}
+            disabled={busy}
+            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-40"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {!file && !result && (
+          <p className="text-xs text-gray-500 flex-shrink-0">
+            Carica il CSV esportato dal Google Form Molokai. Le colonne riconosciute sono:{" "}
+            <em>Nome utente</em>, <em>Nombre y Apellido</em>, <em>Tipo de Plan</em>,{" "}
+            <em>Método de Pago</em>, <em>Introduce tu IBAN</em>, <em>Introduce tu DNI/NIE</em>,{" "}
+            <em>Introduce tu número de móvil</em>.
+          </p>
+        )}
+
+        {!file && !result && (
+          <div
+            onDragEnter={(e) => { e.preventDefault(); setDragActive(true); }}
+            onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+            onDragLeave={(e) => { e.preventDefault(); setDragActive(false); }}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragActive(false);
+              selectFile(e.dataTransfer.files?.[0]);
+            }}
+            onClick={() => inputRef.current?.click()}
+            className="rounded-2xl border-2 border-dashed px-6 py-12 text-center cursor-pointer transition-all flex-shrink-0"
+            style={{
+              borderColor: dragActive ? "#0ea5e9" : "#cbd5e1",
+              background: dragActive ? "#e0f2fe" : "#f8fafc",
+            }}
+          >
+            <Upload className="w-10 h-10 mx-auto mb-3" style={{ color: dragActive ? "#0ea5e9" : "#94a3b8" }} />
+            <p className="text-sm font-semibold text-gray-800">Trascina qui il file CSV o clicca per selezionarlo</p>
+            <p className="text-xs text-gray-500 mt-1">CSV / XLSX — esportato da Google Form</p>
+          </div>
+        )}
+
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".csv,.xlsx,.xls"
+          className="hidden"
+          onChange={(e) => {
+            selectFile(e.target.files?.[0]);
+            e.target.value = "";
+          }}
+        />
+
+        {parsing && (
+          <div className="flex items-center justify-center gap-2 py-8 text-sm text-gray-500 flex-shrink-0">
+            <Loader2 className="w-5 h-5 animate-spin" /> Analisi del file…
+          </div>
+        )}
+
+        {result && (
+          <div className="rounded-2xl p-6 bg-sky-50 border border-sky-200 text-center space-y-3 flex-shrink-0">
+            <Check className="w-10 h-10 mx-auto" style={{ color: "#16a34a" }} />
+            <div>
+              <p className="text-lg font-bold text-gray-900">Importazione completata</p>
+              <p className="text-sm text-gray-600 mt-1">
+                {result.ok} importati · {result.skipped} non importati
+              </p>
+            </div>
+            <div className="flex gap-3 justify-center pt-2">
+              <button
+                onClick={reset}
+                className="border border-gray-200 text-gray-700 text-sm font-medium py-2 px-4 rounded-xl hover:bg-white"
+              >
+                Importa altro file
+              </button>
+              <button
+                onClick={onClose}
+                className="glass-btn-primary text-white text-sm font-medium py-2 px-5 rounded-xl"
+              >
+                Chiudi
+              </button>
+            </div>
+          </div>
+        )}
+
+        {file && !result && rows.length > 0 && (
+          <>
+            <div className="flex items-center justify-between flex-wrap gap-3 flex-shrink-0 text-xs text-gray-600">
+              <div className="flex items-center gap-3">
+                <span className="font-semibold text-gray-700">{file.name}</span>
+                <span className="text-gray-400">·</span>
+                <span>{rows.length} righe</span>
+                {dupCount > 0 && (
+                  <>
+                    <span className="text-gray-400">·</span>
+                    <span className="flex items-center gap-1" style={{ color: "#b45309" }}>
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      {dupCount} già presenti
+                    </span>
+                  </>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={
+                      rows.filter((r) => !r.duplicato).length > 0 &&
+                      rows.filter((r) => !r.duplicato).every((r) => r.selected)
+                    }
+                    onChange={(e) => toggleAll(e.target.checked)}
+                    className="w-4 h-4"
+                    style={{ accentColor: "#0ea5e9" }}
+                  />
+                  <span>Seleziona tutto</span>
+                </label>
+                <button
+                  onClick={reset}
+                  disabled={busy}
+                  className="text-sky-600 hover:text-sky-700 font-medium disabled:opacity-40"
+                >
+                  Cambia file
+                </button>
+              </div>
+            </div>
+
+            <div className="glass-card rounded-2xl overflow-hidden flex-1 min-h-0 flex flex-col">
+              <div className="overflow-auto flex-1">
+                <table className="w-full">
+                  <thead className="sticky top-0 bg-gray-50 z-10">
+                    <tr className="border-b border-gray-100">
+                      {["", "Nome", "Cognome", "Email", "Piano", "€", "Pag.", "DNI", "Cell.", "IBAN", "Stato"].map((h, i) => (
+                        <th
+                          key={h + i}
+                          className={`text-[11px] font-semibold text-gray-500 uppercase tracking-wide px-3 py-2.5 ${h === "€" ? "text-right" : "text-left"}`}
+                        >
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((r) => (
+                      <tr
+                        key={r.id}
+                        className="border-b border-gray-50"
+                        style={r.duplicato ? { background: "#fefce8" } : undefined}
+                      >
+                        <td className="px-3 py-1.5">
+                          <input
+                            type="checkbox"
+                            checked={r.selected}
+                            disabled={r.duplicato}
+                            onChange={(e) => updateRow(r.id, { selected: e.target.checked })}
+                            className="w-4 h-4"
+                            style={{ accentColor: "#0ea5e9" }}
+                          />
+                        </td>
+                        <td className="px-3 py-1.5 text-xs">
+                          <input
+                            type="text"
+                            value={r.nome}
+                            onChange={(e) => updateRow(r.id, { nome: e.target.value })}
+                            className="w-24 border border-gray-200 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white"
+                          />
+                        </td>
+                        <td className="px-3 py-1.5 text-xs">
+                          <input
+                            type="text"
+                            value={r.cognome}
+                            onChange={(e) => updateRow(r.id, { cognome: e.target.value })}
+                            className="w-28 border border-gray-200 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white"
+                          />
+                        </td>
+                        <td className="px-3 py-1.5 text-xs text-gray-600 max-w-[180px] truncate">{r.email || "—"}</td>
+                        <td className="px-3 py-1.5 text-xs font-semibold text-gray-700">{r.piano}</td>
+                        <td className="px-3 py-1.5 text-xs text-right font-mono">€{r.prezzoPiano.toFixed(2)}</td>
+                        <td className="px-3 py-1.5 text-[10px] text-gray-500">{r.pagamento === "ANNUALE" ? "Anno" : "Mens."}</td>
+                        <td className="px-3 py-1.5 text-[10px] font-mono text-gray-500">{r.dni || "—"}</td>
+                        <td className="px-3 py-1.5 text-[10px] text-gray-500">{r.cellulare || "—"}</td>
+                        <td className="px-3 py-1.5 text-[10px] font-mono text-gray-400 max-w-[120px] truncate">{r.iban || "—"}</td>
+                        <td className="px-3 py-1.5">
+                          {r.duplicato ? (
+                            <span
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                              style={{ background: "#fef3c7", color: "#92400e" }}
+                            >
+                              <AlertCircle className="w-3 h-3" /> Già presente
+                            </span>
+                          ) : (
+                            <span
+                              className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                              style={{ background: "#dcfce7", color: "#166534" }}
+                            >
+                              Nuovo
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
+        )}
+
+        {error && !result && (
+          <div className="rounded-xl p-3 bg-red-50 text-red-800 text-xs flex-shrink-0">{error}</div>
+        )}
+
+        {file && !result && rows.length > 0 && (
+          <div className="flex items-center justify-between flex-wrap gap-3 flex-shrink-0 pt-1">
+            <p className="text-xs text-gray-600">
+              {selectedCount} selezionati da importare
+              {dupCount > 0 && ` · ${dupCount} duplicati esclusi`}
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={onClose}
+                disabled={busy}
+                className="border border-gray-200 text-gray-600 text-sm font-medium py-2.5 px-5 rounded-xl hover:bg-gray-50 disabled:opacity-40"
+              >
+                Annulla
+              </button>
+              <button
+                onClick={doImport}
+                disabled={busy || selectedCount === 0}
+                className="glass-btn-primary text-white text-sm font-medium py-2.5 px-5 rounded-xl disabled:opacity-50 flex items-center gap-2"
+              >
+                {importing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" /> Importazione…
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4" /> Importa {selectedCount} soci
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
