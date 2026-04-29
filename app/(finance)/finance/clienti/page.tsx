@@ -239,7 +239,7 @@ export default function ClientiPage() {
                   <td className="px-4 py-3">
                     <button
                       onClick={() => setDetail(c)}
-                      className="text-sm font-medium text-gray-900 hover:text-pink-600 hover:underline text-left"
+                      className="text-sm font-medium text-gray-900 hover:text-sky-600 hover:underline text-left"
                     >
                       {c.nome}
                     </button>
@@ -405,9 +405,9 @@ export default function ClientiPage() {
                           style={
                             active
                               ? {
-                                  background: "#fce7f3",
-                                  color: "#be185d",
-                                  borderColor: "#f9a8d4",
+                                  background: "#e0f2fe",
+                                  color: "#0369a1",
+                                  borderColor: "#7dd3fc",
                                 }
                               : {
                                   background: "#fff",

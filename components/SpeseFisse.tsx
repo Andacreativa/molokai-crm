@@ -210,14 +210,14 @@ function EditableRow({
           onBlur={(e) =>
             e.target.value !== row.tipo && onUpdate({ tipo: e.target.value })
           }
-          className="w-full bg-transparent border-0 text-sm text-gray-900 px-2 py-1.5 rounded focus:bg-white focus:ring-2 focus:ring-pink-300 focus:outline-none"
+          className="w-full bg-transparent border-0 text-sm text-gray-900 px-2 py-1.5 rounded focus:bg-white focus:ring-2 focus:ring-sky-300 focus:outline-none"
         />
       </td>
       <td className="px-2 py-1.5">
         <select
           value={row.cadenza}
           onChange={(e) => onUpdate({ cadenza: e.target.value })}
-          className="w-full bg-transparent border-0 text-xs font-medium text-gray-700 px-2 py-1.5 rounded focus:bg-white focus:ring-2 focus:ring-pink-300 focus:outline-none cursor-pointer"
+          className="w-full bg-transparent border-0 text-xs font-medium text-gray-700 px-2 py-1.5 rounded focus:bg-white focus:ring-2 focus:ring-sky-300 focus:outline-none cursor-pointer"
         >
           {CADENZE.map((c) => (
             <option key={c} value={c}>
@@ -237,7 +237,7 @@ function EditableRow({
             e.target.value !== row.dataPagamento &&
             onUpdate({ dataPagamento: e.target.value })
           }
-          className="w-full bg-transparent border-0 text-sm text-gray-700 px-2 py-1.5 rounded focus:bg-white focus:ring-2 focus:ring-pink-300 focus:outline-none"
+          className="w-full bg-transparent border-0 text-sm text-gray-700 px-2 py-1.5 rounded focus:bg-white focus:ring-2 focus:ring-sky-300 focus:outline-none"
         />
       </td>
       <td className="px-2 py-1.5">
@@ -251,7 +251,7 @@ function EditableRow({
             setCostoStr(formatEU(n));
             if (n !== row.costo) onUpdate({ costo: n });
           }}
-          className="w-full bg-transparent border-0 text-sm text-gray-900 text-right px-2 py-1.5 rounded focus:bg-white focus:ring-2 focus:ring-pink-300 focus:outline-none tabular-nums"
+          className="w-full bg-transparent border-0 text-sm text-gray-900 text-right px-2 py-1.5 rounded focus:bg-white focus:ring-2 focus:ring-sky-300 focus:outline-none tabular-nums"
         />
       </td>
       <td className="px-2 py-1.5">
@@ -265,7 +265,7 @@ function EditableRow({
             setMensileStr(formatEU(n));
             if (n !== row.costoMensile) onUpdate({ costoMensile: n });
           }}
-          className="w-full bg-transparent border-0 text-sm text-gray-900 text-right px-2 py-1.5 rounded focus:bg-white focus:ring-2 focus:ring-pink-300 focus:outline-none font-semibold tabular-nums"
+          className="w-full bg-transparent border-0 text-sm text-gray-900 text-right px-2 py-1.5 rounded focus:bg-white focus:ring-2 focus:ring-sky-300 focus:outline-none font-semibold tabular-nums"
         />
       </td>
       <td className="px-2 py-1.5 text-right">

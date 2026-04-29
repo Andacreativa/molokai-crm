@@ -307,7 +307,7 @@ export default function DipendentiPage() {
                     />
                     <button
                       onClick={() => setInfoDip(d)}
-                      className="text-left hover:text-pink-600 hover:underline transition-colors cursor-pointer"
+                      className="text-left hover:text-sky-600 hover:underline transition-colors cursor-pointer"
                     >
                       {d.nome}
                       {d.cognome ? ` ${d.cognome}` : ""}
@@ -330,7 +330,7 @@ export default function DipendentiPage() {
                   <div className="flex items-center gap-2 justify-end">
                     <button
                       onClick={() => openEdit(d)}
-                      className="p-1.5 rounded-lg text-gray-400 hover:text-pink-600 hover:bg-pink-50 transition-colors"
+                      className="p-1.5 rounded-lg text-gray-400 hover:text-sky-600 hover:bg-sky-50 transition-colors"
                     >
                       <Pencil className="w-4 h-4" />
                     </button>
@@ -554,7 +554,7 @@ export default function DipendentiPage() {
                       setForm((f) => ({ ...f, nome: e.target.value }))
                     }
                     placeholder="Es. Mario"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
                   />
                 </div>
                 <div>
@@ -568,7 +568,7 @@ export default function DipendentiPage() {
                       setForm((f) => ({ ...f, cognome: e.target.value }))
                     }
                     placeholder="Es. Rossi"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
                   />
                 </div>
                 <div>
@@ -582,7 +582,7 @@ export default function DipendentiPage() {
                       setForm((f) => ({ ...f, ruolo: e.target.value }))
                     }
                     placeholder="Es. Account Manager"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
                   />
                 </div>
                 <div>
@@ -595,7 +595,7 @@ export default function DipendentiPage() {
                     onChange={(e) =>
                       setForm((f) => ({ ...f, dataNascita: e.target.value }))
                     }
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
                   />
                 </div>
                 <div>
@@ -609,7 +609,7 @@ export default function DipendentiPage() {
                       setForm((f) => ({ ...f, dni: e.target.value }))
                     }
                     placeholder="12345678X"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
                   />
                 </div>
                 <div>
@@ -623,7 +623,7 @@ export default function DipendentiPage() {
                       setForm((f) => ({ ...f, nie: e.target.value }))
                     }
                     placeholder="X1234567L"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
                   />
                 </div>
                 <div className="col-span-2">
@@ -661,7 +661,7 @@ export default function DipendentiPage() {
                       setForm((f) => ({ ...f, telefono: e.target.value }))
                     }
                     placeholder="+34..."
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
                   />
                 </div>
                 <div>
@@ -675,7 +675,7 @@ export default function DipendentiPage() {
                       setForm((f) => ({ ...f, email: e.target.value }))
                     }
                     placeholder="mario@example.com"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
                   />
                 </div>
                 <div className="col-span-2">
@@ -689,7 +689,7 @@ export default function DipendentiPage() {
                       setForm((f) => ({ ...f, iban: e.target.value }))
                     }
                     placeholder="ES00 0000 0000 0000 0000 0000"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
                   />
                 </div>
               </div>
@@ -713,7 +713,7 @@ export default function DipendentiPage() {
                       setForm((f) => ({ ...f, nettoBustaPaga: e.target.value }))
                     }
                     placeholder="0.00"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
                   />
                 </div>
                 <div>
@@ -730,7 +730,7 @@ export default function DipendentiPage() {
                       setForm((f) => ({ ...f, irpf: e.target.value }))
                     }
                     placeholder="0"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
                   />
                 </div>
                 <div>
@@ -745,7 +745,7 @@ export default function DipendentiPage() {
                       setForm((f) => ({ ...f, irpfImporto: e.target.value }))
                     }
                     placeholder="0.00"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
                   />
                 </div>
                 <div>
@@ -763,7 +763,7 @@ export default function DipendentiPage() {
                       }))
                     }
                     placeholder="0.00"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
                   />
                 </div>
               </div>

@@ -119,7 +119,7 @@ export function PageNav({
               key={`p-${p}`}
               onClick={() => onPage(p)}
               className={`min-w-8 h-8 px-2 rounded-lg text-sm font-medium border ${p === cur ? "text-white border-transparent" : "border-gray-200 text-gray-700 hover:bg-gray-50"}`}
-              style={p === cur ? { background: "#e8308a" } : undefined}
+              style={p === cur ? { background: "#0ea5e9" } : undefined}
             >
               {p}
             </button>

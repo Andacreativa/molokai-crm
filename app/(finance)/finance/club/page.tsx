@@ -142,6 +142,7 @@ function SociTab() {
   const [soci, setSoci] = useState<Socio[]>([]);
   const [search, setSearch] = useState("");
   const [statoFilter, setStatoFilter] = useState("");
+  const [pagamentoFilter, setPagamentoFilter] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Socio | null>(null);
   const [detail, setDetail] = useState<Socio | null>(null);
@@ -158,6 +159,7 @@ function SociTab() {
   const q = search.toLowerCase();
   const filtered = soci.filter((s) => {
     if (statoFilter && s.stato !== statoFilter) return false;
+    if (pagamentoFilter && s.pagamento !== pagamentoFilter) return false;
     return (
       (s.nome ?? "").toLowerCase().includes(q) ||
       (s.cognome ?? "").toLowerCase().includes(q) ||
@@ -286,6 +288,15 @@ function SociTab() {
                 {s}
               </option>
             ))}
+          </select>
+          <select
+            value={pagamentoFilter}
+            onChange={(e) => setPagamentoFilter(e.target.value)}
+            className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white"
+          >
+            <option value="">Tutti i pagamenti</option>
+            <option value="MENSILE">Mensile</option>
+            <option value="ANNUALE">Annuale</option>
           </select>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
