@@ -23,6 +23,7 @@ interface MeseDetail {
     soci: number;
     matricole: number;
     buoni: number;
+    fatture: number;
     fareharbor: number;
     stripe: number;
     gyg: number;
@@ -57,6 +58,7 @@ const ENTRATA_COLORS: Record<string, string> = {
   Soci: "#0ea5e9",
   Matricole: "#38bdf8",
   Buoni: "#0284c7",
+  Fatture: "#7c3aed",
   FareHarbor: "#22c55e",
   Stripe: "#8b5cf6",
   "Get Your Guide": "#f59e0b",

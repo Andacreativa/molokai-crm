@@ -53,6 +53,7 @@ export async function GET(request: Request) {
     soci,
     sociAttiviCount,
     buoni,
+    fatture,
     fareharbor,
     stripe,
     gyg,
@@ -70,6 +71,7 @@ export async function GET(request: Request) {
     }),
     prisma.socio.count({ where: { stato: "ATTIVO" } }),
     prisma.buono.findMany({ where: { pagato: true } }),
+    prisma.fattura.findMany({ where: { anno, pagato: true } }),
     prisma.prenotazioneFareHarbor.findMany({ where: { anno } }),
     prisma.prenotazioneStripe.findMany({ where: { anno } }),
     prisma.prenotazioneGetYourGuide.findMany({ where: { anno } }),
@@ -115,6 +117,7 @@ export async function GET(request: Request) {
     Soci: 0,
     Matricole: 0,
     Buoni: 0,
+    Fatture: 0,
     FareHarbor: 0,
     Stripe: 0,
     "Get Your Guide": 0,
@@ -142,6 +145,12 @@ export async function GET(request: Request) {
     if (parsed && parsed.anno === anno) {
       entratePerMese[parsed.mese - 1] += b.prezzoBuono;
       breakdownEntrate.Buoni += b.prezzoBuono;
+    }
+  }
+  for (const f of fatture) {
+    if (f.mese >= 1 && f.mese <= 12) {
+      entratePerMese[f.mese - 1] += f.totale;
+      breakdownEntrate.Fatture += f.totale;
     }
   }
   for (const r of fareharbor) {

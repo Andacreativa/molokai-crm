@@ -1540,41 +1540,33 @@ interface ParsedRow {
   mese: number;
   anno: number;
   duplicato: boolean;
+  // True se la categoria coincide con una SpesaFissa attiva → importarla
+  // duplicherebbe l'uscita (la SpesaFissa è già contata automaticamente).
+  inSpesaFissa: boolean;
+  spesaFissaInfo: string | null; // es. "Affitto €969/mese"
 }
 
-// Regole di auto-categorizzazione (match su concepto + beneficiario)
+// Regole di auto-categorizzazione (match su CONCEPTO + BENEFICIARIO + OBSERVACIONES)
 const BBVA_RULES: Array<[RegExp, string]> = [
-  [/FERNANDEZ\s*PEREDA/i, "Affitto"],
+  [/ALQUILER/i, "Affitto"],
   [/OCTOPUS|AIGUES|DIGI/i, "Utenze"],
-  [/IMPUESTOS|TRIBUTOS|TGSS|RETENCION/i, "Tasse"],
+  [/IMPUESTOS|TRIBUTOS|TGSS|SEGURIDAD\s*SOCIAL/i, "Tasse"],
   [/ALLIANZ|OCCIDENT|SEGURO/i, "Assicurazione"],
-  [/EFECTIVO|CAJA/i, "Ritiro Contante"],
-  [/BOARDS\s*MORE|MATERIAL/i, "Materiale Sportivo"],
+  [/DISPOSICION\s*DE\s*EFECTIVO/i, "Ritiro Contante"],
+  [/BOARDS\s*MORE/i, "Materiale Sportivo"],
+  [/TRANSFERENCIAS/i, "Rimborsi Soci"],
 ];
 
-const categorizza = (concepto: string, beneficiario: string): string => {
-  const text = `${concepto} ${beneficiario}`;
+const categorizza = (
+  concepto: string,
+  beneficiario: string,
+  observaciones: string,
+): string => {
+  const text = `${concepto} ${beneficiario} ${observaciones}`;
   for (const [re, cat] of BBVA_RULES) {
     if (re.test(text)) return cat;
   }
   return "Scuola";
-};
-
-// Cerca un valore nel record con fallback su nomi colonna alternativi
-const pick = (
-  row: Record<string, unknown>,
-  ...keys: string[]
-): string | number | null => {
-  const norm = Object.fromEntries(
-    Object.entries(row).map(([k, v]) => [k.toUpperCase().trim(), v]),
-  );
-  for (const k of keys) {
-    const v = norm[k.toUpperCase().trim()];
-    if (v !== undefined && v !== null && v !== "") {
-      return typeof v === "number" || typeof v === "string" ? v : String(v);
-    }
-  }
-  return null;
 };
 
 // Parsing data: accetta "yyyy-mm-dd", "dd/mm/yyyy", Date, numero seriale Excel
@@ -1669,29 +1661,46 @@ function BankImportModal({
         setError('Foglio "Historico" non trovato nel file.');
         return;
       }
-      // Header alla riga 15 (1-indexed) → range: 14 (0-indexed)
-      const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, {
-        range: 14,
+      // Parser BBVA struttura fissa:
+      //   - Header alla riga indice 15 (zero-indexed)
+      //   - Dati dalla riga 16 in poi
+      //   - Colonne (0-indexed): col 2=F.CONTABLE, col 5=CONCEPTO,
+      //     col 6=BENEFICIARIO/ORDENANTE, col 7=OBSERVACIONES, col 8=IMPORTE
+      //   - IMPORTE negativo = uscita, NaN = riga da saltare
+      const aoa = XLSX.utils.sheet_to_json<unknown[]>(ws, {
+        header: 1,
         raw: false,
         dateNF: "yyyy-mm-dd",
         defval: "",
       });
+      const dataRows = aoa.slice(16);
+
+      const cleanText = (v: unknown): string =>
+        String(v ?? "")
+          .replace(/\s+/g, " ")
+          .trim();
 
       const parsed: ParsedRow[] = [];
-      for (let i = 0; i < raw.length; i++) {
-        const r = raw[i];
-        const importoRaw = pick(r, "IMPORTE", "IMPORT");
-        const imp = parseImporto(importoRaw);
-        if (imp === null || imp >= 0) continue; // solo uscite
+      for (let i = 0; i < dataRows.length; i++) {
+        const row = dataRows[i] as unknown[];
+        if (!row || row.length === 0) continue;
 
-        const iso = toIsoDate(pick(r, "F.CONTABLE", "F. CONTABLE", "FECHA"));
+        const importeRaw = row[8];
+        const imp = parseImporto(importeRaw);
+        if (imp === null || isNaN(imp) || imp >= 0) continue; // solo uscite valide
+
+        const iso = toIsoDate(row[2]);
         if (!iso) continue;
 
-        const concepto = String(pick(r, "CONCEPTO") ?? "").trim();
-        const beneficiario = String(
-          pick(r, "BENEFICIARIO/ORDENANTE", "BENEFICIARIO") ?? "",
-        ).trim();
-        const fornitore = beneficiario || concepto || "—";
+        const concepto = cleanText(row[5]);
+        const beneficiario = cleanText(row[6]);
+        const observaciones = cleanText(row[7]);
+
+        // Fornitore: BENEFICIARIO se valorizzato, altrimenti primi 30 caratteri
+        // puliti di OBSERVACIONES, altrimenti CONCEPTO come ultimo fallback
+        const fornitore =
+          beneficiario || observaciones.slice(0, 30).trim() || concepto || "—";
+
         const d = new Date(iso);
         parsed.push({
           id: `row-${i}`,
@@ -1700,11 +1709,13 @@ function BankImportModal({
           concepto,
           beneficiario,
           fornitore,
-          categoria: categorizza(concepto, beneficiario),
+          categoria: categorizza(concepto, beneficiario, observaciones),
           importo: Math.abs(imp),
           mese: d.getMonth() + 1,
           anno: d.getFullYear(),
           duplicato: false,
+          inSpesaFissa: false,
+          spesaFissaInfo: null,
         });
       }
 
@@ -1712,6 +1723,43 @@ function BankImportModal({
         setError("Nessuna uscita trovata nel file.");
         setRows([]);
         return;
+      }
+
+      // Carica le SpeseFisse attive per segnalare le righe la cui categoria
+      // è già coperta automaticamente dal calcolo SpesaFissa nel bilancio.
+      try {
+        const res = await fetch("/api/spese-fisse");
+        const fisseJson: Array<{
+          tipo: string;
+          categoria: string | null;
+          costoMensile: number;
+          attiva: boolean;
+        }> = await res.json();
+        const fisseAttive = (Array.isArray(fisseJson) ? fisseJson : []).filter(
+          (f) => f.attiva,
+        );
+        // Mappa SpesaFissa.tipo (lowercase) → info string per il tooltip.
+        // Matcha solo sul tipo, non su f.categoria, perché diverse SpeseFisse
+        // possono condividere la stessa categoria (es. Digi e Ionos sono
+        // entrambe "Utenze") e darebbero falsi positivi su tutte le bollette
+        // utenze importate da BBVA.
+        const fisseByKey = new Map<string, string>();
+        for (const f of fisseAttive) {
+          const info = `${f.tipo} €${f.costoMensile.toFixed(2)}/mese`;
+          if (f.tipo) {
+            fisseByKey.set(f.tipo.toLowerCase().trim(), info);
+          }
+        }
+        for (const p of parsed) {
+          const info = fisseByKey.get(p.categoria.toLowerCase().trim());
+          if (info) {
+            p.inSpesaFissa = true;
+            p.spesaFissaInfo = info;
+            p.selected = false;
+          }
+        }
+      } catch {
+        // Se la fetch fallisce non bloccare l'import, prosegui senza warning
       }
 
       // Dup-check batch
@@ -1768,7 +1816,12 @@ function BankImportModal({
 
   const toggleAll = (selected: boolean) => {
     setRows((prev) =>
-      prev.map((r) => ({ ...r, selected: selected && !r.duplicato })),
+      prev.map((r) => ({
+        ...r,
+        // Seleziona-tutto esclude righe duplicate o già coperte da SpesaFissa.
+        // L'utente può comunque attivare il singolo checkbox a mano.
+        selected: selected && !r.duplicato && !r.inSpesaFissa,
+      })),
     );
   };
 
@@ -1811,6 +1864,9 @@ function BankImportModal({
 
   const selectedCount = rows.filter((r) => r.selected).length;
   const dupCount = rows.filter((r) => r.duplicato).length;
+  const fisseCount = rows.filter(
+    (r) => r.inSpesaFissa && !r.duplicato,
+  ).length;
   const totaleSelezionato = rows
     .filter((r) => r.selected)
     .reduce((s, r) => s + r.importo, 0);
@@ -1969,15 +2025,29 @@ function BankImportModal({
                     </span>
                   </>
                 )}
+                {fisseCount > 0 && (
+                  <>
+                    <span className="text-gray-400">·</span>
+                    <span
+                      className="flex items-center gap-1"
+                      style={{ color: "#b45309" }}
+                      title="Categoria coperta da una Spesa Fissa attiva — importarla duplicherebbe l'uscita"
+                    >
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      {fisseCount} in Spese Fisse
+                    </span>
+                  </>
+                )}
               </div>
               <div className="flex items-center gap-3">
                 <label className="flex items-center gap-1.5 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={
-                      rows.filter((r) => !r.duplicato).length > 0 &&
+                      rows.filter((r) => !r.duplicato && !r.inSpesaFissa)
+                        .length > 0 &&
                       rows
-                        .filter((r) => !r.duplicato)
+                        .filter((r) => !r.duplicato && !r.inSpesaFissa)
                         .every((r) => r.selected)
                     }
                     onChange={(e) => toggleAll(e.target.checked)}
@@ -2025,7 +2095,14 @@ function BankImportModal({
                         key={r.id}
                         className="border-b border-gray-50"
                         style={
-                          r.duplicato ? { background: "#fefce8" } : undefined
+                          r.duplicato || r.inSpesaFissa
+                            ? { background: "#fefce8" }
+                            : undefined
+                        }
+                        title={
+                          r.inSpesaFissa && r.spesaFissaInfo
+                            ? `⚠️ Esiste già una Spesa Fissa attiva per questa categoria (${r.spesaFissaInfo}). Importando verrà conteggiata due volte.`
+                            : undefined
                         }
                       >
                         <td className="px-3 py-1.5">
@@ -2098,8 +2175,25 @@ function BankImportModal({
                                 background: "#fef3c7",
                                 color: "#92400e",
                               }}
+                              title="Spesa con stesso fornitore/importo/mese già nel DB"
                             >
                               <AlertCircle className="w-3 h-3" /> Già presente
+                            </span>
+                          ) : r.inSpesaFissa ? (
+                            <span
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                              style={{
+                                background: "#fef3c7",
+                                color: "#92400e",
+                              }}
+                              title={
+                                r.spesaFissaInfo
+                                  ? `⚠️ Esiste già una Spesa Fissa attiva (${r.spesaFissaInfo}). Importando verrà conteggiata due volte.`
+                                  : undefined
+                              }
+                            >
+                              <AlertCircle className="w-3 h-3" /> Già in Spese
+                              Fisse
                             </span>
                           ) : (
                             <span

@@ -38,6 +38,7 @@ interface MeseDetail {
     soci: number;
     matricole: number;
     buoni: number;
+    fatture: number;
     fareharbor: number;
     stripe: number;
     gyg: number;
@@ -71,6 +72,7 @@ export async function GET(request: Request) {
   const [
     soci,
     buoni,
+    fatture,
     fareharbor,
     stripe,
     gyg,
@@ -85,6 +87,7 @@ export async function GET(request: Request) {
       include: { pagamentiMensili: { where: { anno, pagato: true } } },
     }),
     prisma.buono.findMany({ where: { pagato: true } }),
+    prisma.fattura.findMany({ where: { anno, pagato: true } }),
     prisma.prenotazioneFareHarbor.findMany({ where: { anno } }),
     prisma.prenotazioneStripe.findMany({ where: { anno } }),
     prisma.prenotazioneGetYourGuide.findMany({ where: { anno } }),
@@ -103,6 +106,7 @@ export async function GET(request: Request) {
       soci: 0,
       matricole: 0,
       buoni: 0,
+      fatture: 0,
       fareharbor: 0,
       stripe: 0,
       gyg: 0,
@@ -134,6 +138,13 @@ export async function GET(request: Request) {
     const parsed = parseMeseAnnoStringa(b.mesePagamento);
     if (parsed && parsed.anno === anno) {
       mensili[parsed.mese - 1].entrate.buoni += b.prezzoBuono;
+    }
+  }
+
+  // Fatture pagate (somma totale lordo nel mese di Fattura.mese)
+  for (const f of fatture) {
+    if (f.mese >= 1 && f.mese <= 12) {
+      mensili[f.mese - 1].entrate.fatture += f.totale;
     }
   }
 
@@ -193,6 +204,7 @@ export async function GET(request: Request) {
       m.entrate.soci +
         m.entrate.matricole +
         m.entrate.buoni +
+        m.entrate.fatture +
         m.entrate.fareharbor +
         m.entrate.stripe +
         m.entrate.gyg +
@@ -220,6 +232,7 @@ export async function GET(request: Request) {
     Soci: round2(mensili.reduce((s, m) => s + m.entrate.soci, 0)),
     Matricole: round2(mensili.reduce((s, m) => s + m.entrate.matricole, 0)),
     Buoni: round2(mensili.reduce((s, m) => s + m.entrate.buoni, 0)),
+    Fatture: round2(mensili.reduce((s, m) => s + m.entrate.fatture, 0)),
     FareHarbor: round2(mensili.reduce((s, m) => s + m.entrate.fareharbor, 0)),
     Stripe: round2(mensili.reduce((s, m) => s + m.entrate.stripe, 0)),
     "Get Your Guide": round2(mensili.reduce((s, m) => s + m.entrate.gyg, 0)),
