@@ -112,10 +112,9 @@ export async function GET(request: Request) {
   const entratePerMese = Array(12).fill(0) as number[];
   const uscitePerMese = Array(12).fill(0) as number[];
 
-  // Soci pagamenti + matricole
+  // Soci pagamenti + matricole (matricole sommate dentro Soci per la dashboard)
   const breakdownEntrate = {
     Soci: 0,
-    Matricole: 0,
     Buoni: 0,
     Fatture: 0,
     FareHarbor: 0,
@@ -136,7 +135,7 @@ export async function GET(request: Request) {
       const parsed = parseMeseAnnoStringa(s.matricolaMesePagamento);
       if (parsed && parsed.anno === anno) {
         entratePerMese[parsed.mese - 1] += s.matricolaImporto;
-        breakdownEntrate.Matricole += s.matricolaImporto;
+        breakdownEntrate.Soci += s.matricolaImporto;
       }
     }
   }

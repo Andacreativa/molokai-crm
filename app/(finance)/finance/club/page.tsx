@@ -203,6 +203,14 @@ function SociTab() {
     }
   }
   const totaleAnnoRiepilogo = totaliMensili.reduce((a, b) => a + b, 0);
+  // Quota matricole pagate dell'anno selezionato (sottoinsieme di
+  // totaleAnnoRiepilogo, mostrato come riga "di cui matricole")
+  const totaleMatricoleAnno = soci.reduce((sum, s) => {
+    if (!s.matricolaPagata || s.matricolaGratuita) return sum;
+    const annoMatch = s.matricolaMesePagamento?.match(/\d{4}/);
+    const annoMat = annoMatch ? parseInt(annoMatch[0]) : null;
+    return annoMat === annoRiepilogo ? sum + s.matricolaImporto : sum;
+  }, 0);
 
   const openNew = () => {
     setEditing(null);
@@ -400,13 +408,25 @@ function SociTab() {
             );
           })}
         </div>
-        <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-200">
-          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-            Totale {annoRiepilogo}
-          </span>
-          <span className="text-lg font-bold" style={{ color: "#0ea5e9" }}>
-            {fmt(totaleAnnoRiepilogo)}
-          </span>
+        <div className="mt-4 pt-3 border-t border-gray-200 space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              Totale {annoRiepilogo}
+            </span>
+            <span className="text-lg font-bold" style={{ color: "#0ea5e9" }}>
+              {fmt(totaleAnnoRiepilogo)}
+            </span>
+          </div>
+          {totaleMatricoleAnno > 0 && (
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-gray-500 italic">
+                di cui matricole
+              </span>
+              <span className="text-xs font-medium text-gray-600">
+                {fmt(totaleMatricoleAnno)}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
