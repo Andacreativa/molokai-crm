@@ -13,6 +13,7 @@ import {
   Store,
   School,
   Briefcase,
+  Building2,
   Package,
   Package2,
   Home,
@@ -43,6 +44,7 @@ const navGroups = [
   [
     { href: "/finance/collaboratori", label: "Collaboratori", icon: Briefcase },
     { href: "/finance/dipendenti", label: "Dipendenti", icon: UserCog },
+    { href: "/finance/fornitori", label: "Fornitori", icon: Building2 },
   ],
   [
     { href: "/finance/prodotti", label: "Prodotti", icon: Package },

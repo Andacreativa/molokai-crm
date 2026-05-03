@@ -339,6 +339,39 @@ model PagamentoDipendente {
   @@unique([dipendenteId, anno, mese, tipo])
 }
 
+// ─── FORNITORI ─────────────────────────────────────────────
+
+model Fornitore {
+  id          Int                @id @default(autoincrement())
+  nome        String
+  paese       String             @default("Spagna")
+  email       String?
+  telefono    String?
+  partitaIva  String?
+  via         String?
+  cap         String?
+  citta       String?
+  provincia   String?
+  note        String?
+  createdAt   DateTime           @default(now())
+  fattureFile FatturaFornitore[]
+}
+
+model FatturaFornitore {
+  id           Int        @id @default(autoincrement())
+  fileName     String
+  filePath     String?
+  fileData     String?    @db.Text
+  fileMimeType String?
+  fornitoreId  Int?
+  fornitore    Fornitore? @relation(fields: [fornitoreId], references: [id], onDelete: SetNull)
+  mese         Int
+  anno         Int
+  importo      Float      @default(0)
+  dataFattura  DateTime?
+  createdAt    DateTime   @default(now())
+}
+
 // ─── INVENTARIO ─────────────────────────────────────────────
 
 model CategoriaInventario {
