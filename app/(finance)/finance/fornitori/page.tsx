@@ -10,14 +10,11 @@ import {
   Check,
   Upload,
   Download,
-  FileDown,
-  FileSpreadsheet,
 } from "lucide-react";
 import { fmt, MESI } from "@/lib/constants";
 import AddressFields, { formatAddress } from "@/components/AddressFields";
 import FiltriBar from "@/components/FiltriBar";
 import { PageSizeSelect, PageNav } from "@/components/Pagination";
-import { exportExcel, exportPDF } from "@/lib/export";
 
 interface Fornitore {
   id: number;
@@ -183,56 +180,6 @@ export default function FornitoriPage() {
     }, 0);
   };
 
-  // Build righe esportazione: stessa info della tabella + indirizzo completo
-  const buildRows = () =>
-    filtered.map((c) => ({
-      Nome: c.nome,
-      "P.IVA / NIF": c.partitaIva ?? "",
-      Paese: c.paese,
-      Email: c.email ?? "",
-      Telefono: c.telefono ?? "",
-      Indirizzo: formatAddress({
-        via: c.via ?? "",
-        cap: c.cap ?? "",
-        citta: c.citta ?? "",
-        provincia: c.provincia ?? "",
-        paese: c.paese,
-      }),
-      "Totale Spese (€)": totaleSpese(c.nome),
-      Note: c.note ?? "",
-    }));
-
-  const handleExportExcel = () => {
-    if (filtered.length === 0) return;
-    const today = new Date().toISOString().slice(0, 10);
-    exportExcel(buildRows(), `fornitori_${today}`);
-  };
-
-  const handleExportPDF = () => {
-    if (filtered.length === 0) return;
-    const today = new Date().toISOString().slice(0, 10);
-    const cols = [
-      "Paese",
-      "Nome",
-      "P.IVA / NIF",
-      "Email",
-      "Telefono",
-      "Totale Spese",
-    ];
-    const rows = filtered.map((c) => {
-      const tot = totaleSpese(c.nome);
-      return [
-        c.paese,
-        c.nome,
-        c.partitaIva ?? "—",
-        c.email ?? "—",
-        c.telefono ?? "—",
-        tot > 0 ? fmt(tot) : "—",
-      ];
-    });
-    exportPDF(`Fornitori — ${filtered.length} record`, cols, rows, `fornitori_${today}`);
-  };
-
   return (
     <div className="space-y-6">
       {/* Tabs */}
@@ -284,26 +231,6 @@ export default function FornitoriPage() {
             hideOptions={["Altro"]}
           />
           <PageSizeSelect pageSize={pageSize} onChange={setPageSize} />
-          <button
-            onClick={handleExportPDF}
-            disabled={filtered.length === 0}
-            className="glass-btn-secondary flex items-center gap-2 text-gray-700 text-sm font-medium px-4 py-2.5 rounded-xl disabled:opacity-40 disabled:cursor-not-allowed"
-            title="Esporta lista filtrata in PDF"
-          >
-            <FileDown className="w-4 h-4" style={{ color: "#ef4444" }} /> PDF
-          </button>
-          <button
-            onClick={handleExportExcel}
-            disabled={filtered.length === 0}
-            className="glass-btn-secondary flex items-center gap-2 text-gray-700 text-sm font-medium px-4 py-2.5 rounded-xl disabled:opacity-40 disabled:cursor-not-allowed"
-            title="Esporta lista filtrata in Excel"
-          >
-            <FileSpreadsheet
-              className="w-4 h-4"
-              style={{ color: "#16a34a" }}
-            />{" "}
-            Excel
-          </button>
           <button
             onClick={openNew}
             className="glass-btn-primary flex items-center gap-2 text-white text-sm font-medium px-4 py-2.5 rounded-xl"

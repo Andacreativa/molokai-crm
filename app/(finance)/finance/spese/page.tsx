@@ -14,6 +14,8 @@ import {
   Landmark,
   CheckCircle2,
   AlertCircle,
+  FileDown,
+  FileSpreadsheet,
 } from "lucide-react";
 import {
   fmt,
@@ -23,6 +25,7 @@ import {
   CATEGORIE_COLORI,
   CATEGORIA_TEXT,
 } from "@/lib/constants";
+import { exportExcel, exportPDF } from "@/lib/export";
 
 // ─── Types ─────────────────────────────────────────────────────────────
 
@@ -139,6 +142,70 @@ export default function SpesePage() {
     if (categoriaFiltro) r = r.filter((x) => x.categoria === categoriaFiltro);
     return r;
   }, [rows, meseFiltro, categoriaFiltro]);
+
+  // Export Excel/PDF della lista filtrata corrente
+  const exportFilename = () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const meseLabel = meseFiltro !== null ? `_${MESI[meseFiltro - 1]}` : "";
+    const catLabel = categoriaFiltro
+      ? `_${categoriaFiltro.replace(/\s+/g, "-")}`
+      : "";
+    return `spese_${anno}${meseLabel}${catLabel}_${today}`;
+  };
+
+  const handleExportExcel = () => {
+    if (rowsFiltrate.length === 0) return;
+    exportExcel(
+      rowsFiltrate.map((s) => ({
+        Data: new Date(s.data).toLocaleDateString("it-IT"),
+        Mese: MESI[s.mese - 1],
+        Anno: s.anno,
+        Fornitore: s.fornitore,
+        Categoria: s.categoria,
+        "Importo (€)": s.importo,
+        "IVA Deducibile": s.ivaDeducibile ? "Sì" : "No",
+        "Aliquota IVA (%)": s.aliquotaIva,
+        "IVA Recuperabile (€)": s.ivaRecuperabile,
+        Descrizione: s.descrizione ?? "",
+        Note: s.note ?? "",
+      })),
+      exportFilename(),
+    );
+  };
+
+  const handleExportPDF = () => {
+    if (rowsFiltrate.length === 0) return;
+    const filtroLabel = [
+      `anno ${anno}`,
+      meseFiltro !== null ? MESI[meseFiltro - 1] : null,
+      categoriaFiltro || null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    const cols = [
+      "Data",
+      "Fornitore",
+      "Categoria",
+      "Importo",
+      "IVA recup.",
+    ];
+    const totale = rowsFiltrate.reduce((s, r) => s + r.importo, 0);
+    const ivaTot = rowsFiltrate.reduce((s, r) => s + r.ivaRecuperabile, 0);
+    const body = rowsFiltrate.map((s) => [
+      new Date(s.data).toLocaleDateString("it-IT"),
+      s.fornitore,
+      s.categoria,
+      fmt(s.importo),
+      s.ivaRecuperabile > 0 ? fmt(s.ivaRecuperabile) : "—",
+    ]);
+    body.push(["", "", "TOTALE", fmt(totale), fmt(ivaTot)]);
+    exportPDF(
+      `Spese — ${filtroLabel} (${rowsFiltrate.length} record)`,
+      cols,
+      body,
+      exportFilename(),
+    );
+  };
 
   // Stats
   const totaleAnno = useMemo(
@@ -272,6 +339,26 @@ export default function SpesePage() {
           >
             <Landmark className="w-4 h-4" style={{ color: "#0ea5e9" }} />
             Importa da Banca
+          </button>
+          <button
+            onClick={handleExportPDF}
+            disabled={rowsFiltrate.length === 0}
+            className="glass-btn-secondary flex items-center gap-2 text-gray-700 text-sm font-medium px-4 py-2.5 rounded-xl disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Esporta lista filtrata in PDF"
+          >
+            <FileDown className="w-4 h-4" style={{ color: "#ef4444" }} /> PDF
+          </button>
+          <button
+            onClick={handleExportExcel}
+            disabled={rowsFiltrate.length === 0}
+            className="glass-btn-secondary flex items-center gap-2 text-gray-700 text-sm font-medium px-4 py-2.5 rounded-xl disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Esporta lista filtrata in Excel"
+          >
+            <FileSpreadsheet
+              className="w-4 h-4"
+              style={{ color: "#16a34a" }}
+            />{" "}
+            Excel
           </button>
           <button
             onClick={openNew}
