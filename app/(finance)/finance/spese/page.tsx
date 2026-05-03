@@ -621,6 +621,57 @@ function SpesaFormModal({
   });
   const [saving, setSaving] = useState(false);
 
+  // Anagrafica fornitori per match-check (autocomplete-style + crea-al-volo)
+  const [fornitoriAnag, setFornitoriAnag] = useState<{ id: number; nome: string }[]>([]);
+  const [creatingFornitore, setCreatingFornitore] = useState(false);
+  const [fornitoreFeedback, setFornitoreFeedback] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/fornitori")
+      .then((r) => r.json())
+      .then((d) => setFornitoriAnag(Array.isArray(d) ? d : []))
+      .catch(() => setFornitoriAnag([]));
+  }, []);
+
+  // Normalizza per match (lowercase, no punteggiatura, spazi singoli)
+  const normFornit = (s: string) =>
+    (s ?? "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/[.,'`"()\-_/]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const fornitoreInAnag = (() => {
+    const n = normFornit(form.fornitore);
+    if (!n) return false;
+    return fornitoriAnag.some((f) => normFornit(f.nome) === n);
+  })();
+
+  const creaFornitoreInAnag = async () => {
+    const nome = form.fornitore.trim();
+    if (!nome) return;
+    setCreatingFornitore(true);
+    setFornitoreFeedback(null);
+    try {
+      const res = await fetch("/api/fornitori", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nome }),
+      });
+      if (!res.ok) {
+        setFornitoreFeedback("Errore creazione fornitore");
+        return;
+      }
+      const created = await res.json();
+      setFornitoriAnag((prev) => [...prev, { id: created.id, nome: created.nome }]);
+      setFornitoreFeedback(`✓ "${created.nome}" aggiunto in anagrafica`);
+    } finally {
+      setCreatingFornitore(false);
+    }
+  };
+
   // Auto-calcolo IVA recuperabile quando importo, aliquota o deducibile cambiano.
   // L'utente può sovrascrivere manualmente; cambi successivi a importo/aliquota
   // ri-sovrascrivono il manuale (comportamento esplicito dichiarato).
@@ -749,12 +800,48 @@ function SpesaFormModal({
             <input
               type="text"
               value={form.fornitore}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, fornitore: e.target.value }))
-              }
+              onChange={(e) => {
+                setForm((f) => ({ ...f, fornitore: e.target.value }));
+                setFornitoreFeedback(null);
+              }}
+              list="fornitori-anag-datalist"
               placeholder="Es. Leroy Merlin"
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
             />
+            <datalist id="fornitori-anag-datalist">
+              {fornitoriAnag.map((f) => (
+                <option key={f.id} value={f.nome} />
+              ))}
+            </datalist>
+            {form.fornitore.trim() && (
+              <div className="mt-1.5 flex items-center justify-between gap-2">
+                {fornitoreInAnag ? (
+                  <span className="text-[11px] text-emerald-600 font-medium">
+                    ✓ In anagrafica fornitori
+                  </span>
+                ) : (
+                  <>
+                    <span className="text-[11px] text-amber-700">
+                      ⚠ Non presente in anagrafica
+                    </span>
+                    <button
+                      type="button"
+                      onClick={creaFornitoreInAnag}
+                      disabled={creatingFornitore}
+                      className="text-[11px] font-medium text-white px-2.5 py-1 rounded-lg whitespace-nowrap disabled:opacity-60"
+                      style={{ background: "#0ea5e9" }}
+                    >
+                      {creatingFornitore ? "Creo…" : "Crea fornitore"}
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+            {fornitoreFeedback && (
+              <p className="text-[11px] text-emerald-600 mt-1">
+                {fornitoreFeedback}
+              </p>
+            )}
           </div>
           <div className="col-span-2">
             <label className="text-xs font-medium text-gray-600 block mb-1">
