@@ -1718,10 +1718,7 @@ function splitName(full: string): { nome: string; cognome: string } {
   return { nome: tokens[0], cognome: tokens.slice(1).join(" ") };
 }
 
-const pickField = (
-  row: Record<string, unknown>,
-  ...keys: string[]
-): string => {
+const pickField = (row: Record<string, unknown>, ...keys: string[]): string => {
   const norm = Object.fromEntries(
     Object.entries(row).map(([k, v]) => [k.toLowerCase().trim(), v]),
   );
@@ -1749,7 +1746,9 @@ function GoogleFormImportModal({
   const [importing, setImporting] = useState(false);
   const [rows, setRows] = useState<ParsedSocioRow[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ ok: number; skipped: number } | null>(null);
+  const [result, setResult] = useState<{ ok: number; skipped: number } | null>(
+    null,
+  );
   const inputRef = useRef<HTMLInputElement>(null);
 
   const existingEmails = new Set(
@@ -1810,20 +1809,43 @@ function GoogleFormImportModal({
       const parsed: ParsedSocioRow[] = [];
       for (let i = 0; i < raw.length; i++) {
         const r = raw[i];
-        const email = pickField(r, "Nome utente", "Email", "email").toLowerCase();
+        const email = pickField(
+          r,
+          "Nome utente",
+          "Email",
+          "email",
+        ).toLowerCase();
         const fullName = pickField(r, "Nombre y Apellido", "Nombre", "Nome");
         const pianoRaw = pickField(r, "Tipo de Plan", "Tipo Plan", "Plan");
-        const pagamentoRaw = pickField(r, "Método de Pago", "Metodo de Pago", "Metodo Pagamento");
+        const pagamentoRaw = pickField(
+          r,
+          "Método de Pago",
+          "Metodo de Pago",
+          "Metodo Pagamento",
+        );
         const ibanRaw = pickField(r, "Introduce tu IBAN", "IBAN", "iban");
         const dniRaw = pickField(r, "Introduce tu DNI/NIE", "DNI", "DNI/NIE");
-        const cellulareRaw = pickField(r, "Introduce tu número de móvil", "Móvil", "Movil", "Telefono", "Cellulare");
-        const dataRaw = pickField(r, "Informazioni cronologiche", "Marca temporal", "Timestamp");
+        const cellulareRaw = pickField(
+          r,
+          "Introduce tu número de móvil",
+          "Móvil",
+          "Movil",
+          "Telefono",
+          "Cellulare",
+        );
+        const dataRaw = pickField(
+          r,
+          "Informazioni cronologiche",
+          "Marca temporal",
+          "Timestamp",
+        );
 
         if (!fullName && !email) continue;
 
         const { piano, prezzoPiano } = parsePiano(pianoRaw);
         const { nome, cognome } = splitName(fullName);
-        const dupByEmail = email && existingEmails.has(email.toLowerCase().trim());
+        const dupByEmail =
+          email && existingEmails.has(email.toLowerCase().trim());
         const dupByName = nome && existingNames.has(fullNameKey(nome, cognome));
         const dup = dupByEmail || dupByName;
         parsed.push({
@@ -1862,7 +1884,9 @@ function GoogleFormImportModal({
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
 
   const toggleAll = (selected: boolean) =>
-    setRows((prev) => prev.map((r) => ({ ...r, selected: selected && !r.duplicato })));
+    setRows((prev) =>
+      prev.map((r) => ({ ...r, selected: selected && !r.duplicato })),
+    );
 
   const doImport = async () => {
     const toSend = rows.filter((r) => r.selected && !r.duplicato);
@@ -1922,7 +1946,9 @@ function GoogleFormImportModal({
         <div className="flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-2">
             <Upload className="w-5 h-5" style={{ color: "#0ea5e9" }} />
-            <h2 className="text-lg font-bold text-gray-900">Importa da Google Form</h2>
+            <h2 className="text-lg font-bold text-gray-900">
+              Importa da Google Form
+            </h2>
           </div>
           <button
             onClick={onClose}
@@ -1935,18 +1961,28 @@ function GoogleFormImportModal({
 
         {!file && !result && (
           <p className="text-xs text-gray-500 flex-shrink-0">
-            Carica il CSV esportato dal Google Form Molokai. Le colonne riconosciute sono:{" "}
-            <em>Nome utente</em>, <em>Nombre y Apellido</em>, <em>Tipo de Plan</em>,{" "}
-            <em>Método de Pago</em>, <em>Introduce tu IBAN</em>, <em>Introduce tu DNI/NIE</em>,{" "}
+            Carica il CSV esportato dal Google Form Molokai. Le colonne
+            riconosciute sono: <em>Nome utente</em>, <em>Nombre y Apellido</em>,{" "}
+            <em>Tipo de Plan</em>, <em>Método de Pago</em>,{" "}
+            <em>Introduce tu IBAN</em>, <em>Introduce tu DNI/NIE</em>,{" "}
             <em>Introduce tu número de móvil</em>.
           </p>
         )}
 
         {!file && !result && (
           <div
-            onDragEnter={(e) => { e.preventDefault(); setDragActive(true); }}
-            onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
-            onDragLeave={(e) => { e.preventDefault(); setDragActive(false); }}
+            onDragEnter={(e) => {
+              e.preventDefault();
+              setDragActive(true);
+            }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragActive(true);
+            }}
+            onDragLeave={(e) => {
+              e.preventDefault();
+              setDragActive(false);
+            }}
             onDrop={(e) => {
               e.preventDefault();
               setDragActive(false);
@@ -1959,9 +1995,16 @@ function GoogleFormImportModal({
               background: dragActive ? "#e0f2fe" : "#f8fafc",
             }}
           >
-            <Upload className="w-10 h-10 mx-auto mb-3" style={{ color: dragActive ? "#0ea5e9" : "#94a3b8" }} />
-            <p className="text-sm font-semibold text-gray-800">Trascina qui il file CSV o clicca per selezionarlo</p>
-            <p className="text-xs text-gray-500 mt-1">CSV / XLSX — esportato da Google Form</p>
+            <Upload
+              className="w-10 h-10 mx-auto mb-3"
+              style={{ color: dragActive ? "#0ea5e9" : "#94a3b8" }}
+            />
+            <p className="text-sm font-semibold text-gray-800">
+              Trascina qui il file CSV o clicca per selezionarlo
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              CSV / XLSX — esportato da Google Form
+            </p>
           </div>
         )}
 
@@ -1986,7 +2029,9 @@ function GoogleFormImportModal({
           <div className="rounded-2xl p-6 bg-sky-50 border border-sky-200 text-center space-y-3 flex-shrink-0">
             <Check className="w-10 h-10 mx-auto" style={{ color: "#16a34a" }} />
             <div>
-              <p className="text-lg font-bold text-gray-900">Importazione completata</p>
+              <p className="text-lg font-bold text-gray-900">
+                Importazione completata
+              </p>
               <p className="text-sm text-gray-600 mt-1">
                 {result.ok} importati · {result.skipped} non importati
               </p>
@@ -2018,7 +2063,10 @@ function GoogleFormImportModal({
                 {dupCount > 0 && (
                   <>
                     <span className="text-gray-400">·</span>
-                    <span className="flex items-center gap-1" style={{ color: "#b45309" }}>
+                    <span
+                      className="flex items-center gap-1"
+                      style={{ color: "#b45309" }}
+                    >
                       <AlertCircle className="w-3.5 h-3.5" />
                       {dupCount} già presenti
                     </span>
@@ -2054,7 +2102,19 @@ function GoogleFormImportModal({
                 <table className="w-full">
                   <thead className="sticky top-0 bg-gray-50 z-10">
                     <tr className="border-b border-gray-100">
-                      {["", "Nome", "Cognome", "Email", "Piano", "€", "Pag.", "DNI", "Cell.", "IBAN", "Stato"].map((h, i) => (
+                      {[
+                        "",
+                        "Nome",
+                        "Cognome",
+                        "Email",
+                        "Piano",
+                        "€",
+                        "Pag.",
+                        "DNI",
+                        "Cell.",
+                        "IBAN",
+                        "Stato",
+                      ].map((h, i) => (
                         <th
                           key={h + i}
                           className={`text-[11px] font-semibold text-gray-500 uppercase tracking-wide px-3 py-2.5 ${h === "€" ? "text-right" : "text-left"}`}
@@ -2069,14 +2129,18 @@ function GoogleFormImportModal({
                       <tr
                         key={r.id}
                         className="border-b border-gray-50"
-                        style={r.duplicato ? { background: "#fefce8" } : undefined}
+                        style={
+                          r.duplicato ? { background: "#fefce8" } : undefined
+                        }
                       >
                         <td className="px-3 py-1.5">
                           <input
                             type="checkbox"
                             checked={r.selected}
                             disabled={r.duplicato}
-                            onChange={(e) => updateRow(r.id, { selected: e.target.checked })}
+                            onChange={(e) =>
+                              updateRow(r.id, { selected: e.target.checked })
+                            }
                             className="w-4 h-4"
                             style={{ accentColor: "#0ea5e9" }}
                           />
@@ -2085,7 +2149,9 @@ function GoogleFormImportModal({
                           <input
                             type="text"
                             value={r.nome}
-                            onChange={(e) => updateRow(r.id, { nome: e.target.value })}
+                            onChange={(e) =>
+                              updateRow(r.id, { nome: e.target.value })
+                            }
                             className="w-24 border border-gray-200 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white"
                           />
                         </td>
@@ -2093,29 +2159,51 @@ function GoogleFormImportModal({
                           <input
                             type="text"
                             value={r.cognome}
-                            onChange={(e) => updateRow(r.id, { cognome: e.target.value })}
+                            onChange={(e) =>
+                              updateRow(r.id, { cognome: e.target.value })
+                            }
                             className="w-28 border border-gray-200 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white"
                           />
                         </td>
-                        <td className="px-3 py-1.5 text-xs text-gray-600 max-w-[180px] truncate">{r.email || "—"}</td>
-                        <td className="px-3 py-1.5 text-xs font-semibold text-gray-700">{r.piano}</td>
-                        <td className="px-3 py-1.5 text-xs text-right font-mono">€{r.prezzoPiano.toFixed(2)}</td>
-                        <td className="px-3 py-1.5 text-[10px] text-gray-500">{r.pagamento === "ANNUALE" ? "Anno" : "Mens."}</td>
-                        <td className="px-3 py-1.5 text-[10px] font-mono text-gray-500">{r.dni || "—"}</td>
-                        <td className="px-3 py-1.5 text-[10px] text-gray-500">{r.cellulare || "—"}</td>
-                        <td className="px-3 py-1.5 text-[10px] font-mono text-gray-400 max-w-[120px] truncate">{r.iban || "—"}</td>
+                        <td className="px-3 py-1.5 text-xs text-gray-600 max-w-[180px] truncate">
+                          {r.email || "—"}
+                        </td>
+                        <td className="px-3 py-1.5 text-xs font-semibold text-gray-700">
+                          {r.piano}
+                        </td>
+                        <td className="px-3 py-1.5 text-xs text-right font-mono">
+                          €{r.prezzoPiano.toFixed(2)}
+                        </td>
+                        <td className="px-3 py-1.5 text-[10px] text-gray-500">
+                          {r.pagamento === "ANNUALE" ? "Anno" : "Mens."}
+                        </td>
+                        <td className="px-3 py-1.5 text-[10px] font-mono text-gray-500">
+                          {r.dni || "—"}
+                        </td>
+                        <td className="px-3 py-1.5 text-[10px] text-gray-500">
+                          {r.cellulare || "—"}
+                        </td>
+                        <td className="px-3 py-1.5 text-[10px] font-mono text-gray-400 max-w-[120px] truncate">
+                          {r.iban || "—"}
+                        </td>
                         <td className="px-3 py-1.5">
                           {r.duplicato ? (
                             <span
                               className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold"
-                              style={{ background: "#fef3c7", color: "#92400e" }}
+                              style={{
+                                background: "#fef3c7",
+                                color: "#92400e",
+                              }}
                             >
                               <AlertCircle className="w-3 h-3" /> Già presente
                             </span>
                           ) : (
                             <span
                               className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold"
-                              style={{ background: "#dcfce7", color: "#166534" }}
+                              style={{
+                                background: "#dcfce7",
+                                color: "#166534",
+                              }}
                             >
                               Nuovo
                             </span>
@@ -2131,7 +2219,9 @@ function GoogleFormImportModal({
         )}
 
         {error && !result && (
-          <div className="rounded-xl p-3 bg-red-50 text-red-800 text-xs flex-shrink-0">{error}</div>
+          <div className="rounded-xl p-3 bg-red-50 text-red-800 text-xs flex-shrink-0">
+            {error}
+          </div>
         )}
 
         {file && !result && rows.length > 0 && (

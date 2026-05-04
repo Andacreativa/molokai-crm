@@ -22,10 +22,7 @@ const SAMPLE_CSV = `Informazioni cronologiche,Nome utente,Nombre y Apellido,Tipo
 2026-04-29 11:00:00,test2@molokai.es,Anna Bianchi,"Plan Anual - 648,00 €",Anual,ES7620770024003102575766,12345678A,600333444
 2026-04-29 12:00:00,test3@molokai.es,Luigi De Luca,"Plan Material - 55,00 €",Mensual,,Y0011223A,+34 612 345 678`;
 
-const pickField = (
-  row: Record<string, unknown>,
-  ...keys: string[]
-): string => {
+const pickField = (row: Record<string, unknown>, ...keys: string[]): string => {
   const norm = Object.fromEntries(
     Object.entries(row).map(([k, v]) => [k.toLowerCase().trim(), v]),
   );

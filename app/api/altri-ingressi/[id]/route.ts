@@ -10,8 +10,7 @@ export async function GET(
     const row = await prisma.altroIngresso.findUnique({
       where: { id: parseInt(id) },
     });
-    if (!row)
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
     return NextResponse.json(row);
   } catch (e) {
     console.error("[GET /api/altri-ingressi/[id]]", e);

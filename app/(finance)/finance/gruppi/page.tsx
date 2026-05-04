@@ -252,9 +252,11 @@ export default function GruppiPage() {
                   <th
                     key={h}
                     className={`text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 ${
-                      ["N° Sessioni", "Da Incassare", "Totale Incassato"].includes(
-                        h,
-                      )
+                      [
+                        "N° Sessioni",
+                        "Da Incassare",
+                        "Totale Incassato",
+                      ].includes(h)
                         ? "text-right"
                         : "text-left"
                     }`}

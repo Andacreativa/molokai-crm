@@ -41,7 +41,8 @@ export async function POST(request: Request) {
         note: body.note || null,
         dataAcquisto: body.dataAcquisto ? new Date(body.dataAcquisto) : null,
         costoAcquisto:
-          body.costoAcquisto !== undefined && body.costoAcquisto !== null &&
+          body.costoAcquisto !== undefined &&
+          body.costoAcquisto !== null &&
           body.costoAcquisto !== ""
             ? parseFloat(body.costoAcquisto)
             : null,

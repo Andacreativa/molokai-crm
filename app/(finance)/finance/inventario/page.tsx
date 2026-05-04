@@ -261,10 +261,7 @@ export default function InventarioPage() {
               {/* Toolbar */}
               <div className="flex items-center justify-between flex-wrap gap-3">
                 <div className="flex items-center gap-2">
-                  <Package2
-                    className="w-5 h-5"
-                    style={{ color: "#0ea5e9" }}
-                  />
+                  <Package2 className="w-5 h-5" style={{ color: "#0ea5e9" }} />
                   <h2 className="text-lg font-bold text-gray-900">
                     {selectedCat.nome}
                   </h2>

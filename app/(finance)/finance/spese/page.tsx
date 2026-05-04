@@ -184,13 +184,7 @@ export default function SpesePage() {
     ]
       .filter(Boolean)
       .join(" · ");
-    const cols = [
-      "Data",
-      "Fornitore",
-      "Categoria",
-      "Importo",
-      "IVA recup.",
-    ];
+    const cols = ["Data", "Fornitore", "Categoria", "Importo", "IVA recup."];
     const totale = rowsFiltrate.reduce((s, r) => s + r.importo, 0);
     const ivaTot = rowsFiltrate.reduce((s, r) => s + r.ivaRecuperabile, 0);
     const body = rowsFiltrate.map((s) => [
@@ -359,10 +353,7 @@ export default function SpesePage() {
             className="glass-btn-secondary flex items-center gap-2 text-gray-700 text-sm font-medium px-4 py-2.5 rounded-xl disabled:opacity-40 disabled:cursor-not-allowed"
             title="Esporta lista filtrata in Excel"
           >
-            <FileSpreadsheet
-              className="w-4 h-4"
-              style={{ color: "#16a34a" }}
-            />{" "}
+            <FileSpreadsheet className="w-4 h-4" style={{ color: "#16a34a" }} />{" "}
             Excel
           </button>
           <button
@@ -721,9 +712,13 @@ function SpesaFormModal({
   const [saving, setSaving] = useState(false);
 
   // Anagrafica fornitori per match-check (autocomplete-style + crea-al-volo)
-  const [fornitoriAnag, setFornitoriAnag] = useState<{ id: number; nome: string }[]>([]);
+  const [fornitoriAnag, setFornitoriAnag] = useState<
+    { id: number; nome: string }[]
+  >([]);
   const [creatingFornitore, setCreatingFornitore] = useState(false);
-  const [fornitoreFeedback, setFornitoreFeedback] = useState<string | null>(null);
+  const [fornitoreFeedback, setFornitoreFeedback] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     fetch("/api/fornitori")
@@ -764,7 +759,10 @@ function SpesaFormModal({
         return;
       }
       const created = await res.json();
-      setFornitoriAnag((prev) => [...prev, { id: created.id, nome: created.nome }]);
+      setFornitoriAnag((prev) => [
+        ...prev,
+        { id: created.id, nome: created.nome },
+      ]);
       setFornitoreFeedback(`✓ "${created.nome}" aggiunto in anagrafica`);
     } finally {
       setCreatingFornitore(false);
@@ -830,8 +828,7 @@ function SpesaFormModal({
       // (case-insensitive) o lo crea al volo prima del POST multipart.
       if (savedSpesa?.id && attachedFile) {
         const nomeFornitore = form.fornitore.trim();
-        const norm = (s: string) =>
-          s.toLowerCase().replace(/\s+/g, " ").trim();
+        const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
         let fornitoreId: number | null = null;
         try {
           const listRes = await fetch("/api/fornitori");
@@ -2106,9 +2103,7 @@ function BankImportModal({
 
   const selectedCount = rows.filter((r) => r.selected).length;
   const dupCount = rows.filter((r) => r.duplicato).length;
-  const fisseCount = rows.filter(
-    (r) => r.inSpesaFissa && !r.duplicato,
-  ).length;
+  const fisseCount = rows.filter((r) => r.inSpesaFissa && !r.duplicato).length;
   const totaleSelezionato = rows
     .filter((r) => r.selected)
     .reduce((s, r) => s + r.importo, 0);
@@ -2143,9 +2138,10 @@ function BankImportModal({
 
         {!file && !result && (
           <p className="text-xs text-gray-500 flex-shrink-0">
-            Carica l&apos;estratto conto (.xlsx) dal foglio &quot;Historico&quot;.
-            Verranno mostrate solo le uscite, con categoria assegnata
-            automaticamente. Puoi rivedere e modificare prima di importare.
+            Carica l&apos;estratto conto (.xlsx) dal foglio
+            &quot;Historico&quot;. Verranno mostrate solo le uscite, con
+            categoria assegnata automaticamente. Puoi rivedere e modificare
+            prima di importare.
           </p>
         )}
 

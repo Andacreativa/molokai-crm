@@ -246,9 +246,7 @@ function FareHarborTab({
 
   const rowsMese = useMemo(
     () =>
-      meseFiltro === null
-        ? rows
-        : rows.filter((r) => r.mese === meseFiltro),
+      meseFiltro === null ? rows : rows.filter((r) => r.mese === meseFiltro),
     [rows, meseFiltro],
   );
 
@@ -258,10 +256,7 @@ function FareHarborTab({
     [rows],
   );
   // Totale fee anno = somma processing fees
-  const totaleFee = useMemo(
-    () => rows.reduce((s, r) => s + r.fee, 0),
-    [rows],
-  );
+  const totaleFee = useMemo(() => rows.reduce((s, r) => s + r.fee, 0), [rows]);
 
   // Riepilogo mensile per il box 12-celle (somma del netto)
   const totaliMensili = useMemo(() => {
@@ -477,7 +472,10 @@ function FareHarborTab({
                       }}
                       onBlur={(e) => {
                         const initial = e.currentTarget.dataset.initial;
-                        if (e.currentTarget.value && e.currentTarget.value !== initial) {
+                        if (
+                          e.currentTarget.value &&
+                          e.currentTarget.value !== initial
+                        ) {
                           saveField(r.id, "data", e.currentTarget.value);
                         }
                       }}
@@ -692,7 +690,11 @@ function FareHarborCsvImportModal({
               : "Trascina qui il file CSV o clicca per selezionarlo"}
           </p>
           <p className="text-xs text-gray-500 text-center">
-            Colonne attese: <code className="bg-gray-100 px-1.5 py-0.5 rounded font-mono text-[11px]">payout_date · net_payout_amount · processing_fee_amount · gross_amount · payout_status</code>
+            Colonne attese:{" "}
+            <code className="bg-gray-100 px-1.5 py-0.5 rounded font-mono text-[11px]">
+              payout_date · net_payout_amount · processing_fee_amount ·
+              gross_amount · payout_status
+            </code>
             <br />
             Anno {anno} · solo righe Succeeded · upsert per data
           </p>
@@ -970,7 +972,6 @@ function StripeTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
           </table>
         </div>
       </div>
-
     </div>
   );
 }
@@ -1123,9 +1124,7 @@ function GYGTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
                 `${skippedOtherYear} prenotazioni di altri anni saltate`,
               );
             if (skippedNoDate > 0)
-              errors.push(
-                `${skippedNoDate} righe senza Activity Date valida`,
-              );
+              errors.push(`${skippedNoDate} righe senza Activity Date valida`);
             return { payloads, errors };
           }}
           onImported={() => {
@@ -1183,7 +1182,6 @@ function GYGTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
           </table>
         </div>
       </div>
-
     </div>
   );
 }

@@ -26,7 +26,9 @@ const PAIRS: Pair[] = [
 ];
 
 async function main() {
-  console.log(`\n🔧  Merge inverso di ${PAIRS.length} coppie di soci duplicati\n`);
+  console.log(
+    `\n🔧  Merge inverso di ${PAIRS.length} coppie di soci duplicati\n`,
+  );
 
   let merged = 0;
   let deleted = 0;
@@ -39,12 +41,16 @@ async function main() {
     ]);
 
     if (!keep) {
-      console.log(`  ⚠  ${p.label}: socio originale id=${p.keepId} non trovato, skip`);
+      console.log(
+        `  ⚠  ${p.label}: socio originale id=${p.keepId} non trovato, skip`,
+      );
       skipped++;
       continue;
     }
     if (!drop) {
-      console.log(`  ⏭  ${p.label}: duplicato id=${p.dropId} già rimosso, skip`);
+      console.log(
+        `  ⏭  ${p.label}: duplicato id=${p.dropId} già rimosso, skip`,
+      );
       skipped++;
       continue;
     }
@@ -58,7 +64,9 @@ async function main() {
     if (Object.keys(data).length > 0) {
       await prisma.socio.update({ where: { id: p.keepId }, data });
       console.log(
-        `  ✓  ${p.label}: id=${p.keepId} aggiornato con { ${Object.entries(data).map(([k, v]) => `${k}=${(v as string).slice(0, 25)}`).join(", ")} }`,
+        `  ✓  ${p.label}: id=${p.keepId} aggiornato con { ${Object.entries(data)
+          .map(([k, v]) => `${k}=${(v as string).slice(0, 25)}`)
+          .join(", ")} }`,
       );
       merged++;
     } else {

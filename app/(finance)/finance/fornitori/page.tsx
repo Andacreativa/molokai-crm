@@ -213,128 +213,128 @@ export default function FornitoriPage() {
         <FattureFornitoriTab fornitori={fornitori} onFornitoreCreato={load} />
       ) : (
         <>
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Fornitori</h1>
-          <p className="text-gray-500 text-sm mt-1">
-            {filtered.length} fornitori in anagrafica
-          </p>
-        </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <FiltriBar
-            anno={0}
-            azienda={paeseFiltro}
-            onAnno={() => {}}
-            onAzienda={setPaeseFiltro}
-            showAnno={false}
-            hideOptions={["Altro"]}
+          {/* Header */}
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Fornitori</h1>
+              <p className="text-gray-500 text-sm mt-1">
+                {filtered.length} fornitori in anagrafica
+              </p>
+            </div>
+            <div className="flex items-center gap-3 flex-wrap">
+              <FiltriBar
+                anno={0}
+                azienda={paeseFiltro}
+                onAnno={() => {}}
+                onAzienda={setPaeseFiltro}
+                showAnno={false}
+                hideOptions={["Altro"]}
+              />
+              <PageSizeSelect pageSize={pageSize} onChange={setPageSize} />
+              <button
+                onClick={openNew}
+                className="glass-btn-primary flex items-center gap-2 text-white text-sm font-medium px-4 py-2.5 rounded-xl"
+              >
+                <Plus className="w-4 h-4" /> Nuovo Fornitore
+              </button>
+            </div>
+          </div>
+
+          {/* Ricerca */}
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Cerca per nome, NIF, paese, email..."
+            className="w-full max-w-sm border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white"
           />
-          <PageSizeSelect pageSize={pageSize} onChange={setPageSize} />
-          <button
-            onClick={openNew}
-            className="glass-btn-primary flex items-center gap-2 text-white text-sm font-medium px-4 py-2.5 rounded-xl"
-          >
-            <Plus className="w-4 h-4" /> Nuovo Fornitore
-          </button>
-        </div>
-      </div>
 
-      {/* Ricerca */}
-      <input
-        type="text"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        placeholder="Cerca per nome, NIF, paese, email..."
-        className="w-full max-w-sm border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white"
-      />
-
-      {/* Tabella */}
-      <div className="glass-card rounded-2xl overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-gray-100 bg-gray-50">
-              {["Paese", "Fornitore", "Totale Spese", ""].map((h) => (
-                <th
-                  key={h}
-                  className={`text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 ${h === "Totale Spese" ? "text-right" : "text-left"}`}
-                >
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="zebra">
-            {filtered.length === 0 && (
-              <tr>
-                <td
-                  colSpan={4}
-                  className="text-center text-gray-400 py-12 text-sm"
-                >
-                  Nessun fornitore trovato
-                </td>
-              </tr>
-            )}
-            {paged.map((c) => {
-              const totale = totaleSpese(c.nome);
-              return (
-                <tr
-                  key={c.id}
-                  className="border-b border-gray-50 hover:bg-gray-50 transition-colors"
-                >
-                  <td className="px-4 py-3 text-xl">
-                    {PAESE_FLAG[c.paese] || "🌍"}
-                  </td>
-                  <td className="px-4 py-3">
-                    <button
-                      onClick={() => setDetail(c)}
-                      className="text-sm font-medium text-gray-900 hover:text-sky-600 hover:underline text-left"
+          {/* Tabella */}
+          <div className="glass-card rounded-2xl overflow-hidden">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-100 bg-gray-50">
+                  {["Paese", "Fornitore", "Totale Spese", ""].map((h) => (
+                    <th
+                      key={h}
+                      className={`text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 ${h === "Totale Spese" ? "text-right" : "text-left"}`}
                     >
-                      {c.nome}
-                    </button>
-                    {c.partitaIva && (
-                      <p className="text-xs text-gray-400 font-mono">
-                        {c.partitaIva}
-                      </p>
-                    )}
-                  </td>
-                  <td
-                    className="px-4 py-3 text-sm font-semibold text-right"
-                    style={{ color: totale > 0 ? "#ef4444" : "#94a3b8" }}
-                  >
-                    {totale > 0 ? fmt(totale) : "—"}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2 justify-end">
-                      <button
-                        onClick={() => openEdit(c)}
-                        className="p-1.5 rounded-lg text-gray-400 hover:text-sky-600 hover:bg-sky-50 transition-colors"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => del(c.id)}
-                        className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
+                      {h}
+                    </th>
+                  ))}
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      {filtered.length > 0 && (
-        <PageNav
-          total={filtered.length}
-          page={page}
-          pageSize={pageSize}
-          onPage={setPage}
-          labelSuffix="fornitori"
-        />
-      )}
+              </thead>
+              <tbody className="zebra">
+                {filtered.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={4}
+                      className="text-center text-gray-400 py-12 text-sm"
+                    >
+                      Nessun fornitore trovato
+                    </td>
+                  </tr>
+                )}
+                {paged.map((c) => {
+                  const totale = totaleSpese(c.nome);
+                  return (
+                    <tr
+                      key={c.id}
+                      className="border-b border-gray-50 hover:bg-gray-50 transition-colors"
+                    >
+                      <td className="px-4 py-3 text-xl">
+                        {PAESE_FLAG[c.paese] || "🌍"}
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => setDetail(c)}
+                          className="text-sm font-medium text-gray-900 hover:text-sky-600 hover:underline text-left"
+                        >
+                          {c.nome}
+                        </button>
+                        {c.partitaIva && (
+                          <p className="text-xs text-gray-400 font-mono">
+                            {c.partitaIva}
+                          </p>
+                        )}
+                      </td>
+                      <td
+                        className="px-4 py-3 text-sm font-semibold text-right"
+                        style={{ color: totale > 0 ? "#ef4444" : "#94a3b8" }}
+                      >
+                        {totale > 0 ? fmt(totale) : "—"}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2 justify-end">
+                          <button
+                            onClick={() => openEdit(c)}
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-sky-600 hover:bg-sky-50 transition-colors"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => del(c.id)}
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          {filtered.length > 0 && (
+            <PageNav
+              total={filtered.length}
+              page={page}
+              pageSize={pageSize}
+              onPage={setPage}
+              labelSuffix="fornitori"
+            />
+          )}
         </>
       )}
 
@@ -635,9 +635,7 @@ function FattureFornitoriTab({
     const params = new URLSearchParams();
     params.set("anno", String(filtroAnno));
     if (filtroMese > 0) params.set("mese", String(filtroMese));
-    const data = await (
-      await fetch(`/api/fatture-fornitori?${params}`)
-    ).json();
+    const data = await (await fetch(`/api/fatture-fornitori?${params}`)).json();
     setFatture(Array.isArray(data) ? data : []);
   };
   useEffect(() => {
@@ -709,7 +707,11 @@ function FattureFornitoriTab({
               setTimeout(() => URL.revokeObjectURL(url), 1000);
             }}
             disabled={fatture.length === 0}
-            title={fatture.length === 0 ? "Nessuna fattura nel filtro" : "Scarica ZIP"}
+            title={
+              fatture.length === 0
+                ? "Nessuna fattura nel filtro"
+                : "Scarica ZIP"
+            }
             className="flex items-center gap-2 border border-gray-200 text-gray-700 text-sm font-medium px-4 py-2.5 rounded-xl hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Download className="w-4 h-4" /> Scarica ZIP
@@ -894,7 +896,9 @@ function UploadFatturaModal({
       });
       const data = await res.json();
       if (!res.ok) {
-        setInfo(`Estrazione AI fallita: ${data.error ?? "errore"}. Compila a mano.`);
+        setInfo(
+          `Estrazione AI fallita: ${data.error ?? "errore"}. Compila a mano.`,
+        );
         return;
       }
       if (data.fornitore) setExtractedNome(data.fornitore);
@@ -914,7 +918,9 @@ function UploadFatturaModal({
         }
       }
     } catch (e) {
-      setInfo(`Errore estrazione: ${e instanceof Error ? e.message : String(e)}`);
+      setInfo(
+        `Errore estrazione: ${e instanceof Error ? e.message : String(e)}`,
+      );
     } finally {
       setExtracting(false);
     }
@@ -1057,9 +1063,7 @@ function UploadFatturaModal({
           body.stage || body.code
             ? ` [stage=${body.stage ?? "?"} code=${body.code ?? "?"}]`
             : "";
-        setError(
-          `${body.error || `Errore salvataggio (${res.status})`}${dbg}`,
-        );
+        setError(`${body.error || `Errore salvataggio (${res.status})`}${dbg}`);
         return;
       }
       console.log("[upload-fattura] ✓ salvato, chiudo modal");
@@ -1090,7 +1094,9 @@ function UploadFatturaModal({
           }}
           onDragLeave={() => setDragOver(false)}
           onDrop={onDrop}
-          onClick={() => document.getElementById("file-input-fornitore")?.click()}
+          onClick={() =>
+            document.getElementById("file-input-fornitore")?.click()
+          }
           className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${
             dragOver
               ? "border-sky-400 bg-sky-50"
@@ -1132,9 +1138,7 @@ function UploadFatturaModal({
             </label>
             <select
               value={fornitoreId ?? ""}
-              onChange={(e) =>
-                setFornitoreId(parseInt(e.target.value) || null)
-              }
+              onChange={(e) => setFornitoreId(parseInt(e.target.value) || null)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
             >
               <option value="">Seleziona fornitore...</option>
@@ -1147,8 +1151,7 @@ function UploadFatturaModal({
             {extractedNome && !matchFound && (
               <div className="mt-2 flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                 <span className="text-xs text-amber-800 flex-1">
-                  Fornitore estratto:{" "}
-                  <strong>{extractedNome}</strong>
+                  Fornitore estratto: <strong>{extractedNome}</strong>
                   {extractedPiva ? ` (P.IVA ${extractedPiva})` : ""} — non
                   presente in anagrafica
                 </span>
@@ -1274,7 +1277,8 @@ function PreviewFatturaModal({
   const fileUrl = `/api/fatture-fornitori/${fattura.id}/file`;
   const mime = fattura.fileMimeType ?? "";
   const isPdf = mime === "application/pdf" || /\.pdf$/i.test(fattura.fileName);
-  const isImage = /^image\//.test(mime) || /\.(jpe?g|png|webp|gif)$/i.test(fattura.fileName);
+  const isImage =
+    /^image\//.test(mime) || /\.(jpe?g|png|webp|gif)$/i.test(fattura.fileName);
 
   const downloadFile = async () => {
     const res = await fetch(fileUrl);

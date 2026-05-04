@@ -21,7 +21,9 @@ async function main() {
     return;
   }
 
-  console.log(`\nTrovati ${candidates.length} AltroIngresso 'Socio annuale':\n`);
+  console.log(
+    `\nTrovati ${candidates.length} AltroIngresso 'Socio annuale':\n`,
+  );
 
   const soci = await prisma.socio.findMany({
     select: {
@@ -60,9 +62,7 @@ async function main() {
       const nc = nameCandidate.toLowerCase();
       if (!nc) return false;
       // fuzzy: ogni parola del nameCandidate contenuta in fullName
-      return nc
-        .split(/\s+/)
-        .every((w) => w.length > 2 && fullName.includes(w));
+      return nc.split(/\s+/).every((w) => w.length > 2 && fullName.includes(w));
     });
 
     if (matches.length === 0) {
@@ -77,9 +77,11 @@ async function main() {
         `   ✓ Match: Socio "${s.nome} ${s.cognome ?? ""}" (id=${s.id})`,
       );
       console.log(
-        `     PagamentoSocio anno ${r.anno}: ${s.pagamentiMensili
-          .map((p) => `m${p.mese}=€${p.importo}`)
-          .join(", ") || "(nessuno)"}`,
+        `     PagamentoSocio anno ${r.anno}: ${
+          s.pagamentiMensili
+            .map((p) => `m${p.mese}=€${p.importo}`)
+            .join(", ") || "(nessuno)"
+        }`,
       );
       if (pagMese.length > 0) {
         console.log(
@@ -101,7 +103,9 @@ async function main() {
   }
 
   await prisma.altroIngresso.deleteMany({ where: { id: { in: toDelete } } });
-  console.log(`\n✅  Eliminati ${toDelete.length} duplicati: ${toDelete.join(", ")}`);
+  console.log(
+    `\n✅  Eliminati ${toDelete.length} duplicati: ${toDelete.join(", ")}`,
+  );
 }
 
 main()

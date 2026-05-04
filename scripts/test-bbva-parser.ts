@@ -96,7 +96,9 @@ function main() {
   });
   const dataRows = aoa.slice(16);
 
-  console.log(`Foglio: "${sheetName}" · ${dataRows.length} righe dopo header\n`);
+  console.log(
+    `Foglio: "${sheetName}" · ${dataRows.length} righe dopo header\n`,
+  );
 
   const fisseMap = buildFisseMap();
 
@@ -144,19 +146,20 @@ function main() {
     );
   }
   const fisseCount = out.filter((r) => r.inFissa).length;
-  console.log(`\nRighe segnalate "Già in Spese Fisse": ${fisseCount}/${out.length}`);
+  console.log(
+    `\nRighe segnalate "Già in Spese Fisse": ${fisseCount}/${out.length}`,
+  );
 
   // Distribuzione per categoria
   const byCat: Record<string, { count: number; total: number }> = {};
   for (const r of out) {
-    if (!byCat[r.categoria])
-      byCat[r.categoria] = { count: 0, total: 0 };
+    if (!byCat[r.categoria]) byCat[r.categoria] = { count: 0, total: 0 };
     byCat[r.categoria].count += 1;
     byCat[r.categoria].total += r.importo;
   }
   console.log("\nDistribuzione per categoria:");
-  for (const [cat, info] of Object.entries(byCat).sort((a, b) =>
-    b[1].total - a[1].total,
+  for (const [cat, info] of Object.entries(byCat).sort(
+    (a, b) => b[1].total - a[1].total,
   )) {
     console.log(
       `  ${cat.padEnd(22)} ${String(info.count).padStart(3)} righe  €${info.total.toFixed(2).padStart(9)}`,

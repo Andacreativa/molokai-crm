@@ -122,7 +122,9 @@ async function main() {
     console.log(`── Mese ${m} · €${bankEntrateByMese[m].toFixed(2)} ──`);
     for (const r of rows) {
       const label = (r.beneficiario || r.concepto).slice(0, 50);
-      console.log(`   ${r.data}  €${r.importo.toFixed(2).padStart(10)}  ${label}`);
+      console.log(
+        `   ${r.data}  €${r.importo.toFixed(2).padStart(10)}  ${label}`,
+      );
     }
     console.log();
   }
@@ -264,9 +266,7 @@ async function main() {
   let totUnk = 0;
   for (const u of unknowns) {
     const label = (u.beneficiario || u.concepto).slice(0, 60);
-    console.log(
-      `   ${u.data}  €${u.importo.toFixed(2).padStart(9)}  ${label}`,
-    );
+    console.log(`   ${u.data}  €${u.importo.toFixed(2).padStart(9)}  ${label}`);
     totUnk += u.importo;
   }
   console.log(`\n   Totale voci non tracciate: €${totUnk.toFixed(2)}`);

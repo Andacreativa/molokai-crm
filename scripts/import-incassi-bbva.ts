@@ -54,9 +54,7 @@ async function main() {
       update: r,
     });
     if (existing) {
-      console.log(
-        `  ⏭  FareHarbor mese ${r.mese} già presente (aggiornato)`,
-      );
+      console.log(`  ⏭  FareHarbor mese ${r.mese} già presente (aggiornato)`);
     } else {
       console.log(
         `  ✓  FareHarbor mese ${r.mese}: €${r.totale.toFixed(2)} totale`,
@@ -111,15 +109,69 @@ async function main() {
     mese: number;
   }
   const altri: AltroSeed[] = [
-    { data: "2026-03-09", fonte: "Prestito Soci", descrizione: "Bogliolo Maurizio", importo: 1000, mese: 3 },
-    { data: "2026-03-09", fonte: "Prestito Soci", descrizione: "Finn Kalbhenn", importo: 1000, mese: 3 },
-    { data: "2026-03-09", fonte: "Prestito Soci", descrizione: "Lorenzo Vanghetti", importo: 1000, mese: 3 },
-    { data: "2026-02-17", fonte: "Rimborso Assicurazione", descrizione: "Maurizio Bogliolo", importo: 797.5, mese: 2 },
-    { data: "2026-02-09", fonte: "Ingresso Socio", descrizione: "Maurizio Bogliolo", importo: 75, mese: 2 },
-    { data: "2026-04-07", fonte: "Soci", descrizione: "Socio annuale — Llar i Salut", importo: 648, mese: 4 },
-    { data: "2026-03-11", fonte: "Soci", descrizione: "Socio annuale — Alexandru Turov", importo: 648, mese: 3 },
-    { data: "2026-04-08", fonte: "Soci", descrizione: "Quote mensili Aprile — Remesa adeudos", importo: 490, mese: 4 },
-    { data: "2026-03-09", fonte: "Soci", descrizione: "Quote mensili Marzo — Remesa adeudos", importo: 575, mese: 3 },
+    {
+      data: "2026-03-09",
+      fonte: "Prestito Soci",
+      descrizione: "Bogliolo Maurizio",
+      importo: 1000,
+      mese: 3,
+    },
+    {
+      data: "2026-03-09",
+      fonte: "Prestito Soci",
+      descrizione: "Finn Kalbhenn",
+      importo: 1000,
+      mese: 3,
+    },
+    {
+      data: "2026-03-09",
+      fonte: "Prestito Soci",
+      descrizione: "Lorenzo Vanghetti",
+      importo: 1000,
+      mese: 3,
+    },
+    {
+      data: "2026-02-17",
+      fonte: "Rimborso Assicurazione",
+      descrizione: "Maurizio Bogliolo",
+      importo: 797.5,
+      mese: 2,
+    },
+    {
+      data: "2026-02-09",
+      fonte: "Ingresso Socio",
+      descrizione: "Maurizio Bogliolo",
+      importo: 75,
+      mese: 2,
+    },
+    {
+      data: "2026-04-07",
+      fonte: "Soci",
+      descrizione: "Socio annuale — Llar i Salut",
+      importo: 648,
+      mese: 4,
+    },
+    {
+      data: "2026-03-11",
+      fonte: "Soci",
+      descrizione: "Socio annuale — Alexandru Turov",
+      importo: 648,
+      mese: 3,
+    },
+    {
+      data: "2026-04-08",
+      fonte: "Soci",
+      descrizione: "Quote mensili Aprile — Remesa adeudos",
+      importo: 490,
+      mese: 4,
+    },
+    {
+      data: "2026-03-09",
+      fonte: "Soci",
+      descrizione: "Quote mensili Marzo — Remesa adeudos",
+      importo: 575,
+      mese: 3,
+    },
   ];
 
   const existing = await prisma.altroIngresso.findMany({
@@ -168,9 +220,15 @@ async function main() {
   }
 
   console.log(`\n✅  Riepilogo:`);
-  console.log(`   Stripe       : ${stripeNew} nuovi, ${stripeRows.length - stripeNew} aggiornati/già presenti`);
-  console.log(`   FareHarbor   : ${fhNew} nuovi, ${fhRows.length - fhNew} aggiornati/già presenti`);
-  console.log(`   Pag. Scuola  : ${scuolaNew} nuovi, ${scuolaRows.length - scuolaNew} già presenti`);
+  console.log(
+    `   Stripe       : ${stripeNew} nuovi, ${stripeRows.length - stripeNew} aggiornati/già presenti`,
+  );
+  console.log(
+    `   FareHarbor   : ${fhNew} nuovi, ${fhRows.length - fhNew} aggiornati/già presenti`,
+  );
+  console.log(
+    `   Pag. Scuola  : ${scuolaNew} nuovi, ${scuolaRows.length - scuolaNew} già presenti`,
+  );
   console.log(`   Altri Ingr.  : ${altriNew} nuovi, ${altriSkip} skippati`);
   console.log();
 }

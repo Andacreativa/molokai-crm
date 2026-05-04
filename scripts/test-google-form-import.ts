@@ -13,10 +13,7 @@ const path =
   process.argv[2] ||
   "/Users/b16451536/Downloads/CLUB MEMBER FORM - MOLOKAI SUP CENTER.csv";
 
-const pickField = (
-  row: Record<string, unknown>,
-  ...keys: string[]
-): string => {
+const pickField = (row: Record<string, unknown>, ...keys: string[]): string => {
   const norm = Object.fromEntries(
     Object.entries(row).map(([k, v]) => [k.toLowerCase().trim(), v]),
   );
@@ -104,27 +101,16 @@ async function main() {
 
   for (let i = 0; i < raw.length; i++) {
     const r = raw[i];
-    const email = pickField(
-      r,
-      "Nome utente",
-      "Email",
-      "email",
-    ).toLowerCase();
+    const email = pickField(r, "Nome utente", "Email", "email").toLowerCase();
     const fullName = pickField(r, "Nombre y Apellido", "Nombre", "Nome");
     const pianoRaw = pickField(r, "Tipo de Plan", "Tipo Plan", "Plan");
-    const pagamentoRaw = pickField(
-      r,
-      "Método de Pago",
-      "Metodo de Pago",
-    );
+    const pagamentoRaw = pickField(r, "Método de Pago", "Metodo de Pago");
     if (!fullName && !email) continue;
 
     const { piano, prezzoPiano } = parsePiano(pianoRaw);
     const { nome, cognome } = splitName(fullName);
-    const dupByEmail =
-      email && existingEmails.has(email.toLowerCase().trim());
-    const dupByName =
-      nome && existingNames.has(fullNameKey(nome, cognome));
+    const dupByEmail = email && existingEmails.has(email.toLowerCase().trim());
+    const dupByName = nome && existingNames.has(fullNameKey(nome, cognome));
 
     let stato: string;
     let icon: string;
@@ -153,7 +139,9 @@ async function main() {
   console.log(`  🟡 Duplicati per email         : ${dupEmail}`);
   console.log(`  🟡 Duplicati per nome+cognome  : ${dupNome}`);
   console.log(`  ─────────────────────────────────────`);
-  console.log(`  Totale righe parsate          : ${nuovi + dupEmail + dupNome}\n`);
+  console.log(
+    `  Totale righe parsate          : ${nuovi + dupEmail + dupNome}\n`,
+  );
 }
 
 main()

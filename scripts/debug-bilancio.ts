@@ -47,7 +47,8 @@ async function main() {
   console.log(`${"═".repeat(80)}\n`);
 
   const today = new Date();
-  const mesiAttiviFisse = ANNO === today.getFullYear() ? today.getMonth() + 1 : 12;
+  const mesiAttiviFisse =
+    ANNO === today.getFullYear() ? today.getMonth() + 1 : 12;
 
   const [
     soci,
@@ -114,7 +115,8 @@ async function main() {
   // Buoni
   for (const b of buoni) {
     const parsed = parseMeseAnnoStringa(b.mesePagamento);
-    if (parsed && parsed.anno === ANNO) bk.buoni[parsed.mese - 1] += b.prezzoBuono;
+    if (parsed && parsed.anno === ANNO)
+      bk.buoni[parsed.mese - 1] += b.prezzoBuono;
   }
 
   // Cassa
@@ -235,8 +237,12 @@ async function main() {
     `${"TOT".padEnd(6)}  ${euro(totU.spese)} ${euro(totU.fisse)} ${euro(totU.collab)} ${euro(totU.dipendenti)}  ${euro(totUscite)}`,
   );
 
-  console.log(`\nℹ  Colonna "Dipendenti" è informativa (PagamentoDipendente collegati`);
-  console.log(`   a Spesa via spesaId). Gli importi sono già inclusi in "Spese".\n`);
+  console.log(
+    `\nℹ  Colonna "Dipendenti" è informativa (PagamentoDipendente collegati`,
+  );
+  console.log(
+    `   a Spesa via spesaId). Gli importi sono già inclusi in "Spese".\n`,
+  );
 
   // ── Totali finali ──
   console.log(`${"═".repeat(80)}`);
@@ -251,19 +257,19 @@ async function main() {
 
   // ── Context: number of rows per collection ──
   console.log(`\nRighe considerate:`);
-  console.log(`  PagamentoSocio (pagato=true, ${ANNO}): ${soci.reduce((a, b) => a + b.pagamentiMensili.length, 0)}`);
-  console.log(`  Soci con matricolaPagata e !gratuita: ${soci.filter((s) => s.matricolaPagata && !s.matricolaGratuita).length}`);
+  console.log(
+    `  PagamentoSocio (pagato=true, ${ANNO}): ${soci.reduce((a, b) => a + b.pagamentiMensili.length, 0)}`,
+  );
+  console.log(
+    `  Soci con matricolaPagata e !gratuita: ${soci.filter((s) => s.matricolaPagata && !s.matricolaGratuita).length}`,
+  );
   console.log(`  Buoni pagati (qualsiasi anno): ${buoni.length}`);
   console.log(`  PagamentoInScuola (${ANNO}): ${cassa.length}`);
   console.log(`  PrenotazioneFareHarbor (${ANNO}): ${fareharbor.length}`);
   console.log(`  PrenotazioneStripe (${ANNO}): ${stripe.length}`);
   console.log(`  PrenotazioneGetYourGuide (${ANNO}): ${gyg.length}`);
-  console.log(
-    `  SessioneGruppo incassate (${ANNO}): ${sessioniGruppi.length}`,
-  );
-  console.log(
-    `  AltroIngresso incassati (${ANNO}): ${altriIngressi.length}`,
-  );
+  console.log(`  SessioneGruppo incassate (${ANNO}): ${sessioniGruppi.length}`);
+  console.log(`  AltroIngresso incassati (${ANNO}): ${altriIngressi.length}`);
   console.log(`  Spesa (${ANNO}): ${spese.length}`);
   console.log(
     `  SpesaFissa attive: ${speseFisse.length} × ${mesiAttiviFisse} mesi = €${(totaleFisseMese * mesiAttiviFisse).toFixed(2)}`,

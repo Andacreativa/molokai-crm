@@ -40,7 +40,9 @@ async function main() {
     }
 
     // Analisi: stesso fornitore? stesso mese?
-    const fornitori = new Set(rows.map((r) => r.fornitore.toLowerCase().trim()));
+    const fornitori = new Set(
+      rows.map((r) => r.fornitore.toLowerCase().trim()),
+    );
     const mesi = new Set(rows.map((r) => `${r.mese}/${r.anno}`));
     const verdicts: string[] = [];
     if (fornitori.size === 1) verdicts.push("STESSO fornitore");
