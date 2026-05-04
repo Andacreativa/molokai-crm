@@ -7,6 +7,7 @@ import {
   FileText,
   CheckCircle2,
   AlertTriangle,
+  X,
 } from "lucide-react";
 import { fmt, MESI, ANNI } from "@/lib/constants";
 
@@ -94,6 +95,7 @@ export default function IncassiScuolaPage() {
   const [rows, setRows] = useState<PagamentoScuola[]>([]);
   const [dragActive, setDragActive] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [result, setResult] = useState<{
     ok: number;
     errors: string[];
@@ -216,64 +218,95 @@ export default function IncassiScuolaPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Incassi Scuola</h1>
-        <p className="text-gray-500 text-sm mt-1">
-          Pagamenti in cassa (importazione da CSV)
-        </p>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Incassi Scuola</h1>
+          <p className="text-gray-500 text-sm mt-1">
+            Pagamenti in cassa (importazione da CSV)
+          </p>
+        </div>
+        <button
+          onClick={() => setShowImport(true)}
+          className="glass-btn-primary flex items-center gap-2 text-white text-sm font-medium px-4 py-2.5 rounded-xl"
+        >
+          <Upload className="w-4 h-4" /> Importa CSV
+        </button>
       </div>
 
-      {/* Upload zone */}
-      <div
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragActive(true);
-        }}
-        onDragLeave={() => setDragActive(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragActive(false);
-          const f = e.dataTransfer.files?.[0];
-          if (f) handleFile(f);
-        }}
-        onClick={() => fileInputRef.current?.click()}
-        className="glass-card rounded-2xl p-8 border-2 border-dashed flex flex-col items-center justify-center gap-3 cursor-pointer transition-all"
-        style={{
-          borderColor: dragActive ? "#0ea5e9" : "#cbd5e1",
-          background: dragActive ? "#f0f9ff" : undefined,
-        }}
-      >
+      {showImport && (
         <div
-          className="w-14 h-14 rounded-full flex items-center justify-center"
-          style={{ background: "#e0f2fe" }}
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowImport(false)}
         >
-          <Upload className="w-7 h-7" style={{ color: "#0ea5e9" }} />
+          <div
+            className="glass-modal rounded-2xl w-full max-w-xl p-6 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+            style={{ textAlign: "left" }}
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-gray-900">Importa CSV</h2>
+              <button
+                onClick={() => setShowImport(false)}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragActive(true);
+              }}
+              onDragLeave={() => setDragActive(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragActive(false);
+                const f = e.dataTransfer.files?.[0];
+                if (f) {
+                  handleFile(f).then(() => setShowImport(false));
+                }
+              }}
+              onClick={() => fileInputRef.current?.click()}
+              className="rounded-2xl p-8 border-2 border-dashed flex flex-col items-center justify-center gap-3 cursor-pointer transition-all"
+              style={{
+                borderColor: dragActive ? "#0ea5e9" : "#cbd5e1",
+                background: dragActive ? "#f0f9ff" : "#f8fafc",
+              }}
+            >
+              <div
+                className="w-14 h-14 rounded-full flex items-center justify-center"
+                style={{ background: "#e0f2fe" }}
+              >
+                <Upload className="w-7 h-7" style={{ color: "#0ea5e9" }} />
+              </div>
+              <p className="text-sm font-semibold text-gray-900">
+                {uploading
+                  ? "Caricamento in corso..."
+                  : "Trascina qui il file CSV o clicca per selezionarlo"}
+              </p>
+              <p className="text-xs text-gray-500 text-center">
+                Formato atteso:{" "}
+                <code className="bg-gray-100 px-1.5 py-0.5 rounded font-mono text-[11px]">
+                  DATE;SALE;CURRENCY;TOTALSALES;REFUND;CURRENCY;TOTALREFUND
+                </code>
+                <br />
+                Upsert per data: righe con stessa data vengono sovrascritte.
+              </p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleFile(f).then(() => setShowImport(false));
+                  e.target.value = "";
+                }}
+              />
+            </div>
+          </div>
         </div>
-        <p className="text-sm font-semibold text-gray-900">
-          {uploading
-            ? "Caricamento in corso..."
-            : "Trascina qui il file CSV o clicca per selezionarlo"}
-        </p>
-        <p className="text-xs text-gray-500 text-center">
-          Formato atteso:{" "}
-          <code className="bg-gray-100 px-1.5 py-0.5 rounded font-mono text-[11px]">
-            DATE;SALE;CURRENCY;TOTALSALES;REFUND;CURRENCY;TOTALREFUND
-          </code>
-          <br />
-          Upsert per data: righe con stessa data vengono sovrascritte.
-        </p>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".csv,text/csv"
-          className="hidden"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) handleFile(f);
-            e.target.value = "";
-          }}
-        />
-      </div>
+      )}
 
       {/* Result banner */}
       {result && (

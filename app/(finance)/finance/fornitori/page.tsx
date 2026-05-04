@@ -958,17 +958,58 @@ function UploadFatturaModal({
     console.log("[upload-fattura] submit() start", {
       file,
       fornitoreId,
+      extractedNome,
       mese,
       anno,
       importo,
     });
     if (!file) return setError("Seleziona un file");
-    if (!fornitoreId) return setError("Seleziona o crea un fornitore");
+
+    // Se non c'è fornitoreId selezionato ma abbiamo un nome estratto dall'OCR,
+    // creiamo automaticamente il fornitore prima di proseguire (così l'utente
+    // non deve cliccare separatamente "Crea fornitore").
+    let effectiveFornitoreId = fornitoreId;
+    if (!effectiveFornitoreId && extractedNome.trim()) {
+      console.log(
+        "[upload-fattura] fornitoreId mancante, auto-creo da nome estratto:",
+        extractedNome,
+      );
+      setCreatingFornitore(true);
+      try {
+        const res = await fetch("/api/fornitori", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nome: extractedNome,
+            partitaIva: extractedPiva || null,
+          }),
+        });
+        if (!res.ok) {
+          setError("Errore creazione fornitore automatica");
+          setCreatingFornitore(false);
+          return;
+        }
+        const created = await res.json();
+        effectiveFornitoreId = created.id;
+        setFornitoreId(created.id);
+        setMatchFound(true);
+        onFornitoreCreato();
+      } finally {
+        setCreatingFornitore(false);
+      }
+    }
+
+    if (!effectiveFornitoreId) {
+      return setError(
+        "Seleziona un fornitore dalla lista o aspetta l'estrazione AI",
+      );
+    }
+
     setUploading(true);
     try {
       const fd = new FormData();
       fd.append("file", file);
-      fd.append("fornitoreId", String(fornitoreId));
+      fd.append("fornitoreId", String(effectiveFornitoreId));
       fd.append("mese", String(mese));
       fd.append("anno", String(anno));
       fd.append("importo", String(importo === "" ? 0 : importo));
@@ -1207,10 +1248,14 @@ function UploadFatturaModal({
           </button>
           <button
             onClick={submit}
-            disabled={uploading || !file || !fornitoreId}
+            disabled={uploading || extracting || creatingFornitore || !file}
             className="glass-btn-primary flex-1 text-white text-sm font-medium py-2.5 rounded-xl disabled:opacity-60"
           >
-            {uploading ? "Caricamento..." : "Carica"}
+            {uploading
+              ? "Caricamento..."
+              : creatingFornitore
+                ? "Creo fornitore..."
+                : "Carica"}
           </button>
         </div>
       </div>

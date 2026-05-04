@@ -88,7 +88,7 @@ export async function GET(request: Request) {
     }),
     prisma.buono.findMany({ where: { pagato: true } }),
     prisma.fattura.findMany({ where: { anno, pagato: true } }),
-    prisma.prenotazioneFareHarbor.findMany({ where: { anno } }),
+    prisma.incassoFareHarbor.findMany({ where: { anno } }),
     prisma.prenotazioneStripe.findMany({ where: { anno } }),
     prisma.prenotazioneGetYourGuide.findMany({ where: { anno } }),
     prisma.pagamentoInScuola.findMany({ where: { anno } }),
@@ -150,7 +150,7 @@ export async function GET(request: Request) {
 
   // FareHarbor: totale del mese
   for (const r of fareharbor) {
-    mensili[r.mese - 1].entrate.fareharbor += r.totale;
+    mensili[r.mese - 1].entrate.fareharbor += r.netto;
   }
 
   // Stripe: netto

@@ -72,7 +72,7 @@ export async function GET(request: Request) {
     prisma.socio.count({ where: { stato: "ATTIVO" } }),
     prisma.buono.findMany({ where: { pagato: true } }),
     prisma.fattura.findMany({ where: { anno, pagato: true } }),
-    prisma.prenotazioneFareHarbor.findMany({ where: { anno } }),
+    prisma.incassoFareHarbor.findMany({ where: { anno } }),
     prisma.prenotazioneStripe.findMany({ where: { anno } }),
     prisma.prenotazioneGetYourGuide.findMany({ where: { anno } }),
     prisma.pagamentoInScuola.findMany({ where: { anno } }),
@@ -153,8 +153,8 @@ export async function GET(request: Request) {
     }
   }
   for (const r of fareharbor) {
-    entratePerMese[r.mese - 1] += r.totale;
-    breakdownEntrate.FareHarbor += r.totale;
+    entratePerMese[r.mese - 1] += r.netto;
+    breakdownEntrate.FareHarbor += r.netto;
   }
   for (const r of stripe) {
     entratePerMese[r.mese - 1] += r.netto;

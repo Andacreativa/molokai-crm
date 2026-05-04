@@ -87,6 +87,8 @@ export default function SpesePage() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Spesa | null>(null);
   const [prefill, setPrefill] = useState<Prefill | null>(null);
+  // File caricato via OCR — viene poi salvato come FatturaFornitore al save
+  const [ocrFile, setOcrFile] = useState<File | null>(null);
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrError, setOcrError] = useState<string | null>(null);
   const [showOcrModal, setShowOcrModal] = useState(false);
@@ -286,6 +288,9 @@ export default function SpesePage() {
         descrizione:
           typeof d.descrizione === "string" ? d.descrizione : undefined,
       });
+      // Tieni traccia del file: verrà salvato come FatturaFornitore
+      // collegata alla Spesa al momento del save nel form modal.
+      setOcrFile(file);
       setShowOcrModal(false);
       setShowForm(true);
     } catch (e) {
@@ -633,9 +638,14 @@ export default function SpesePage() {
         <SpesaFormModal
           editing={editing}
           prefill={prefill}
-          onClose={() => setShowForm(false)}
+          attachedFile={ocrFile}
+          onClose={() => {
+            setShowForm(false);
+            setOcrFile(null);
+          }}
           onSaved={() => {
             setShowForm(false);
+            setOcrFile(null);
             load();
           }}
         />
@@ -671,11 +681,13 @@ export default function SpesePage() {
 function SpesaFormModal({
   editing,
   prefill,
+  attachedFile,
   onClose,
   onSaved,
 }: {
   editing: Spesa | null;
   prefill: Prefill | null;
+  attachedFile?: File | null;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -796,19 +808,75 @@ function SpesaFormModal({
       note: form.note,
     };
     try {
+      let savedSpesa: { id: number } | null = null;
       if (editing) {
-        await fetch(`/api/spese/${editing.id}`, {
+        const res = await fetch(`/api/spese/${editing.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
+        savedSpesa = res.ok ? await res.json() : { id: editing.id };
       } else {
-        await fetch("/api/spese", {
+        const res = await fetch("/api/spese", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
+        if (res.ok) savedSpesa = await res.json();
       }
+
+      // Se c'è un file allegato (upload via OCR), crea anche un record
+      // FatturaFornitore con lo stesso file. Trova il fornitore in anagrafica
+      // (case-insensitive) o lo crea al volo prima del POST multipart.
+      if (savedSpesa?.id && attachedFile) {
+        const nomeFornitore = form.fornitore.trim();
+        const norm = (s: string) =>
+          s.toLowerCase().replace(/\s+/g, " ").trim();
+        let fornitoreId: number | null = null;
+        try {
+          const listRes = await fetch("/api/fornitori");
+          const list = (await listRes.json()) as Array<{
+            id: number;
+            nome: string;
+          }>;
+          const match = Array.isArray(list)
+            ? list.find((f) => norm(f.nome) === norm(nomeFornitore))
+            : null;
+          if (match) {
+            fornitoreId = match.id;
+          } else {
+            const createRes = await fetch("/api/fornitori", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ nome: nomeFornitore }),
+            });
+            if (createRes.ok) {
+              const created = await createRes.json();
+              fornitoreId = created.id;
+            }
+          }
+          if (fornitoreId) {
+            const fd = new FormData();
+            fd.append("file", attachedFile);
+            fd.append("fornitoreId", String(fornitoreId));
+            fd.append("spesaId", String(savedSpesa.id));
+            const d = new Date(form.data);
+            fd.append("mese", String(d.getMonth() + 1));
+            fd.append("anno", String(d.getFullYear()));
+            fd.append("importo", String(parseFloat(form.importo) || 0));
+            fd.append("dataFattura", form.data);
+            await fetch("/api/fatture-fornitori", {
+              method: "POST",
+              body: fd,
+            });
+          }
+        } catch (e) {
+          // Non bloccare il salvataggio della spesa se la creazione
+          // FatturaFornitore fallisce — solo log
+          console.error("[FatturaFornitore auto-create]", e);
+        }
+      }
+
       onSaved();
     } finally {
       setSaving(false);

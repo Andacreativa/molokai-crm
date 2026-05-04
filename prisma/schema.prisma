@@ -67,6 +67,8 @@ model Spesa {
   note            String?
   fatturaId       Int?     @unique
   fattura         Fattura? @relation(fields: [fatturaId], references: [id], onDelete: Cascade)
+  // Documento allegato auto-creato dall'OCR (file in archivio Fornitori)
+  fatturaFornitore FatturaFornitore?
   createdAt       DateTime @default(now())
 }
 
@@ -163,6 +165,21 @@ model FareHarborConfig {
   anno          Int      @unique
   refundReserve Float    @default(0)
   updatedAt     DateTime @updatedAt
+}
+
+// Versione per-data di FareHarbor (modello giornaliero, sostituisce
+// gradualmente il precedente con sett1-4). Usata da bilancio/dashboard.
+model IncassoFareHarbor {
+  id        Int      @id @default(autoincrement())
+  data      DateTime @unique
+  mese      Int
+  anno      Int      @default(2026)
+  importo   Float    @default(0) // legacy/compat — non più usato (sostituito da netto)
+  netto     Float    @default(0) // net_payout_amount dal CSV — valore usato in bilancio
+  fee       Float    @default(0) // processing_fee_amount dal CSV (sempre positivo)
+  lordo     Float    @default(0) // gross_amount dal CSV
+  note      String?
+  createdAt DateTime @default(now())
 }
 
 model PrenotazioneStripe {
@@ -365,6 +382,9 @@ model FatturaFornitore {
   fileMimeType String?
   fornitoreId  Int?
   fornitore    Fornitore? @relation(fields: [fornitoreId], references: [id], onDelete: SetNull)
+  // Spesa di origine se la fattura è stata generata via OCR (1:1 opzionale)
+  spesaId      Int?       @unique
+  spesa        Spesa?     @relation(fields: [spesaId], references: [id], onDelete: Cascade)
   mese         Int
   anno         Int
   importo      Float      @default(0)

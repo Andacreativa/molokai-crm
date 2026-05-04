@@ -38,6 +38,7 @@ export async function POST(request: Request) {
       const anno = formData.get("anno") as string | null;
       const importo = formData.get("importo") as string | null;
       const dataFatturaStr = formData.get("dataFattura") as string | null;
+      const spesaIdStr = formData.get("spesaId") as string | null;
 
       if (!file) {
         return NextResponse.json(
@@ -58,21 +59,54 @@ export async function POST(request: Request) {
       const arrayBuf = await file.arrayBuffer();
       const fileData = Buffer.from(arrayBuf).toString("base64");
 
-      const fattura = await prisma.fatturaFornitore.create({
-        data: {
-          fileName: file.name,
-          fileData,
-          fileMimeType: file.type || "application/octet-stream",
-          filePath: null,
-          fornitoreId: parseInt(fornitoreId, 10),
-          mese: parseInt(mese, 10),
-          anno: (anno ? parseInt(anno, 10) : null) || new Date().getFullYear(),
-          importo: importo ? parseFloat(importo) || 0 : 0,
-          dataFattura: dataFatturaStr ? new Date(dataFatturaStr) : null,
-        },
-        include: { fornitore: true },
-        omit: { fileData: true },
-      });
+      const spesaId = spesaIdStr ? parseInt(spesaIdStr, 10) : null;
+      // Se è un upsert da spesa esistente, sovrascrive il record corrente
+      const fattura = spesaId
+        ? await prisma.fatturaFornitore.upsert({
+            where: { spesaId },
+            create: {
+              fileName: file.name,
+              fileData,
+              fileMimeType: file.type || "application/octet-stream",
+              filePath: null,
+              fornitoreId: parseInt(fornitoreId, 10),
+              spesaId,
+              mese: parseInt(mese, 10),
+              anno:
+                (anno ? parseInt(anno, 10) : null) || new Date().getFullYear(),
+              importo: importo ? parseFloat(importo) || 0 : 0,
+              dataFattura: dataFatturaStr ? new Date(dataFatturaStr) : null,
+            },
+            update: {
+              fileName: file.name,
+              fileData,
+              fileMimeType: file.type || "application/octet-stream",
+              fornitoreId: parseInt(fornitoreId, 10),
+              mese: parseInt(mese, 10),
+              anno:
+                (anno ? parseInt(anno, 10) : null) || new Date().getFullYear(),
+              importo: importo ? parseFloat(importo) || 0 : 0,
+              dataFattura: dataFatturaStr ? new Date(dataFatturaStr) : null,
+            },
+            include: { fornitore: true },
+            omit: { fileData: true },
+          })
+        : await prisma.fatturaFornitore.create({
+            data: {
+              fileName: file.name,
+              fileData,
+              fileMimeType: file.type || "application/octet-stream",
+              filePath: null,
+              fornitoreId: parseInt(fornitoreId, 10),
+              mese: parseInt(mese, 10),
+              anno:
+                (anno ? parseInt(anno, 10) : null) || new Date().getFullYear(),
+              importo: importo ? parseFloat(importo) || 0 : 0,
+              dataFattura: dataFatturaStr ? new Date(dataFatturaStr) : null,
+            },
+            include: { fornitore: true },
+            omit: { fileData: true },
+          });
       return NextResponse.json(fattura);
     }
 

@@ -1,20 +1,29 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Upload, CheckCircle2, AlertTriangle } from "lucide-react";
+import {
+  Upload,
+  CheckCircle2,
+  AlertTriangle,
+  X,
+  Plus,
+  Trash2,
+  FileText,
+} from "lucide-react";
 import { fmt, MESI, ANNI } from "@/lib/constants";
 
 // ─── Types ─────────────────────────────────────────────────────────────
 
-interface FHRow {
-  id?: number;
-  anno: number;
+// FareHarbor per-data (modello IncassoFareHarbor)
+interface FHDayRow {
+  id: number;
+  data: string; // ISO
   mese: number;
-  sett1: number;
-  sett2: number;
-  sett3: number;
-  sett4: number;
-  totale: number;
+  anno: number;
+  netto: number;
+  fee: number;
+  lordo: number;
+  note: string | null;
 }
 
 interface StripeRow {
@@ -219,11 +228,13 @@ function FareHarborTab({
   anno: number;
   onSaved?: () => void;
 }) {
-  const [rows, setRows] = useState<FHRow[]>([]);
-  const [saving, setSaving] = useState<number | null>(null);
+  const [rows, setRows] = useState<FHDayRow[]>([]);
+  // mese === null → tutti i mesi
+  const [meseFiltro, setMeseFiltro] = useState<number | null>(null);
+  const [showImport, setShowImport] = useState(false);
 
   const load = async () => {
-    const res = await fetch(`/api/incassi-web/fareharbor?anno=${anno}`);
+    const res = await fetch(`/api/incassi-fh-day?anno=${anno}`);
     const data = await res.json();
     setRows(Array.isArray(data) ? data : []);
   };
@@ -233,204 +244,501 @@ function FareHarborTab({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [anno]);
 
-  const rowFor = (mese: number): FHRow =>
-    rows.find((r) => r.mese === mese) ?? {
-      anno,
-      mese,
-      sett1: 0,
-      sett2: 0,
-      sett3: 0,
-      sett4: 0,
-      totale: 0,
-    };
+  const rowsMese = useMemo(
+    () =>
+      meseFiltro === null
+        ? rows
+        : rows.filter((r) => r.mese === meseFiltro),
+    [rows, meseFiltro],
+  );
 
+  // Totale anno = somma dei NETTO (valore che entra in banca, e in bilancio)
   const totaleAnno = useMemo(
-    () => rows.reduce((s, r) => s + r.totale, 0),
+    () => rows.reduce((s, r) => s + r.netto, 0),
+    [rows],
+  );
+  // Totale fee anno = somma processing fees
+  const totaleFee = useMemo(
+    () => rows.reduce((s, r) => s + r.fee, 0),
     [rows],
   );
 
-  const save = async (
-    mese: number,
-    patch: Partial<Pick<FHRow, "sett1" | "sett2" | "sett3" | "sett4">>,
+  // Riepilogo mensile per il box 12-celle (somma del netto)
+  const totaliMensili = useMemo(() => {
+    const arr = Array(12).fill(0) as number[];
+    for (const r of rows) arr[r.mese - 1] += r.netto;
+    return arr;
+  }, [rows]);
+
+  const isoDate = (d: string) => new Date(d).toISOString().slice(0, 10);
+
+  const updateLocal = (id: number, patch: Partial<FHDayRow>) =>
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+
+  const saveField = async (
+    id: number,
+    field: "data" | "netto" | "fee" | "lordo" | "note",
+    value: string,
   ) => {
-    setSaving(mese);
-    const current = rowFor(mese);
-    const next = { ...current, ...patch };
     try {
-      const res = await fetch("/api/incassi-web/fareharbor", {
-        method: "POST",
+      const res = await fetch(`/api/incassi-fh-day/${id}`, {
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          anno,
-          mese,
-          sett1: next.sett1,
-          sett2: next.sett2,
-          sett3: next.sett3,
-          sett4: next.sett4,
-        }),
+        body: JSON.stringify({ [field]: value }),
       });
-      const saved: FHRow = await res.json();
-      setRows((prev) => {
-        const idx = prev.findIndex((r) => r.mese === mese);
-        if (idx >= 0) {
-          const copy = [...prev];
-          copy[idx] = saved;
-          return copy;
-        }
-        return [...prev, saved].sort((a, b) => a.mese - b.mese);
-      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || "Errore salvataggio");
+        load();
+        return;
+      }
+      const updated: FHDayRow = await res.json();
+      setRows((prev) => prev.map((r) => (r.id === id ? updated : r)));
       onSaved?.();
-    } finally {
-      setSaving(null);
+    } catch (e) {
+      alert(String(e));
+      load();
+    }
+  };
+
+  const del = async (id: number) => {
+    if (!confirm("Eliminare questa riga?")) return;
+    await fetch(`/api/incassi-fh-day/${id}`, { method: "DELETE" });
+    load();
+    onSaved?.();
+  };
+
+  const addRow = async () => {
+    // Default: oggi se nell'anno corrente, altrimenti 1° gennaio dell'anno selezionato
+    const today = new Date();
+    const baseDate =
+      today.getFullYear() === anno ? today : new Date(anno, 0, 1);
+    const data = baseDate.toISOString();
+    const res = await fetch("/api/incassi-fh-day", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ data, netto: 0, fee: 0, lordo: 0 }),
+    });
+    if (res.ok) {
+      load();
+      onSaved?.();
     }
   };
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <StatCard label={`Totale FareHarbor ${anno}`} value={totaleAnno} />
+        <StatCard
+          label={`Totale Fee ${anno}`}
+          value={totaleFee}
+          color="#ef4444"
+        />
         <RefundReserveCard anno={anno} />
       </div>
 
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <span className="text-xs text-gray-500">
+          {meseFiltro === null
+            ? `${rows.length} righe · tutti i mesi`
+            : `${rowsMese.length} righe · ${MESI[meseFiltro - 1]} ${anno}`}
+        </span>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={addRow}
+            className="glass-btn-secondary flex items-center gap-2 text-gray-700 text-sm font-medium px-4 py-2.5 rounded-xl"
+          >
+            <Plus className="w-4 h-4" style={{ color: "#0ea5e9" }} /> Aggiungi
+            riga
+          </button>
+          <button
+            onClick={() => setShowImport(true)}
+            className="glass-btn-primary flex items-center gap-2 text-white text-sm font-medium px-4 py-2.5 rounded-xl"
+          >
+            <Upload className="w-4 h-4" /> Importa CSV
+          </button>
+        </div>
+      </div>
+
+      {/* Riepilogo mensile cliccabile */}
+      <div className="glass-card rounded-2xl p-4">
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <h3 className="text-sm font-bold text-gray-900">
+            Riepilogo FareHarbor mensile
+          </h3>
+          {meseFiltro !== null && (
+            <button
+              onClick={() => setMeseFiltro(null)}
+              className="text-xs text-sky-600 hover:text-sky-700 font-medium"
+            >
+              Rimuovi filtro
+            </button>
+          )}
+        </div>
+        <div className="grid grid-cols-6 sm:grid-cols-12 gap-1">
+          {MESI.map((meseNome, idx) => {
+            const m = idx + 1;
+            const tot = totaliMensili[idx];
+            const hasValue = tot > 0;
+            const isActive = meseFiltro === m;
+            const cellStyle = isActive
+              ? { background: "#0ea5e9", borderColor: "#0284c7" }
+              : hasValue
+                ? { background: "#e0f2fe", borderColor: "#7dd3fc" }
+                : { background: "#fff", borderColor: "#e2e8f0" };
+            const labelColor = isActive
+              ? "#ffffff"
+              : hasValue
+                ? "#6b7280"
+                : "#9ca3af";
+            const valueColor = isActive
+              ? "#ffffff"
+              : hasValue
+                ? "#0369a1"
+                : "#cbd5e1";
+            return (
+              <button
+                key={meseNome}
+                type="button"
+                onClick={() => setMeseFiltro(isActive ? null : m)}
+                className="flex flex-col items-center gap-1 px-1 py-2 rounded-lg border transition-all cursor-pointer hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
+                style={cellStyle}
+              >
+                <span
+                  className="text-[10px] uppercase tracking-wide font-semibold"
+                  style={{ color: labelColor }}
+                >
+                  {meseNome.slice(0, 3)}
+                </span>
+                <span
+                  className="text-[11px] font-bold whitespace-nowrap"
+                  style={{ color: valueColor }}
+                >
+                  {hasValue ? fmt(tot).replace(" €", "") : "—"}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Tabella per-data */}
       <div className="glass-card rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
-                {["Mese", "Sett 1", "Sett 2", "Sett 3", "Sett 4", "Totale"].map(
-                  (h, i) => (
-                    <th
-                      key={h}
-                      className={`text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 ${i === 0 ? "text-left" : "text-right"}`}
-                    >
-                      {h}
-                    </th>
-                  ),
-                )}
+                {["Data", "Netto", "Fee", "Lordo", ""].map((h, i) => (
+                  <th
+                    key={h}
+                    className={`text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 ${i === 0 || i === 4 ? "text-left" : "text-right"}`}
+                  >
+                    {h}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody className="zebra">
-              {MESI.map((mese, idx) => {
-                const m = idx + 1;
-                const r = rowFor(m);
-                const loading = saving === m;
-                return (
-                  <tr
-                    key={m}
-                    className="border-b border-gray-50"
-                    style={loading ? { opacity: 0.6 } : undefined}
+              {rowsMese.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={5}
+                    className="text-center text-gray-400 py-12 text-sm"
                   >
-                    <td className="px-4 py-2 text-sm font-medium text-gray-900">
-                      {mese}
-                    </td>
-                    {(["sett1", "sett2", "sett3", "sett4"] as const).map(
-                      (k) => (
-                        <td key={k} className="px-2 py-1 text-right">
-                          <EuroInput
-                            value={r[k]}
-                            onSave={(v) => save(m, { [k]: v })}
-                          />
-                        </td>
-                      ),
-                    )}
-                    <td
-                      className="px-4 py-2 text-sm font-bold text-right"
-                      style={{ color: "#0ea5e9" }}
+                    <FileText className="w-10 h-10 mx-auto mb-2 opacity-40" />
+                    Nessun incasso per{" "}
+                    {meseFiltro === null
+                      ? anno
+                      : `${MESI[meseFiltro - 1]} ${anno}`}
+                  </td>
+                </tr>
+              )}
+              {rowsMese.map((r) => (
+                <tr
+                  key={r.id}
+                  className="border-b border-gray-50 hover:bg-gray-50 transition-colors"
+                >
+                  <td className="px-2 py-1.5 w-[180px]">
+                    <input
+                      type="date"
+                      value={isoDate(r.data)}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (!v) return;
+                        const d = new Date(v);
+                        updateLocal(r.id, {
+                          data: d.toISOString(),
+                          mese: d.getMonth() + 1,
+                          anno: d.getFullYear(),
+                        });
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.dataset.initial = e.currentTarget.value;
+                      }}
+                      onBlur={(e) => {
+                        const initial = e.currentTarget.dataset.initial;
+                        if (e.currentTarget.value && e.currentTarget.value !== initial) {
+                          saveField(r.id, "data", e.currentTarget.value);
+                        }
+                      }}
+                      className="w-full text-sm px-2 py-1.5 rounded-md border border-transparent hover:border-gray-200 focus:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-300 focus:bg-white bg-transparent"
+                    />
+                  </td>
+                  <td className="px-2 py-1.5 text-right w-[140px]">
+                    <EuroInput
+                      value={r.netto}
+                      onSave={(v) => {
+                        updateLocal(r.id, { netto: v });
+                        saveField(r.id, "netto", String(v));
+                      }}
+                    />
+                  </td>
+                  <td className="px-2 py-1.5 text-right w-[120px]">
+                    <EuroInput
+                      value={r.fee}
+                      onSave={(v) => {
+                        updateLocal(r.id, { fee: v });
+                        saveField(r.id, "fee", String(v));
+                      }}
+                    />
+                  </td>
+                  <td className="px-2 py-1.5 text-right w-[140px]">
+                    <EuroInput
+                      value={r.lordo}
+                      onSave={(v) => {
+                        updateLocal(r.id, { lordo: v });
+                        saveField(r.id, "lordo", String(v));
+                      }}
+                    />
+                  </td>
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={() => del(r.id)}
+                      className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                      title="Elimina"
                     >
-                      {fmt(r.totale)}
-                    </td>
-                  </tr>
-                );
-              })}
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
       </div>
 
-      <ExcelUploadBox
-        anno={anno}
-        endpoint="fareharbor"
-        title="Importa FareHarbor da CSV (export payouts)"
-        formatHint="Colonne: payout_date · net_payout_amount · payout_status. Solo righe Succeeded. Bucketing per giorno: 1-7→Sett1, 8-14→Sett2, 15-21→Sett3, 22-31→Sett4."
-        buildBatch={(rows, y) => {
-          const payloads: Record<string, unknown>[] = [];
-          const errors: string[] = [];
-          const byMonth = new Map<
-            number,
-            { sett1: number; sett2: number; sett3: number; sett4: number }
-          >();
-          let skippedNotSucceeded = 0;
-          let skippedOtherYear = 0;
-          let skippedBadDate = 0;
+      {showImport && (
+        <FareHarborCsvImportModal
+          anno={anno}
+          onClose={() => setShowImport(false)}
+          onImported={() => {
+            setShowImport(false);
+            load();
+            onSaved?.();
+          }}
+        />
+      )}
+    </div>
+  );
+}
 
-          rows.forEach((row, i) => {
-            const status = String(getCell(row, "payout_status") ?? "")
-              .trim()
-              .toLowerCase();
-            if (status !== "succeeded") {
-              skippedNotSucceeded++;
-              return;
-            }
+// CSV import modal specifico per FareHarbor per-data: il CSV BBVA ha
+// payout_date / net_payout_amount / payout_status. Crea una riga per
+// ogni payout Succeeded dell'anno selezionato.
+function FareHarborCsvImportModal({
+  anno,
+  onClose,
+  onImported,
+}: {
+  anno: number;
+  onClose: () => void;
+  onImported: () => void;
+}) {
+  const [dragActive, setDragActive] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [result, setResult] = useState<{
+    ok: number;
+    errors: string[];
+  } | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-            const rawDate = getCell(row, "payout_date");
-            const payoutDate =
-              rawDate instanceof Date
-                ? rawDate
-                : new Date(String(rawDate ?? "").trim());
-            if (isNaN(payoutDate.getTime())) {
-              skippedBadDate++;
-              errors.push(`Riga ${i + 2}: payout_date non valida`);
-              return;
-            }
-            if (payoutDate.getFullYear() !== y) {
-              skippedOtherYear++;
-              return;
-            }
-
-            const mese = payoutDate.getMonth() + 1;
-            const day = payoutDate.getDate();
-            const net = toNumber(getCell(row, "net_payout_amount"));
-
-            const cur = byMonth.get(mese) ?? {
-              sett1: 0,
-              sett2: 0,
-              sett3: 0,
-              sett4: 0,
-            };
-            if (day <= 7) cur.sett1 += net;
-            else if (day <= 14) cur.sett2 += net;
-            else if (day <= 21) cur.sett3 += net;
-            else cur.sett4 += net;
-            byMonth.set(mese, cur);
+  const handleFile = async (file: File) => {
+    setUploading(true);
+    setResult(null);
+    try {
+      const XLSX = await import("xlsx");
+      const isCSV = /\.csv$/i.test(file.name);
+      const wb = isCSV
+        ? XLSX.read(await file.text(), { type: "string", cellDates: true })
+        : XLSX.read(await file.arrayBuffer(), {
+            type: "array",
+            cellDates: true,
           });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      if (!ws) {
+        setResult({ ok: 0, errors: ["File vuoto"] });
+        return;
+      }
+      const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, {
+        raw: false,
+        dateNF: "yyyy-mm-dd",
+      });
+      const righe: Array<{
+        data: string;
+        netto: number;
+        fee: number;
+        lordo: number;
+      }> = [];
+      const errors: string[] = [];
+      let skippedNotSucceeded = 0;
+      let skippedOtherYear = 0;
+      let skippedBadDate = 0;
+      raw.forEach((row, i) => {
+        const status = String(getCell(row, "payout_status") ?? "")
+          .trim()
+          .toLowerCase();
+        if (status !== "succeeded") {
+          skippedNotSucceeded++;
+          return;
+        }
+        const rawDate = getCell(row, "payout_date");
+        const d =
+          rawDate instanceof Date
+            ? rawDate
+            : new Date(String(rawDate ?? "").trim());
+        if (isNaN(d.getTime())) {
+          skippedBadDate++;
+          errors.push(`Riga ${i + 2}: payout_date non valida`);
+          return;
+        }
+        if (d.getFullYear() !== anno) {
+          skippedOtherYear++;
+          return;
+        }
+        const netto = toNumber(getCell(row, "net_payout_amount"));
+        const fee = Math.abs(toNumber(getCell(row, "processing_fee_amount")));
+        const lordo = toNumber(getCell(row, "gross_amount"));
+        righe.push({ data: d.toISOString(), netto, fee, lordo });
+      });
 
-          for (const [mese, agg] of byMonth) {
-            payloads.push({
-              anno: y,
-              mese,
-              sett1: Math.round(agg.sett1 * 100) / 100,
-              sett2: Math.round(agg.sett2 * 100) / 100,
-              sett3: Math.round(agg.sett3 * 100) / 100,
-              sett4: Math.round(agg.sett4 * 100) / 100,
-            });
-          }
+      const res = await fetch("/api/incassi-fh-day", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ righe }),
+      });
+      const json = await res.json();
+      if (skippedNotSucceeded > 0)
+        errors.push(`${skippedNotSucceeded} payout non-Succeeded saltati`);
+      if (skippedOtherYear > 0)
+        errors.push(`${skippedOtherYear} payout di altri anni saltati`);
+      if (skippedBadDate > 0)
+        errors.push(`${skippedBadDate} righe senza payout_date valida`);
+      setResult({ ok: json.ok ?? 0, errors });
+      if (json.ok > 0) onImported();
+    } catch (e) {
+      setResult({ ok: 0, errors: [String(e)] });
+    } finally {
+      setUploading(false);
+    }
+  };
 
-          if (skippedNotSucceeded > 0) {
-            errors.push(`${skippedNotSucceeded} payout non-Succeeded saltati`);
-          }
-          if (skippedOtherYear > 0) {
-            errors.push(`${skippedOtherYear} payout di altri anni saltati`);
-          }
-          if (skippedBadDate > 0) {
-            errors.push(`${skippedBadDate} righe senza payout_date valida`);
-          }
-          return { payloads, errors };
-        }}
-        onImported={() => {
-          load();
-          onSaved?.();
-        }}
-      />
+  return (
+    <div
+      className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="glass-modal rounded-2xl w-full max-w-xl p-6 space-y-4"
+        onClick={(e) => e.stopPropagation()}
+        style={{ textAlign: "left" }}
+      >
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-gray-900">Importa CSV</h2>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragActive(true);
+          }}
+          onDragLeave={() => setDragActive(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragActive(false);
+            const f = e.dataTransfer.files?.[0];
+            if (f) handleFile(f);
+          }}
+          onClick={() => inputRef.current?.click()}
+          className="rounded-2xl p-8 border-2 border-dashed flex flex-col items-center justify-center gap-3 cursor-pointer transition-all"
+          style={{
+            borderColor: dragActive ? "#0ea5e9" : "#cbd5e1",
+            background: dragActive ? "#f0f9ff" : "#f8fafc",
+          }}
+        >
+          <div
+            className="w-14 h-14 rounded-full flex items-center justify-center"
+            style={{ background: "#e0f2fe" }}
+          >
+            <Upload className="w-7 h-7" style={{ color: "#0ea5e9" }} />
+          </div>
+          <p className="text-sm font-semibold text-gray-900">
+            {uploading
+              ? "Caricamento in corso..."
+              : "Trascina qui il file CSV o clicca per selezionarlo"}
+          </p>
+          <p className="text-xs text-gray-500 text-center">
+            Colonne attese: <code className="bg-gray-100 px-1.5 py-0.5 rounded font-mono text-[11px]">payout_date · net_payout_amount · processing_fee_amount · gross_amount · payout_status</code>
+            <br />
+            Anno {anno} · solo righe Succeeded · upsert per data
+          </p>
+          <input
+            ref={inputRef}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handleFile(f);
+              e.target.value = "";
+            }}
+          />
+        </div>
+        {result && (
+          <div
+            className="rounded-xl p-3 flex items-start gap-3"
+            style={{
+              background: result.ok > 0 ? "#dcfce7" : "#fee2e2",
+              color: result.ok > 0 ? "#166534" : "#991b1b",
+            }}
+          >
+            {result.ok > 0 ? (
+              <CheckCircle2 className="w-5 h-5 shrink-0" />
+            ) : (
+              <AlertTriangle className="w-5 h-5 shrink-0" />
+            )}
+            <div className="flex-1">
+              <p className="text-sm font-semibold">
+                {result.ok} righe importate
+                {result.errors.length > 0
+                  ? ` · ${result.errors.length} errori`
+                  : ""}
+              </p>
+              {result.errors.length > 0 && (
+                <ul className="text-xs mt-1 space-y-0.5 opacity-80">
+                  {result.errors.slice(0, 5).map((e, i) => (
+                    <li key={i}>• {e}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -521,6 +829,85 @@ function StripeTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
         <StatCard label="Netto" value={totals.netto} color="#0ea5e9" />
       </div>
 
+      <div className="flex justify-end">
+        <ExcelUploadModalButton
+          anno={anno}
+          endpoint="stripe"
+          title="Importa Stripe da CSV (export per-transaction)"
+          formatHint="Colonne: Type · Created · Amount · Fees · Net. Solo righe Type=Charge. Importi in formato IT (30,00)."
+          buildBatch={(rows, y) => {
+            const payloads: Record<string, unknown>[] = [];
+            const errors: string[] = [];
+            const byMonth = new Map<
+              number,
+              { lordo: number; commissioni: number; netto: number }
+            >();
+            let skippedNonCharge = 0;
+            let skippedOtherYear = 0;
+            let skippedBadDate = 0;
+            rows.forEach((row, i) => {
+              const type = String(getCell(row, "Type") ?? "")
+                .trim()
+                .toLowerCase();
+              if (type !== "charge") {
+                skippedNonCharge++;
+                return;
+              }
+              const rawDate = getCell(row, "Created");
+              const created =
+                rawDate instanceof Date
+                  ? rawDate
+                  : new Date(String(rawDate ?? "").trim());
+              if (isNaN(created.getTime())) {
+                skippedBadDate++;
+                errors.push(`Riga ${i + 2}: Created non valida`);
+                return;
+              }
+              if (created.getFullYear() !== y) {
+                skippedOtherYear++;
+                return;
+              }
+              const mese = created.getMonth() + 1;
+              const amount = toNumber(getCell(row, "Amount"));
+              const fees = toNumber(getCell(row, "Fees"));
+              const net = toNumber(getCell(row, "Net"));
+              const cur = byMonth.get(mese) ?? {
+                lordo: 0,
+                commissioni: 0,
+                netto: 0,
+              };
+              cur.lordo += amount;
+              cur.commissioni += fees;
+              cur.netto += net;
+              byMonth.set(mese, cur);
+            });
+            for (const [mese, agg] of byMonth) {
+              payloads.push({
+                anno: y,
+                mese,
+                lordo: Math.round(agg.lordo * 100) / 100,
+                commissioni: Math.round(agg.commissioni * 100) / 100,
+                rimborsi: 0,
+                netto: Math.round(agg.netto * 100) / 100,
+              });
+            }
+            if (skippedNonCharge > 0)
+              errors.push(`${skippedNonCharge} righe non-Charge saltate`);
+            if (skippedOtherYear > 0)
+              errors.push(
+                `${skippedOtherYear} transazioni di altri anni saltate`,
+              );
+            if (skippedBadDate > 0)
+              errors.push(`${skippedBadDate} righe senza Created valida`);
+            return { payloads, errors };
+          }}
+          onImported={() => {
+            load();
+            onSaved?.();
+          }}
+        />
+      </div>
+
       <div className="glass-card rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -584,92 +971,6 @@ function StripeTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
         </div>
       </div>
 
-      <ExcelUploadBox
-        anno={anno}
-        endpoint="stripe"
-        title="Importa Stripe da CSV (export per-transaction)"
-        formatHint="Colonne: Type · Created · Amount · Fees · Net. Solo righe Type=Charge. Importi in formato IT (30,00)."
-        buildBatch={(rows, y) => {
-          const payloads: Record<string, unknown>[] = [];
-          const errors: string[] = [];
-          const byMonth = new Map<
-            number,
-            { lordo: number; commissioni: number; netto: number }
-          >();
-          let skippedNonCharge = 0;
-          let skippedOtherYear = 0;
-          let skippedBadDate = 0;
-
-          rows.forEach((row, i) => {
-            const type = String(getCell(row, "Type") ?? "")
-              .trim()
-              .toLowerCase();
-            if (type !== "charge") {
-              skippedNonCharge++;
-              return;
-            }
-
-            const rawDate = getCell(row, "Created");
-            const created =
-              rawDate instanceof Date
-                ? rawDate
-                : new Date(String(rawDate ?? "").trim());
-            if (isNaN(created.getTime())) {
-              skippedBadDate++;
-              errors.push(`Riga ${i + 2}: Created non valida`);
-              return;
-            }
-            if (created.getFullYear() !== y) {
-              skippedOtherYear++;
-              return;
-            }
-
-            const mese = created.getMonth() + 1;
-            const amount = toNumber(getCell(row, "Amount"));
-            const fees = toNumber(getCell(row, "Fees"));
-            const net = toNumber(getCell(row, "Net"));
-
-            const cur = byMonth.get(mese) ?? {
-              lordo: 0,
-              commissioni: 0,
-              netto: 0,
-            };
-            cur.lordo += amount;
-            cur.commissioni += fees;
-            cur.netto += net;
-            byMonth.set(mese, cur);
-          });
-
-          for (const [mese, agg] of byMonth) {
-            payloads.push({
-              anno: y,
-              mese,
-              lordo: Math.round(agg.lordo * 100) / 100,
-              commissioni: Math.round(agg.commissioni * 100) / 100,
-              // Rimborsi non presenti nel CSV per-Charge (sarebbero righe Type=Refund, escluse)
-              rimborsi: 0,
-              netto: Math.round(agg.netto * 100) / 100,
-            });
-          }
-
-          if (skippedNonCharge > 0) {
-            errors.push(`${skippedNonCharge} righe non-Charge saltate`);
-          }
-          if (skippedOtherYear > 0) {
-            errors.push(
-              `${skippedOtherYear} transazioni di altri anni saltate`,
-            );
-          }
-          if (skippedBadDate > 0) {
-            errors.push(`${skippedBadDate} righe senza Created valida`);
-          }
-          return { payloads, errors };
-        }}
-        onImported={() => {
-          load();
-          onSaved?.();
-        }}
-      />
     </div>
   );
 }
@@ -748,6 +1049,92 @@ function GYGTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
         <StatCard label="Netto" value={totals.netto} color="#0ea5e9" />
       </div>
 
+      <div className="flex justify-end">
+        <ExcelUploadModalButton
+          anno={anno}
+          endpoint="gyg"
+          title="Importa Get Your Guide da Excel (export per-booking)"
+          formatHint="Colonne: Booking Ref # · Status · Activity Date · Retail Price · Commission Amount · Retail Price Minus Commission. Le prenotazioni Reversal/Reversed vengono ignorate."
+          buildBatch={(rows, y) => {
+            const payloads: Record<string, unknown>[] = [];
+            const errors: string[] = [];
+            const byMonth = new Map<
+              number,
+              { lordo: number; commissioni: number; netto: number }
+            >();
+            let skippedReversal = 0;
+            let skippedOtherYear = 0;
+            let skippedNoDate = 0;
+            rows.forEach((row, i) => {
+              const status = String(getCell(row, "Status") ?? "")
+                .trim()
+                .toLowerCase();
+              if (status === "reversal" || status === "reversed") {
+                skippedReversal++;
+                return;
+              }
+              const rawDate = getCell(row, "Activity Date");
+              const activityDate =
+                rawDate instanceof Date
+                  ? rawDate
+                  : new Date(String(rawDate ?? "").trim());
+              if (isNaN(activityDate.getTime())) {
+                skippedNoDate++;
+                errors.push(`Riga ${i + 2}: Activity Date non valida`);
+                return;
+              }
+              if (activityDate.getFullYear() !== y) {
+                skippedOtherYear++;
+                return;
+              }
+              const mese = activityDate.getMonth() + 1;
+              const retailPrice = toNumber(getCell(row, "Retail Price"));
+              const commission = Math.abs(
+                toNumber(getCell(row, "Commission Amount")),
+              );
+              const netto = toNumber(
+                getCell(row, "Retail Price Minus Commission"),
+              );
+              const cur = byMonth.get(mese) ?? {
+                lordo: 0,
+                commissioni: 0,
+                netto: 0,
+              };
+              cur.lordo += retailPrice;
+              cur.commissioni += commission;
+              cur.netto += netto;
+              byMonth.set(mese, cur);
+            });
+            for (const [mese, agg] of byMonth) {
+              payloads.push({
+                anno: y,
+                mese,
+                lordo: Math.round(agg.lordo * 100) / 100,
+                commissioni: Math.round(agg.commissioni * 100) / 100,
+                netto: Math.round(agg.netto * 100) / 100,
+              });
+            }
+            if (skippedReversal > 0)
+              errors.push(
+                `${skippedReversal} prenotazioni Reversal/Reversed saltate`,
+              );
+            if (skippedOtherYear > 0)
+              errors.push(
+                `${skippedOtherYear} prenotazioni di altri anni saltate`,
+              );
+            if (skippedNoDate > 0)
+              errors.push(
+                `${skippedNoDate} righe senza Activity Date valida`,
+              );
+            return { payloads, errors };
+          }}
+          onImported={() => {
+            load();
+            onSaved?.();
+          }}
+        />
+      </div>
+
       <div className="glass-card rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -797,98 +1184,6 @@ function GYGTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
         </div>
       </div>
 
-      <ExcelUploadBox
-        anno={anno}
-        endpoint="gyg"
-        title="Importa Get Your Guide da Excel (export per-booking)"
-        formatHint="Colonne: Booking Ref # · Status · Activity Date · Retail Price · Commission Amount · Retail Price Minus Commission. Le prenotazioni Reversal/Reversed vengono ignorate."
-        buildBatch={(rows, y) => {
-          const payloads: Record<string, unknown>[] = [];
-          const errors: string[] = [];
-          const byMonth = new Map<
-            number,
-            { lordo: number; commissioni: number; netto: number }
-          >();
-          let skippedReversal = 0;
-          let skippedOtherYear = 0;
-          let skippedNoDate = 0;
-
-          rows.forEach((row, i) => {
-            const status = String(getCell(row, "Status") ?? "")
-              .trim()
-              .toLowerCase();
-            if (status === "reversal" || status === "reversed") {
-              skippedReversal++;
-              return;
-            }
-
-            const rawDate = getCell(row, "Activity Date");
-            const activityDate =
-              rawDate instanceof Date
-                ? rawDate
-                : new Date(String(rawDate ?? "").trim());
-            if (isNaN(activityDate.getTime())) {
-              skippedNoDate++;
-              errors.push(`Riga ${i + 2}: Activity Date non valida`);
-              return;
-            }
-
-            if (activityDate.getFullYear() !== y) {
-              skippedOtherYear++;
-              return;
-            }
-
-            const mese = activityDate.getMonth() + 1;
-            const retailPrice = toNumber(getCell(row, "Retail Price"));
-            const commission = Math.abs(
-              toNumber(getCell(row, "Commission Amount")),
-            );
-            const netto = toNumber(
-              getCell(row, "Retail Price Minus Commission"),
-            );
-
-            const cur = byMonth.get(mese) ?? {
-              lordo: 0,
-              commissioni: 0,
-              netto: 0,
-            };
-            cur.lordo += retailPrice;
-            cur.commissioni += commission;
-            cur.netto += netto;
-            byMonth.set(mese, cur);
-          });
-
-          for (const [mese, agg] of byMonth) {
-            payloads.push({
-              anno: y,
-              mese,
-              lordo: Math.round(agg.lordo * 100) / 100,
-              commissioni: Math.round(agg.commissioni * 100) / 100,
-              netto: Math.round(agg.netto * 100) / 100,
-            });
-          }
-
-          // Info (mostrate nel banner errori anche se non sono errori veri)
-          if (skippedReversal > 0) {
-            errors.push(
-              `${skippedReversal} prenotazioni Reversal/Reversed saltate`,
-            );
-          }
-          if (skippedOtherYear > 0) {
-            errors.push(
-              `${skippedOtherYear} prenotazioni di altri anni saltate`,
-            );
-          }
-          if (skippedNoDate > 0) {
-            errors.push(`${skippedNoDate} righe senza Activity Date valida`);
-          }
-          return { payloads, errors };
-        }}
-        onImported={() => {
-          load();
-          onSaved?.();
-        }}
-      />
     </div>
   );
 }
@@ -1249,5 +1544,71 @@ function ExcelUploadBox({
         </div>
       )}
     </div>
+  );
+}
+
+// Wrapper che renderizza un bottone "Importa CSV" e apre un modal
+// contenente l'ExcelUploadBox. Stessi prop del box, gestisce open/close.
+function ExcelUploadModalButton({
+  anno,
+  endpoint,
+  title,
+  formatHint,
+  buildBatch,
+  onImported,
+}: {
+  anno: number;
+  endpoint: "fareharbor" | "stripe" | "gyg";
+  title: string;
+  formatHint: string;
+  buildBatch: (
+    rows: Record<string, unknown>[],
+    anno: number,
+  ) => { payloads: Record<string, unknown>[]; errors: string[] };
+  onImported: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="glass-btn-primary flex items-center gap-2 text-white text-sm font-medium px-4 py-2.5 rounded-xl"
+      >
+        <Upload className="w-4 h-4" /> Importa CSV
+      </button>
+      {open && (
+        <div
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+          onClick={() => setOpen(false)}
+        >
+          <div
+            className="glass-modal rounded-2xl w-full max-w-xl p-6 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+            style={{ textAlign: "left" }}
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-gray-900">Importa CSV</h2>
+              <button
+                onClick={() => setOpen(false)}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <ExcelUploadBox
+              anno={anno}
+              endpoint={endpoint}
+              title={title}
+              formatHint={formatHint}
+              buildBatch={buildBatch}
+              onImported={() => {
+                onImported();
+                setOpen(false);
+              }}
+            />
+          </div>
+        </div>
+      )}
+    </>
   );
 }
