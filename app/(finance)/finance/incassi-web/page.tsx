@@ -54,9 +54,6 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 export default function IncassiWebPage() {
   const [tab, setTab] = useState<Tab>("fareharbor");
   const [anno, setAnno] = useState(new Date().getFullYear());
-  // Bumpato quando un tab salva, per far rifetchare il RiepilogoBox.
-  const [reloadToken, setReloadToken] = useState(0);
-  const bumpReload = () => setReloadToken((x) => x + 1);
 
   return (
     <div className="space-y-6">
@@ -79,8 +76,6 @@ export default function IncassiWebPage() {
           ))}
         </select>
       </div>
-
-      <RiepilogoBoxWeb anno={anno} tab={tab} reloadToken={reloadToken} />
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-gray-200">
@@ -109,101 +104,86 @@ export default function IncassiWebPage() {
         })}
       </div>
 
-      {tab === "fareharbor" && (
-        <FareHarborTab anno={anno} onSaved={bumpReload} />
-      )}
-      {tab === "stripe" && <StripeTab anno={anno} onSaved={bumpReload} />}
-      {tab === "gyg" && <GYGTab anno={anno} onSaved={bumpReload} />}
+      {tab === "fareharbor" && <FareHarborTab anno={anno} />}
+      {tab === "stripe" && <StripeTab anno={anno} />}
+      {tab === "gyg" && <GYGTab anno={anno} />}
     </div>
   );
 }
 
 // ─── Riepilogo mensile per tab attivo ──────────────────────────────────
 
-const TAB_CONFIG: Record<
-  Tab,
-  {
-    endpoint: "fareharbor" | "stripe" | "gyg";
-    valueKey: "totale" | "netto";
-    title: string;
-  }
-> = {
-  fareharbor: {
-    endpoint: "fareharbor",
-    valueKey: "totale",
-    title: "Riepilogo mensile FareHarbor",
-  },
-  stripe: {
-    endpoint: "stripe",
-    valueKey: "netto",
-    title: "Riepilogo mensile Stripe (netto)",
-  },
-  gyg: {
-    endpoint: "gyg",
-    valueKey: "netto",
-    title: "Riepilogo mensile Get Your Guide (netto)",
-  },
-};
+// ─── Box riepilogo mensile cliccabile (condiviso FH/Stripe/GYG) ────────
 
-function RiepilogoBoxWeb({
+function MonthlyClickBox({
+  title,
+  totaliMensili,
+  meseFiltro,
+  onMeseChange,
   anno,
-  tab,
-  reloadToken,
 }: {
+  title: string;
+  totaliMensili: number[];
+  meseFiltro: number | null;
+  onMeseChange: (m: number | null) => void;
   anno: number;
-  tab: Tab;
-  reloadToken: number;
 }) {
-  // Righe generiche: tutti e 3 gli endpoint hanno `mese` e almeno uno tra `totale`/`netto`.
-  const [rows, setRows] = useState<
-    Array<{ mese: number } & Record<string, number>>
-  >([]);
-  const { endpoint, valueKey, title } = TAB_CONFIG[tab];
-
-  useEffect(() => {
-    (async () => {
-      const res = await fetch(`/api/incassi-web/${endpoint}?anno=${anno}`);
-      const data = await res.json();
-      setRows(Array.isArray(data) ? data : []);
-    })();
-  }, [anno, endpoint, reloadToken]);
-
-  const totaliMensili = Array(12).fill(0) as number[];
-  for (const r of rows) {
-    const v = Number(r[valueKey]) || 0;
-    totaliMensili[r.mese - 1] += v;
-  }
   const totaleAnno = totaliMensili.reduce((a, b) => a + b, 0);
-
   return (
     <div className="glass-card rounded-2xl p-4">
       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
         <h3 className="text-sm font-bold text-gray-900">{title}</h3>
+        {meseFiltro !== null && (
+          <button
+            onClick={() => onMeseChange(null)}
+            className="text-xs text-sky-600 hover:text-sky-700 font-medium"
+          >
+            Rimuovi filtro
+          </button>
+        )}
       </div>
       <div className="grid grid-cols-6 sm:grid-cols-12 gap-1">
-        {MESI.map((mese, idx) => {
+        {MESI.map((meseNome, idx) => {
+          const m = idx + 1;
           const tot = totaliMensili[idx];
           const hasValue = tot > 0;
+          const isActive = meseFiltro === m;
+          const cellStyle = isActive
+            ? { background: "#0ea5e9", borderColor: "#0284c7" }
+            : hasValue
+              ? { background: "#e0f2fe", borderColor: "#7dd3fc" }
+              : { background: "#fff", borderColor: "#e2e8f0" };
+          const labelColor = isActive
+            ? "#ffffff"
+            : hasValue
+              ? "#6b7280"
+              : "#9ca3af";
+          const valueColor = isActive
+            ? "#ffffff"
+            : hasValue
+              ? "#0369a1"
+              : "#cbd5e1";
           return (
-            <div
-              key={mese}
-              className="flex flex-col items-center gap-1 px-1 py-2 rounded-lg border"
-              style={
-                hasValue
-                  ? { background: "#e0f2fe", borderColor: "#7dd3fc" }
-                  : { background: "#fff", borderColor: "#e2e8f0" }
-              }
+            <button
+              key={meseNome}
+              type="button"
+              onClick={() => onMeseChange(isActive ? null : m)}
+              className="flex flex-col items-center gap-1 px-1 py-2 rounded-lg border transition-all cursor-pointer hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
+              style={cellStyle}
             >
-              <span className="text-[10px] uppercase tracking-wide font-semibold text-gray-500">
-                {mese.slice(0, 3)}
+              <span
+                className="text-[10px] uppercase tracking-wide font-semibold"
+                style={{ color: labelColor }}
+              >
+                {meseNome.slice(0, 3)}
               </span>
               <span
                 className="text-[11px] font-bold whitespace-nowrap"
-                style={{ color: hasValue ? "#0369a1" : "#cbd5e1" }}
+                style={{ color: valueColor }}
               >
-                {hasValue ? fmt(tot) : "—"}
+                {hasValue ? fmt(tot).replace(" €", "") : "—"}
               </span>
-            </div>
+            </button>
           );
         })}
       </div>
@@ -322,16 +302,7 @@ function FareHarborTab({
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <StatCard label={`Totale FareHarbor ${anno}`} value={totaleAnno} />
-        <StatCard
-          label={`Totale Fee ${anno}`}
-          value={totaleFee}
-          color="#ef4444"
-        />
-        <RefundReserveCard anno={anno} />
-      </div>
-
+      {/* Toolbar bottoni in alto a destra */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <span className="text-xs text-gray-500">
           {meseFiltro === null
@@ -355,67 +326,23 @@ function FareHarborTab({
         </div>
       </div>
 
-      {/* Riepilogo mensile cliccabile */}
-      <div className="glass-card rounded-2xl p-4">
-        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-          <h3 className="text-sm font-bold text-gray-900">
-            Riepilogo FareHarbor mensile
-          </h3>
-          {meseFiltro !== null && (
-            <button
-              onClick={() => setMeseFiltro(null)}
-              className="text-xs text-sky-600 hover:text-sky-700 font-medium"
-            >
-              Rimuovi filtro
-            </button>
-          )}
-        </div>
-        <div className="grid grid-cols-6 sm:grid-cols-12 gap-1">
-          {MESI.map((meseNome, idx) => {
-            const m = idx + 1;
-            const tot = totaliMensili[idx];
-            const hasValue = tot > 0;
-            const isActive = meseFiltro === m;
-            const cellStyle = isActive
-              ? { background: "#0ea5e9", borderColor: "#0284c7" }
-              : hasValue
-                ? { background: "#e0f2fe", borderColor: "#7dd3fc" }
-                : { background: "#fff", borderColor: "#e2e8f0" };
-            const labelColor = isActive
-              ? "#ffffff"
-              : hasValue
-                ? "#6b7280"
-                : "#9ca3af";
-            const valueColor = isActive
-              ? "#ffffff"
-              : hasValue
-                ? "#0369a1"
-                : "#cbd5e1";
-            return (
-              <button
-                key={meseNome}
-                type="button"
-                onClick={() => setMeseFiltro(isActive ? null : m)}
-                className="flex flex-col items-center gap-1 px-1 py-2 rounded-lg border transition-all cursor-pointer hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
-                style={cellStyle}
-              >
-                <span
-                  className="text-[10px] uppercase tracking-wide font-semibold"
-                  style={{ color: labelColor }}
-                >
-                  {meseNome.slice(0, 3)}
-                </span>
-                <span
-                  className="text-[11px] font-bold whitespace-nowrap"
-                  style={{ color: valueColor }}
-                >
-                  {hasValue ? fmt(tot).replace(" €", "") : "—"}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <StatCard label={`Totale FareHarbor ${anno}`} value={totaleAnno} />
+        <StatCard
+          label={`Totale Fee ${anno}`}
+          value={totaleFee}
+          color="#ef4444"
+        />
+        <RefundReserveCard anno={anno} />
       </div>
+
+      <MonthlyClickBox
+        title="Riepilogo FareHarbor mensile (netto)"
+        totaliMensili={totaliMensili}
+        meseFiltro={meseFiltro}
+        onMeseChange={setMeseFiltro}
+        anno={anno}
+      />
 
       {/* Tabella per-data */}
       <div className="glass-card rounded-2xl overflow-hidden">
@@ -750,6 +677,7 @@ function FareHarborCsvImportModal({
 function StripeTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
   const [rows, setRows] = useState<StripeRow[]>([]);
   const [saving, setSaving] = useState<number | null>(null);
+  const [meseFiltro, setMeseFiltro] = useState<number | null>(null);
 
   const load = async () => {
     const res = await fetch(`/api/incassi-web/stripe?anno=${anno}`);
@@ -782,6 +710,19 @@ function StripeTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
       { lordo: 0, commissioni: 0, rimborsi: 0, netto: 0 },
     );
   }, [rows]);
+
+  // Totali mensili NETTI per il box riepilogo
+  const totaliMensili = useMemo(() => {
+    const arr = Array(12).fill(0) as number[];
+    for (const r of rows) arr[r.mese - 1] += r.netto;
+    return arr;
+  }, [rows]);
+
+  // Mesi visibili nella tabella: tutti, oppure solo il mese filtrato
+  const mesiVisibili =
+    meseFiltro === null
+      ? MESI.map((_, i) => i + 1)
+      : [meseFiltro];
 
   const save = async (
     mese: number,
@@ -820,17 +761,6 @@ function StripeTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-        <StatCard label={`Lordo ${anno}`} value={totals.lordo} />
-        <StatCard
-          label="Commissioni"
-          value={totals.commissioni}
-          color="#64748b"
-        />
-        <StatCard label="Rimborsi" value={totals.rimborsi} color="#ef4444" />
-        <StatCard label="Netto" value={totals.netto} color="#0ea5e9" />
-      </div>
-
       <div className="flex justify-end">
         <ExcelUploadModalButton
           anno={anno}
@@ -910,6 +840,25 @@ function StripeTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
         />
       </div>
 
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+        <StatCard label={`Lordo ${anno}`} value={totals.lordo} />
+        <StatCard
+          label="Commissioni"
+          value={totals.commissioni}
+          color="#64748b"
+        />
+        <StatCard label="Rimborsi" value={totals.rimborsi} color="#ef4444" />
+        <StatCard label="Netto" value={totals.netto} color="#0ea5e9" />
+      </div>
+
+      <MonthlyClickBox
+        title="Riepilogo Stripe mensile (netto)"
+        totaliMensili={totaliMensili}
+        meseFiltro={meseFiltro}
+        onMeseChange={setMeseFiltro}
+        anno={anno}
+      />
+
       <div className="glass-card rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -928,8 +877,8 @@ function StripeTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
               </tr>
             </thead>
             <tbody className="zebra">
-              {MESI.map((mese, idx) => {
-                const m = idx + 1;
+              {mesiVisibili.map((m) => {
+                const mese = MESI[m - 1];
                 const r = rowFor(m);
                 const loading = saving === m;
                 return (
@@ -981,6 +930,7 @@ function StripeTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
 function GYGTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
   const [rows, setRows] = useState<GYGRow[]>([]);
   const [saving, setSaving] = useState<number | null>(null);
+  const [meseFiltro, setMeseFiltro] = useState<number | null>(null);
 
   const load = async () => {
     const res = await fetch(`/api/incassi-web/gyg?anno=${anno}`);
@@ -1000,6 +950,14 @@ function GYGTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
       commissioni: 0,
       netto: 0,
     };
+
+  const totaliMensili = useMemo(() => {
+    const arr = Array(12).fill(0) as number[];
+    for (const r of rows) arr[r.mese - 1] += r.netto;
+    return arr;
+  }, [rows]);
+  const mesiVisibili =
+    meseFiltro === null ? MESI.map((_, i) => i + 1) : [meseFiltro];
 
   const totals = useMemo(
     () =>
@@ -1040,16 +998,6 @@ function GYGTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <StatCard label={`Lordo ${anno}`} value={totals.lordo} />
-        <StatCard
-          label="Commissioni (25%)"
-          value={totals.commissioni}
-          color="#64748b"
-        />
-        <StatCard label="Netto" value={totals.netto} color="#0ea5e9" />
-      </div>
-
       <div className="flex justify-end">
         <ExcelUploadModalButton
           anno={anno}
@@ -1134,6 +1082,24 @@ function GYGTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
         />
       </div>
 
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <StatCard label={`Lordo ${anno}`} value={totals.lordo} />
+        <StatCard
+          label="Commissioni (25%)"
+          value={totals.commissioni}
+          color="#64748b"
+        />
+        <StatCard label="Netto" value={totals.netto} color="#0ea5e9" />
+      </div>
+
+      <MonthlyClickBox
+        title="Riepilogo Get Your Guide mensile (netto)"
+        totaliMensili={totaliMensili}
+        meseFiltro={meseFiltro}
+        onMeseChange={setMeseFiltro}
+        anno={anno}
+      />
+
       <div className="glass-card rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -1150,8 +1116,8 @@ function GYGTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
               </tr>
             </thead>
             <tbody className="zebra">
-              {MESI.map((mese, idx) => {
-                const m = idx + 1;
+              {mesiVisibili.map((m) => {
+                const mese = MESI[m - 1];
                 const r = rowFor(m);
                 const loading = saving === m;
                 return (
