@@ -51,10 +51,14 @@ export async function exportPDF(
 
   const doc = new jsPDF({ orientation: "landscape" });
 
-  // Logo Molokai (60x60 px ≈ 16x16 mm) in alto a sinistra; fallback al testo
+  // Logo Molokai a sinistra: width fissa, altezza calcolata in proporzione
+  // dalle dimensioni naturali dell'immagine per evitare distorsioni.
   const logo = await loadLogoBase64();
   if (logo) {
-    doc.addImage(logo, "PNG", 14, 8, 16, 16);
+    const props = doc.getImageProperties(logo);
+    const logoW = 14;
+    const logoH = (props.height / props.width) * logoW;
+    doc.addImage(logo, "PNG", 14, 8, logoW, logoH);
   } else {
     doc.setFontSize(16);
     doc.setTextColor(14, 165, 233);
@@ -209,10 +213,14 @@ export async function exportFatturaPDF(
     MR = 14;
   const CW = W - ML - MR;
 
-  // Header: logo Molokai (60x60 px ≈ 18x18 mm) a sinistra + company info a destra
+  // Header: logo Molokai a sinistra (width fissa, altezza in proporzione
+  // alle dimensioni naturali dell'immagine) + company info a destra.
   const logo = await loadLogoBase64();
   if (logo) {
-    doc.addImage(logo, "PNG", ML, 8, 18, 18);
+    const props = doc.getImageProperties(logo);
+    const logoW = 22;
+    const logoH = (props.height / props.width) * logoW;
+    doc.addImage(logo, "PNG", ML, 8, logoW, logoH);
   } else {
     // fallback al testo se l'immagine non è raggiungibile
     doc.setFont("helvetica", "bold");
