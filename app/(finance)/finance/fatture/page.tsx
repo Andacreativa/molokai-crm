@@ -15,6 +15,7 @@ import { fmt, TIPO_IMPOSTA_OPTIONS, MESI, ANNI } from "@/lib/constants";
 import FiltriBar from "@/components/FiltriBar";
 import { PageSizeSelect, PageNav } from "@/components/Pagination";
 import { exportFatturaPDF } from "@/lib/export";
+import AddressFields from "@/components/AddressFields";
 
 // ─── Types ─────────────────────────────────────────────────────────────
 
@@ -818,16 +819,6 @@ function FatturaFormModal({
 
 // ─── Clienti Tab ───────────────────────────────────────────────────────
 
-const PAESI = [
-  "Spagna",
-  "Italia",
-  "Francia",
-  "Germania",
-  "Portogallo",
-  "Regno Unito",
-  "Altro",
-];
-
 function ClientiTab() {
   const [clienti, setClienti] = useState<Cliente[]>([]);
   const [search, setSearch] = useState("");
@@ -1052,6 +1043,7 @@ function ClienteFormModal({
     via: editing?.via ?? "",
     cap: editing?.cap ?? "",
     citta: editing?.citta ?? "",
+    provincia: editing?.provincia ?? "",
     paese: editing?.paese ?? "Spagna",
     iban: editing?.iban ?? "",
     tipo: editing?.tipo ?? "privato",
@@ -1145,29 +1137,29 @@ function ClienteFormModal({
               <option value="azienda">Azienda</option>
             </select>
           </div>
-          <div>
-            <label className="text-xs font-medium text-gray-600 block mb-1">
-              Paese
-            </label>
-            <select
-              value={form.paese}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, paese: e.target.value }))
+          <div className="col-span-2">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+              Indirizzo
+            </p>
+            <AddressFields
+              value={{
+                via: form.via,
+                cap: form.cap,
+                citta: form.citta,
+                provincia: form.provincia,
+                paese: form.paese,
+              }}
+              onChange={(a) =>
+                setForm((f) => ({
+                  ...f,
+                  via: a.via,
+                  cap: a.cap,
+                  citta: a.citta,
+                  provincia: a.provincia,
+                  paese: a.paese,
+                }))
               }
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white"
-            >
-              {PAESI.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {Input("via", "Via", "Carrer ...")}
-          <div className="grid grid-cols-2 gap-3">
-            {Input("cap", "CAP", "08003")}
-            {Input("citta", "Città", "Barcelona")}
+            />
           </div>
 
           <div className="col-span-2">

@@ -1,5 +1,30 @@
 import { fmt } from "./constants";
 
+// Logo Molokai inlinato base64 — fetchato una sola volta e cacheato per
+// successivi export. Il PNG sta in /public/logo-molokai.png. Se la fetch
+// fallisce (es. SSR o asset mancante) i PDF mantengono il testo "molokai!"
+// di fallback.
+let logoCache: string | null = null;
+async function loadLogoBase64(): Promise<string | null> {
+  if (logoCache) return logoCache;
+  if (typeof window === "undefined") return null;
+  try {
+    const res = await fetch("/logo-molokai.png");
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(String(reader.result));
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+    logoCache = dataUrl;
+    return dataUrl;
+  } catch {
+    return null;
+  }
+}
+
 // ── Excel ──────────────────────────────────────────────────────────────
 
 export async function exportExcel(
@@ -26,20 +51,26 @@ export async function exportPDF(
 
   const doc = new jsPDF({ orientation: "landscape" });
 
-  doc.setFontSize(16);
-  doc.setTextColor(14, 165, 233);
-  doc.text("molokai!", 14, 16);
+  // Logo Molokai (60x60 px ≈ 16x16 mm) in alto a sinistra; fallback al testo
+  const logo = await loadLogoBase64();
+  if (logo) {
+    doc.addImage(logo, "PNG", 14, 8, 16, 16);
+  } else {
+    doc.setFontSize(16);
+    doc.setTextColor(14, 165, 233);
+    doc.text("molokai!", 14, 16);
+  }
   doc.setFontSize(10);
   doc.setTextColor(100);
-  doc.text("Molokai Experience SL — Gestionale Interno", 14, 22);
+  doc.text("Molokai Experience SL — Gestionale Interno", 32, 18);
   doc.setFontSize(13);
   doc.setTextColor(30);
-  doc.text(title, 14, 30);
+  doc.text(title, 14, 32);
 
   autoTable(doc, {
     head: [columns],
     body: rows,
-    startY: 35,
+    startY: 38,
     styles: { fontSize: 9, cellPadding: 3 },
     headStyles: {
       fillColor: [14, 165, 233],
@@ -133,6 +164,38 @@ function formatDate(d: string | null): string {
   return new Date(d).toLocaleDateString("es-ES");
 }
 
+// Traduce il nome del paese da italiano a spagnolo per la fattura PDF.
+// Le opzioni note in lib/constants.PAESI sono in italiano; qui le mappiamo
+// allo spagnolo per coerenza con il resto del template (FACTURA è in ES).
+const PAESE_IT_TO_ES: Record<string, string> = {
+  Spagna: "España",
+  Italia: "Italia",
+  Francia: "Francia",
+  Germania: "Alemania",
+  Portogallo: "Portugal",
+  "Regno Unito": "Reino Unido",
+  Irlanda: "Irlanda",
+  Lussemburgo: "Luxemburgo",
+  "Stati Uniti": "Estados Unidos",
+  Svizzera: "Suiza",
+  Olanda: "Países Bajos",
+  "Paesi Bassi": "Países Bajos",
+  Austria: "Austria",
+  Belgio: "Bélgica",
+  Danimarca: "Dinamarca",
+  Svezia: "Suecia",
+  Norvegia: "Noruega",
+  Finlandia: "Finlandia",
+  Polonia: "Polonia",
+  Grecia: "Grecia",
+  Brasile: "Brasil",
+  Messico: "México",
+};
+function paeseES(p: string | null | undefined): string {
+  if (!p) return "";
+  return PAESE_IT_TO_ES[p.trim()] ?? p;
+}
+
 export async function exportFatturaPDF(
   f: FatturaPDFData,
   c: ClientePDFData | null,
@@ -146,11 +209,17 @@ export async function exportFatturaPDF(
     MR = 14;
   const CW = W - ML - MR;
 
-  // Header: "molokai!" branded logo (left) + company info (right)
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(28);
-  doc.setTextColor(...SKY);
-  doc.text("molokai!", ML, 22);
+  // Header: logo Molokai (60x60 px ≈ 18x18 mm) a sinistra + company info a destra
+  const logo = await loadLogoBase64();
+  if (logo) {
+    doc.addImage(logo, "PNG", ML, 8, 18, 18);
+  } else {
+    // fallback al testo se l'immagine non è raggiungibile
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(28);
+    doc.setTextColor(...SKY);
+    doc.text("molokai!", ML, 22);
+  }
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
@@ -211,7 +280,7 @@ export async function exportFatturaPDF(
     yC += 4;
   }
   if (c?.paese) {
-    doc.text(c.paese, col1X, yC);
+    doc.text(paeseES(c.paese), col1X, yC);
   }
 
   // FACTURA box
