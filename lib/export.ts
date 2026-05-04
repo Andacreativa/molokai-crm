@@ -1,13 +1,16 @@
 import { fmt } from "./constants";
 
-// Logo Molokai ridimensionato a max 80×80 px ed embeddato come PNG per
-// preservare la nitidezza di testo e linee sottili (JPEG sgranerebbe il
-// lettering). Se per qualche motivo il PNG cresce oltre la soglia, fallback
-// a JPEG q=0.9. La sorgente è un PNG 3375×4219 (~424KB) che jsPDF altrimenti
-// inlinerebbe verbatim, gonfiando il PDF a decine di MB. Cacheato a livello
-// di modulo: una sola decodifica + ridimensionamento per sessione.
-const LOGO_MAX_PX = 80;
-const LOGO_PNG_MAX_BYTES = 50_000;
+// Logo Molokai ridimensionato a max 512×512 px ed embeddato come PNG. A
+// 22mm di display 512px = ~590 DPI, ben oltre la soglia print (300 DPI):
+// risoluzioni più basse (es. 80px = 92 DPI) producono un logo sgranato
+// quando il PDF viewer scala. PNG mantiene la nitidezza di testo e linee
+// sottili che JPEG sgranerebbe. Se per qualche motivo il PNG cresce oltre
+// la soglia, fallback a JPEG q=0.9. La sorgente è un PNG 3375×4219
+// (~424KB) che jsPDF altrimenti inlinerebbe verbatim, gonfiando il PDF a
+// decine di MB. Cacheato a livello di modulo: una sola decodifica +
+// ridimensionamento per sessione.
+const LOGO_MAX_PX = 512;
+const LOGO_PNG_MAX_BYTES = 250_000;
 const LOGO_JPEG_FALLBACK_QUALITY = 0.9;
 interface CachedLogo {
   data: string;
