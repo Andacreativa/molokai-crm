@@ -1,13 +1,20 @@
 import { fmt } from "./constants";
 
-// Logo Molokai compresso in JPEG e ridimensionato a max 120×120 px prima
-// dell'embed. La sorgente è un PNG 3375×4219 (~424KB) che jsPDF altrimenti
+// Logo Molokai ridimensionato a max 80×80 px ed embeddato come PNG per
+// preservare la nitidezza di testo e linee sottili (JPEG sgranerebbe il
+// lettering). Se per qualche motivo il PNG cresce oltre la soglia, fallback
+// a JPEG q=0.9. La sorgente è un PNG 3375×4219 (~424KB) che jsPDF altrimenti
 // inlinerebbe verbatim, gonfiando il PDF a decine di MB. Cacheato a livello
 // di modulo: una sola decodifica + ridimensionamento per sessione.
-const LOGO_MAX_PX = 120;
-const LOGO_JPEG_QUALITY = 0.5;
-let logoCache: string | null = null;
-async function loadLogoBase64(): Promise<string | null> {
+const LOGO_MAX_PX = 80;
+const LOGO_PNG_MAX_BYTES = 50_000;
+const LOGO_JPEG_FALLBACK_QUALITY = 0.9;
+interface CachedLogo {
+  data: string;
+  format: "PNG" | "JPEG";
+}
+let logoCache: CachedLogo | null = null;
+async function loadLogo(): Promise<CachedLogo | null> {
   if (logoCache) return logoCache;
   if (typeof window === "undefined") return null;
   try {
@@ -29,12 +36,20 @@ async function loadLogoBase64(): Promise<string | null> {
     canvas.height = h;
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
-    // sfondo bianco esplicito: la sorgente PNG è trasparente, e JPEG non
-    // supporta trasparenza — senza fill apparirebbe nero.
+    ctx.drawImage(img, 0, 0, w, h);
+    const pngData = canvas.toDataURL("image/png");
+    if (pngData.length <= LOGO_PNG_MAX_BYTES) {
+      logoCache = { data: pngData, format: "PNG" };
+      return logoCache;
+    }
+    // Fallback JPEG con sfondo bianco (PNG → JPEG perde alpha).
+    ctx.globalCompositeOperation = "destination-over";
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, w, h);
-    ctx.drawImage(img, 0, 0, w, h);
-    logoCache = canvas.toDataURL("image/jpeg", LOGO_JPEG_QUALITY);
+    logoCache = {
+      data: canvas.toDataURL("image/jpeg", LOGO_JPEG_FALLBACK_QUALITY),
+      format: "JPEG",
+    };
     return logoCache;
   } catch {
     return null;
@@ -69,12 +84,12 @@ export async function exportPDF(
 
   // Logo Molokai a sinistra: width fissa, altezza calcolata in proporzione
   // dalle dimensioni naturali dell'immagine per evitare distorsioni.
-  const logo = await loadLogoBase64();
+  const logo = await loadLogo();
   if (logo) {
-    const props = doc.getImageProperties(logo);
+    const props = doc.getImageProperties(logo.data);
     const logoW = 14;
     const logoH = (props.height / props.width) * logoW;
-    doc.addImage(logo, "JPEG", 14, 8, logoW, logoH);
+    doc.addImage(logo.data, logo.format, 14, 8, logoW, logoH);
   } else {
     doc.setFontSize(16);
     doc.setTextColor(14, 165, 233);
@@ -236,12 +251,12 @@ export async function exportFatturaPDF(
 
   // Header: logo Molokai a sinistra (width fissa, altezza in proporzione
   // alle dimensioni naturali dell'immagine) + company info a destra.
-  const logo = await loadLogoBase64();
+  const logo = await loadLogo();
   if (logo) {
-    const props = doc.getImageProperties(logo);
+    const props = doc.getImageProperties(logo.data);
     const logoW = 22;
     const logoH = (props.height / props.width) * logoW;
-    doc.addImage(logo, "JPEG", ML, 8, logoW, logoH);
+    doc.addImage(logo.data, logo.format, ML, 8, logoW, logoH);
   } else {
     // fallback al testo se l'immagine non è raggiungibile
     doc.setFont("helvetica", "bold");
