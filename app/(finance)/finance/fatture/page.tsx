@@ -693,11 +693,16 @@ function FatturaFormModal({
                 />
                 <input
                   type="number"
-                  step="0.01"
+                  step="1"
+                  min="1"
                   value={r.quantita}
-                  onChange={(e) =>
-                    updateRiga(i, { quantita: parseFloat(e.target.value) || 0 })
-                  }
+                  onChange={(e) => {
+                    const n = Math.max(
+                      1,
+                      Math.round(parseFloat(e.target.value) || 1),
+                    );
+                    updateRiga(i, { quantita: n });
+                  }}
                   className="border border-gray-200 rounded-lg px-2 py-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-sky-300"
                 />
                 <input
