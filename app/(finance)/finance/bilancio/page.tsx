@@ -90,6 +90,10 @@ const colorFor = (
   fallback: string,
 ): string => map[key] ?? fallback;
 
+// Verde se positivo, rosso se negativo, grigio se esattamente 0.
+const bilancioColor = (v: number): string =>
+  v > 0 ? "#22c55e" : v < 0 ? "#ef4444" : "#9ca3af";
+
 // ─── Page ──────────────────────────────────────────────────────────────
 
 export default function BilancioPage() {
@@ -171,7 +175,7 @@ export default function BilancioPage() {
         <KPI
           label="Bilancio"
           value={data.totali.bilancio}
-          color={data.totali.bilancio >= 0 ? "#22c55e" : "#ef4444"}
+          color={bilancioColor(data.totali.bilancio)}
         />
       </div>
 
@@ -259,15 +263,13 @@ export default function BilancioPage() {
                     </td>
                     <td
                       className="px-4 py-3 text-sm font-bold text-right"
-                      style={{
-                        color: m.bilancio >= 0 ? "#22c55e" : "#ef4444",
-                      }}
+                      style={{ color: bilancioColor(m.bilancio) }}
                     >
                       {fmt(m.bilancio)}
                     </td>
                     <td
                       className="px-4 py-3 text-sm font-bold text-right"
-                      style={{ color: cum >= 0 ? "#22c55e" : "#ef4444" }}
+                      style={{ color: bilancioColor(cum) }}
                     >
                       {fmt(cum)}
                     </td>
@@ -292,9 +294,7 @@ export default function BilancioPage() {
                 </td>
                 <td
                   className="px-4 py-3 text-sm font-bold text-right"
-                  style={{
-                    color: data.totali.bilancio >= 0 ? "#22c55e" : "#ef4444",
-                  }}
+                  style={{ color: bilancioColor(data.totali.bilancio) }}
                 >
                   {fmt(data.totali.bilancio)}
                 </td>
