@@ -38,6 +38,13 @@ export async function PUT(
       ...(body.incassato !== undefined && {
         incassato: Boolean(body.incassato),
       }),
+      ...(body.metodoPagamento !== undefined && {
+        metodoPagamento:
+          typeof body.metodoPagamento === "string" &&
+          body.metodoPagamento.trim()
+            ? body.metodoPagamento.trim()
+            : "Transferencia",
+      }),
       ...(body.note !== undefined && { note: body.note || null }),
     },
   });

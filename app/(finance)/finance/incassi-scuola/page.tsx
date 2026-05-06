@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   X,
+  Plus,
 } from "lucide-react";
 import { fmt, MESI, ANNI } from "@/lib/constants";
 
@@ -29,6 +30,15 @@ interface ParsedRow {
   totaleGiorno: number;
   totVendite: number;
   rimborsi: number;
+}
+
+interface IncassoContanti {
+  id: number;
+  data: string; // ISO
+  mese: number;
+  anno: number;
+  importo: number;
+  descrizione: string | null;
 }
 
 // ─── CSV parsing ───────────────────────────────────────────────────────
@@ -85,10 +95,11 @@ function parseCSV(text: string): { rows: ParsedRow[]; errors: string[] } {
   return { rows, errors };
 }
 
-// ─── Page ──────────────────────────────────────────────────────────────
+// ─── Page (tab switcher TPV / Contanti) ───────────────────────────────
 
 export default function IncassiScuolaPage() {
   const now = new Date();
+  const [tab, setTab] = useState<"tpv" | "contanti">("tpv");
   const [anno, setAnno] = useState(now.getFullYear());
   // mese === null → vista completa anno (no filter mese)
   const [mese, setMese] = useState<number | null>(now.getMonth() + 1);
@@ -102,6 +113,13 @@ export default function IncassiScuolaPage() {
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Contanti
+  const [contanti, setContanti] = useState<IncassoContanti[]>([]);
+  const [showContantiModal, setShowContantiModal] = useState(false);
+  const [editingContanti, setEditingContanti] = useState<IncassoContanti | null>(
+    null,
+  );
+
   // Fetch full-year: la tabella filtra per mese client-side, il box
   // riepilogo usa tutte le righe dell'anno.
   const load = async () => {
@@ -110,8 +128,15 @@ export default function IncassiScuolaPage() {
     setRows(Array.isArray(data) ? data : []);
   };
 
+  const loadContanti = async () => {
+    const res = await fetch(`/api/incassi-scuola/contanti?anno=${anno}`);
+    const data = await res.json();
+    setContanti(Array.isArray(data) ? data : []);
+  };
+
   useEffect(() => {
     load();
+    loadContanti();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [anno]);
 
@@ -143,6 +168,21 @@ export default function IncassiScuolaPage() {
   const totaliMensili = Array(12).fill(0) as number[];
   for (const r of rows) totaliMensili[r.mese - 1] += r.totaleGiorno;
   const totaleAnno = totaliMensili.reduce((a, b) => a + b, 0);
+
+  // Contanti: filtro per mese, aggregati mensili, totale anno
+  const contantiMese = useMemo(
+    () => (mese === null ? contanti : contanti.filter((c) => c.mese === mese)),
+    [contanti, mese],
+  );
+  const totaliContantiMensili = Array(12).fill(0) as number[];
+  for (const c of contanti) totaliContantiMensili[c.mese - 1] += c.importo;
+  const totaleContantiAnno = totaliContantiMensili.reduce((a, b) => a + b, 0);
+
+  // Totali generali combinati TPV + Contanti
+  const totaleGeneraleMese = stats.totaleGiorno + (mese === null
+    ? totaleContantiAnno
+    : totaliContantiMensili[mese - 1]);
+  const totaleGeneraleAnno = totaleAnno + totaleContantiAnno;
 
   const handleFile = async (file: File) => {
     setUploading(true);
@@ -216,21 +256,68 @@ export default function IncassiScuolaPage() {
 
   const isoDate = (d: string) => new Date(d).toISOString().slice(0, 10);
 
+  // Contanti CRUD
+  const saveContanti = async (
+    payload: { data: string; importo: number; descrizione: string },
+    id?: number,
+  ) => {
+    const url = id
+      ? `/api/incassi-scuola/contanti/${id}`
+      : `/api/incassi-scuola/contanti`;
+    const method = id ? "PUT" : "POST";
+    const res = await fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      alert(err.error || "Errore salvataggio");
+      return;
+    }
+    setShowContantiModal(false);
+    setEditingContanti(null);
+    loadContanti();
+  };
+
+  const delContanti = async (id: number) => {
+    if (!confirm("Eliminare questo incasso contanti?")) return;
+    await fetch(`/api/incassi-scuola/contanti/${id}`, { method: "DELETE" });
+    loadContanti();
+  };
+
+  const tabLabel: Record<typeof tab, string> = {
+    tpv: "TPV",
+    contanti: "Contanti",
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Incassi Scuola</h1>
-          <p className="text-gray-500 text-sm mt-1">
-            Pagamenti in cassa (importazione da CSV)
-          </p>
-        </div>
-        <button
-          onClick={() => setShowImport(true)}
-          className="glass-btn-primary flex items-center gap-2 text-white text-sm font-medium px-4 py-2.5 rounded-xl"
-        >
-          <Upload className="w-4 h-4" /> Importa CSV
-        </button>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Incassi Scuola</h1>
+        <p className="text-gray-500 text-sm mt-1">
+          Incassi tramite TPV e contanti
+        </p>
+      </div>
+
+      <div className="flex gap-1 border-b border-gray-200">
+        {(["tpv", "contanti"] as const).map((t) => {
+          const active = tab === t;
+          return (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className="px-4 py-2.5 text-sm font-semibold transition-all border-b-2 -mb-px"
+              style={
+                active
+                  ? { color: "#0ea5e9", borderColor: "#0ea5e9" }
+                  : { color: "#64748b", borderColor: "transparent" }
+              }
+            >
+              {tabLabel[t]}
+            </button>
+          );
+        })}
       </div>
 
       {showImport && (
@@ -308,6 +395,38 @@ export default function IncassiScuolaPage() {
         </div>
       )}
 
+      {/* Filtri (sopra entrambe le tab — anno + filtro mese si applicano a TPV e Contanti) */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <select
+          value={anno}
+          onChange={(e) => setAnno(parseInt(e.target.value))}
+          className="text-sm font-medium px-3 py-2 rounded-xl border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 outline-none"
+        >
+          {ANNI.map((a) => (
+            <option key={a} value={a}>
+              {a}
+            </option>
+          ))}
+        </select>
+        <span className="text-xs text-gray-500">
+          {mese === null
+            ? "Tutti i mesi"
+            : `Filtro: ${MESI[mese - 1]} — clicca di nuovo sul mese per rimuovere`}
+        </span>
+      </div>
+
+      {tab === "tpv" && (
+        <>
+          {/* Toolbar TPV: Importa CSV */}
+          <div className="flex items-center justify-end">
+            <button
+              onClick={() => setShowImport(true)}
+              className="glass-btn-primary flex items-center gap-2 text-white text-sm font-medium px-4 py-2.5 rounded-xl"
+            >
+              <Upload className="w-4 h-4" /> Importa CSV
+            </button>
+          </div>
+
       {/* Result banner */}
       {result && (
         <div
@@ -346,26 +465,6 @@ export default function IncassiScuolaPage() {
           </button>
         </div>
       )}
-
-      {/* Filtri */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <select
-          value={anno}
-          onChange={(e) => setAnno(parseInt(e.target.value))}
-          className="text-sm font-medium px-3 py-2 rounded-xl border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 outline-none"
-        >
-          {ANNI.map((a) => (
-            <option key={a} value={a}>
-              {a}
-            </option>
-          ))}
-        </select>
-        <span className="text-xs text-gray-500">
-          {mese === null
-            ? "Tutti i mesi"
-            : `Filtro: ${MESI[mese - 1]} — clicca di nuovo sul mese per rimuovere`}
-        </span>
-      </div>
 
       {/* Riepilogo mensile incassi scuola (tutto l'anno) */}
       <div className="glass-card rounded-2xl p-4">
@@ -588,6 +687,326 @@ export default function IncassiScuolaPage() {
               {fmt(ivaImporto)}
             </p>
           </div>
+        </div>
+      </div>
+        </>
+      )}
+
+      {tab === "contanti" && (
+        <>
+          {/* Toolbar Contanti: Aggiungi */}
+          <div className="flex items-center justify-end">
+            <button
+              onClick={() => {
+                setEditingContanti(null);
+                setShowContantiModal(true);
+              }}
+              className="glass-btn-primary flex items-center gap-2 text-white text-sm font-medium px-4 py-2.5 rounded-xl"
+            >
+              <Plus className="w-4 h-4" /> Aggiungi
+            </button>
+          </div>
+
+      {/* Tabella contanti */}
+      <div className="glass-card rounded-2xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50">
+                {["Data", "Descrizione", "Importo", ""].map((h, i) => (
+                  <th
+                    key={h}
+                    className={`text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 ${i === 2 ? "text-right" : "text-left"}`}
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="zebra">
+              {contantiMese.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={4}
+                    className="text-center text-gray-400 py-12 text-sm"
+                  >
+                    <FileText className="w-10 h-10 mx-auto mb-2 opacity-40" />
+                    Nessun incasso contanti per{" "}
+                    {mese === null ? anno : `${MESI[mese - 1]} ${anno}`}
+                  </td>
+                </tr>
+              )}
+              {contantiMese.map((c) => (
+                <tr
+                  key={c.id}
+                  className="border-b border-gray-50 hover:bg-gray-50 transition-colors"
+                >
+                  <td className="px-4 py-3 text-sm text-gray-700">
+                    {new Date(c.data).toLocaleDateString("it-IT")}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-900">
+                    {c.descrizione || (
+                      <span className="text-gray-400 italic">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-sm font-bold text-right" style={{ color: "#0ea5e9" }}>
+                    {fmt(c.importo)}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <button
+                        onClick={() => {
+                          setEditingContanti(c);
+                          setShowContantiModal(true);
+                        }}
+                        className="text-xs px-2 py-1 rounded-lg text-sky-700 hover:bg-sky-50"
+                      >
+                        Modifica
+                      </button>
+                      <button
+                        onClick={() => delContanti(c.id)}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        title="Elimina"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Riepilogo mensile contanti */}
+      <div className="glass-card rounded-2xl p-4">
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <h3 className="text-sm font-bold text-gray-900">
+            Riepilogo contanti mensili
+          </h3>
+        </div>
+        <div className="grid grid-cols-6 sm:grid-cols-12 gap-1">
+          {MESI.map((meseNome, idx) => {
+            const m = idx + 1;
+            const tot = totaliContantiMensili[idx];
+            const hasValue = tot > 0;
+            const isActive = mese === m;
+            const cellStyle = isActive
+              ? { background: "#0ea5e9", borderColor: "#0284c7" }
+              : hasValue
+                ? { background: "#e0f2fe", borderColor: "#7dd3fc" }
+                : { background: "#fff", borderColor: "#e2e8f0" };
+            const labelColor = isActive
+              ? "#ffffff"
+              : hasValue
+                ? "#6b7280"
+                : "#9ca3af";
+            const valueColor = isActive
+              ? "#ffffff"
+              : hasValue
+                ? "#0369a1"
+                : "#cbd5e1";
+            return (
+              <button
+                key={meseNome}
+                type="button"
+                onClick={() => setMese(isActive ? null : m)}
+                className="flex flex-col items-center gap-1 px-1 py-2 rounded-lg border transition-all cursor-pointer hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
+                style={cellStyle}
+                title={
+                  isActive
+                    ? "Clicca per rimuovere il filtro"
+                    : `Filtra per ${meseNome}`
+                }
+              >
+                <span
+                  className="text-[10px] uppercase tracking-wide font-semibold"
+                  style={{ color: labelColor }}
+                >
+                  {meseNome.slice(0, 3)}
+                </span>
+                <span
+                  className="text-xs font-bold"
+                  style={{ color: valueColor }}
+                >
+                  {hasValue ? fmt(tot).replace(" €", "") : "—"}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-200">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            Totale Contanti {anno}
+          </span>
+          <span className="text-lg font-bold" style={{ color: "#0ea5e9" }}>
+            {fmt(totaleContantiAnno)}
+          </span>
+        </div>
+      </div>
+        </>
+      )}
+
+      {/* Totale generale: TPV + Contanti — sempre visibile in entrambe le tab */}
+      <div
+        className="rounded-2xl p-5"
+        style={{ background: "#f0f9ff", border: "2px solid #0ea5e9" }}
+      >
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <p className="text-[10px] text-sky-700 uppercase tracking-wide font-semibold">
+              Totale Generale Scuola
+            </p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              TPV + Contanti ·{" "}
+              {mese === null ? `Anno ${anno}` : `${MESI[mese - 1]} ${anno}`}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-2xl font-bold" style={{ color: "#0ea5e9" }}>
+              {fmt(totaleGeneraleMese)}
+            </p>
+            {mese !== null && (
+              <p className="text-xs text-gray-500 mt-0.5">
+                Anno: {fmt(totaleGeneraleAnno)}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Modal Aggiungi/Modifica Contanti */}
+      {showContantiModal && (
+        <ContantiModal
+          editing={editingContanti}
+          onClose={() => {
+            setShowContantiModal(false);
+            setEditingContanti(null);
+          }}
+          onSave={saveContanti}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Modal Contanti ────────────────────────────────────────────────────
+
+function ContantiModal({
+  editing,
+  onClose,
+  onSave,
+}: {
+  editing: IncassoContanti | null;
+  onClose: () => void;
+  onSave: (
+    payload: { data: string; importo: number; descrizione: string },
+    id?: number,
+  ) => Promise<void>;
+}) {
+  const [data, setData] = useState(
+    editing
+      ? new Date(editing.data).toISOString().slice(0, 10)
+      : new Date().toISOString().slice(0, 10),
+  );
+  const [descrizione, setDescrizione] = useState(editing?.descrizione ?? "");
+  const [importo, setImporto] = useState(
+    editing ? String(editing.importo) : "",
+  );
+  const [saving, setSaving] = useState(false);
+
+  const submit = async () => {
+    const n = parseFloat(importo.replace(",", "."));
+    if (!data || isNaN(n) || n <= 0) {
+      alert("Data e importo (>0) richiesti");
+      return;
+    }
+    setSaving(true);
+    try {
+      await onSave(
+        { data, importo: n, descrizione },
+        editing?.id,
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="glass-modal rounded-2xl w-full max-w-md p-6 space-y-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-gray-900">
+            {editing ? "Modifica" : "Nuovo"} Incasso Contanti
+          </h2>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+              Data
+            </label>
+            <input
+              type="date"
+              value={data}
+              onChange={(e) => setData(e.target.value)}
+              className="mt-1 w-full text-sm px-3 py-2 rounded-xl border border-gray-200 bg-white focus:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-300"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+              Descrizione
+            </label>
+            <input
+              type="text"
+              value={descrizione}
+              onChange={(e) => setDescrizione(e.target.value)}
+              placeholder="es. Lezione privata, Noleggio tavola"
+              className="mt-1 w-full text-sm px-3 py-2 rounded-xl border border-gray-200 bg-white focus:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-300"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+              Importo (€)
+            </label>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={importo}
+              onChange={(e) => setImporto(e.target.value)}
+              placeholder="50,00"
+              className="mt-1 w-full text-sm px-3 py-2 rounded-xl border border-gray-200 bg-white focus:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-300"
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 pt-2">
+          <button
+            onClick={onClose}
+            className="text-sm font-medium px-4 py-2 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50"
+          >
+            Annulla
+          </button>
+          <button
+            onClick={submit}
+            disabled={saving}
+            className="glass-btn-primary text-white text-sm font-medium px-4 py-2 rounded-xl disabled:opacity-50"
+          >
+            {saving ? "Salvataggio…" : "Salva"}
+          </button>
         </div>
       </div>
     </div>

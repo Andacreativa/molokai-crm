@@ -77,6 +77,7 @@ export async function GET(request: Request) {
     stripe,
     gyg,
     cassa,
+    contanti,
     sessioniGruppi,
     altriIngressi,
     spese,
@@ -92,6 +93,7 @@ export async function GET(request: Request) {
     prisma.prenotazioneStripe.findMany({ where: { anno } }),
     prisma.prenotazioneGetYourGuide.findMany({ where: { anno } }),
     prisma.pagamentoInScuola.findMany({ where: { anno } }),
+    prisma.incassoContanti.findMany({ where: { anno } }),
     prisma.sessioneGruppo.findMany({ where: { anno, incassato: true } }),
     prisma.altroIngresso.findMany({ where: { anno, incassato: true } }),
     prisma.spesa.findMany({ where: { anno } }),
@@ -163,9 +165,13 @@ export async function GET(request: Request) {
     mensili[r.mese - 1].entrate.gyg += r.netto;
   }
 
-  // Cassa scuola: somma totaleGiorno
+  // Cassa scuola: TPV (totaleGiorno) + Contanti (importo) confluiscono
+  // entrambi nel bucket "cassa" per coerenza con la categoria del breakdown.
   for (const c of cassa) {
     mensili[c.mese - 1].entrate.cassa += c.totaleGiorno;
+  }
+  for (const c of contanti) {
+    mensili[c.mese - 1].entrate.cassa += c.importo;
   }
 
   // Gruppi

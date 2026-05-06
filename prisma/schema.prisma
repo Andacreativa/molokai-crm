@@ -217,6 +217,16 @@ model PagamentoInScuola {
   createdAt     DateTime @default(now())
 }
 
+model IncassoContanti {
+  id          Int      @id @default(autoincrement())
+  data        DateTime
+  mese        Int
+  anno        Int      @default(2026)
+  importo     Float
+  descrizione String?
+  createdAt   DateTime @default(now())
+}
+
 // ─── GRUPPI ─────────────────────────────────────────────────
 
 model Gruppo {
@@ -226,6 +236,8 @@ model Gruppo {
   contatto      String?
   email         String?
   telefono      String?
+  prezzoPP      Float?    // prezzo/persona concordato; pre-compila nuove sessioni
+  prezziScaglioni Json?   // array [{da, a, prezzo}] per pricing dinamico per N partecipanti
   note          String?
   createdAt     DateTime  @default(now())
   sessioni      SessioneGruppo[]
@@ -242,6 +254,7 @@ model SessioneGruppo {
   prezzoPP       Float
   totale         Float    // calcolato: partecipanti * prezzoPP
   incassato      Boolean  @default(false)
+  metodoPagamento String? @default("Transferencia") // Transferencia | Tarjeta | Efectivo
   note           String?
   createdAt      DateTime @default(now())
 }

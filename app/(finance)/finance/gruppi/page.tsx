@@ -25,7 +25,16 @@ interface SessioneGruppo {
   prezzoPP: number;
   totale: number;
   incassato: boolean;
+  metodoPagamento: string | null;
   note: string | null;
+}
+
+const METODI_PAGAMENTO = ["Transferencia", "Tarjeta", "Efectivo"] as const;
+
+interface Scaglione {
+  da: number;
+  a: number;
+  prezzo: number;
 }
 
 interface Gruppo {
@@ -35,10 +44,28 @@ interface Gruppo {
   contatto: string | null;
   email: string | null;
   telefono: string | null;
+  prezzoPP: number | null;
+  prezziScaglioni: Scaglione[] | null;
   note: string | null;
   sessioni: SessioneGruppo[];
   totaleIncassato?: number;
   daIncassare?: number;
+}
+
+// Trova lo scaglione che copre N partecipanti. Ritorna il prezzo o null.
+function prezzoFromScaglioni(
+  scaglioni: Scaglione[] | null | undefined,
+  n: number,
+): number | null {
+  if (!scaglioni || scaglioni.length === 0 || n <= 0) return null;
+  for (const s of scaglioni) {
+    if (n >= s.da && n <= s.a) return s.prezzo;
+  }
+  // Sopra l'ultimo scaglione: usa il prezzo dell'ultimo (heuristic standard
+  // per pricing volume — più persone = stesso prezzo dell'ultimo tier).
+  const last = scaglioni[scaglioni.length - 1];
+  if (n > last.a) return last.prezzo;
+  return null;
 }
 
 const TIPI_GRUPPO = ["scuola", "azienda", "altro"];
@@ -407,25 +434,63 @@ function GruppoFormModal({
     contatto: editing?.contatto ?? "",
     email: editing?.email ?? "",
     telefono: editing?.telefono ?? "",
+    prezzoPP: editing?.prezzoPP != null ? String(editing.prezzoPP) : "",
     note: editing?.note ?? "",
   });
+  const [scaglioniMode, setScaglioniMode] = useState<boolean>(
+    !!editing?.prezziScaglioni && editing.prezziScaglioni.length > 0,
+  );
+  const [scaglioni, setScaglioni] = useState<
+    { da: string; a: string; prezzo: string }[]
+  >(
+    editing?.prezziScaglioni && editing.prezziScaglioni.length > 0
+      ? editing.prezziScaglioni.map((s) => ({
+          da: String(s.da),
+          a: String(s.a),
+          prezzo: String(s.prezzo),
+        }))
+      : [{ da: "", a: "", prezzo: "" }],
+  );
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
     if (!form.nome.trim()) return;
     setSaving(true);
     try {
+      // Se la modalità scaglioni è attiva invia un array, altrimenti []
+      // (il backend lo normalizza a null e cancella eventuali scaglioni
+      // pre-esistenti). Il prezzoPP single resta indipendente.
+      const payload = {
+        ...form,
+        prezziScaglioni: scaglioniMode
+          ? scaglioni
+              .map((s) => ({
+                da: parseInt(s.da),
+                a: parseInt(s.a),
+                prezzo: parseFloat(s.prezzo),
+              }))
+              .filter(
+                (s) =>
+                  Number.isFinite(s.da) &&
+                  Number.isFinite(s.a) &&
+                  Number.isFinite(s.prezzo) &&
+                  s.da >= 1 &&
+                  s.a >= s.da &&
+                  s.prezzo > 0,
+              )
+          : [],
+      };
       if (editing) {
         await fetch(`/api/gruppi/${editing.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(form),
+          body: JSON.stringify(payload),
         });
       } else {
         await fetch("/api/gruppi", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(form),
+          body: JSON.stringify(payload),
         });
       }
       onSaved();
@@ -433,6 +498,20 @@ function GruppoFormModal({
       setSaving(false);
     }
   };
+
+  const updateScaglione = (
+    i: number,
+    field: "da" | "a" | "prezzo",
+    value: string,
+  ) => {
+    setScaglioni((prev) =>
+      prev.map((row, idx) => (idx === i ? { ...row, [field]: value } : row)),
+    );
+  };
+  const addScaglione = () =>
+    setScaglioni((prev) => [...prev, { da: "", a: "", prezzo: "" }]);
+  const removeScaglione = (i: number) =>
+    setScaglioni((prev) => prev.filter((_, idx) => idx !== i));
 
   return (
     <div
@@ -484,6 +563,116 @@ function GruppoFormModal({
                 </option>
               ))}
             </select>
+          </div>
+          <div className="col-span-2 rounded-xl border border-gray-200 p-3 space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-gray-700">
+                Prezzo a scaglioni
+                <span className="text-[10px] text-gray-500 ml-2 font-normal">
+                  pricing dinamico per N partecipanti
+                </span>
+              </label>
+              <button
+                type="button"
+                onClick={() => setScaglioniMode((v) => !v)}
+                className="relative inline-flex h-5 w-9 items-center rounded-full transition-colors"
+                style={{ background: scaglioniMode ? "#0ea5e9" : "#cbd5e1" }}
+                aria-label="Toggle scaglioni"
+              >
+                <span
+                  className="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                  style={{
+                    transform: scaglioniMode
+                      ? "translateX(20px)"
+                      : "translateX(2px)",
+                  }}
+                />
+              </button>
+            </div>
+
+            {!scaglioniMode && (
+              <div>
+                <label className="text-xs font-medium text-gray-600 block mb-1">
+                  Prezzo/pp concordato (€)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={form.prezzoPP}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, prezzoPP: e.target.value }))
+                  }
+                  placeholder="es. 14"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
+                />
+              </div>
+            )}
+
+            {scaglioniMode && (
+              <div className="space-y-2">
+                <div className="grid grid-cols-[1fr_1fr_1fr_28px] gap-2 text-[10px] font-semibold text-gray-500 uppercase tracking-wide px-1">
+                  <span>Da</span>
+                  <span>A</span>
+                  <span>Prezzo/pp (€)</span>
+                  <span />
+                </div>
+                {scaglioni.map((s, i) => (
+                  <div
+                    key={i}
+                    className="grid grid-cols-[1fr_1fr_1fr_28px] gap-2 items-center"
+                  >
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={s.da}
+                      onChange={(e) =>
+                        updateScaglione(i, "da", e.target.value)
+                      }
+                      placeholder="1"
+                      className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
+                    />
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={s.a}
+                      onChange={(e) => updateScaglione(i, "a", e.target.value)}
+                      placeholder="5"
+                      className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
+                    />
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={s.prezzo}
+                      onChange={(e) =>
+                        updateScaglione(i, "prezzo", e.target.value)
+                      }
+                      placeholder="35"
+                      className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeScaglione(i)}
+                      disabled={scaglioni.length === 1}
+                      className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-400"
+                      title="Rimuovi"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={addScaglione}
+                  className="text-xs font-medium text-sky-700 hover:text-sky-900 inline-flex items-center gap-1"
+                >
+                  <Plus className="w-3 h-3" /> Aggiungi scaglione
+                </button>
+              </div>
+            )}
           </div>
           <div>
             <label className="text-xs font-medium text-gray-600 block mb-1">
@@ -578,18 +767,29 @@ function GruppoDetailModal({
   const [editingSessioneId, setEditingSessioneId] = useState<number | null>(
     null,
   );
-  // Default prezzo = ultima sessione per data (la più recente)
+  // Default prezzo per nuova sessione: se il gruppo ha scaglioni, lo lascia
+  // vuoto (il prezzo si popola quando l'utente inserisce N partecipanti);
+  // altrimenti usa prezzoPP concordato o l'ultima sessione per data.
+  const hasScaglioni = !!(
+    gruppo.prezziScaglioni && gruppo.prezziScaglioni.length > 0
+  );
   const lastPrezzo =
     gruppo.sessioni.length > 0
       ? [...gruppo.sessioni].sort(
           (a, b) => new Date(b.data).getTime() - new Date(a.data).getTime(),
         )[0].prezzoPP
       : 0;
+  const defaultPrezzoPP = hasScaglioni
+    ? 0
+    : gruppo.prezzoPP != null && gruppo.prezzoPP > 0
+      ? gruppo.prezzoPP
+      : lastPrezzo;
 
   const [form, setForm] = useState({
     data: isoDate(new Date()),
     partecipanti: "",
-    prezzoPP: lastPrezzo > 0 ? String(lastPrezzo) : "",
+    prezzoPP: defaultPrezzoPP > 0 ? String(defaultPrezzoPP) : "",
+    metodoPagamento: "Transferencia",
     note: "",
   });
   const [saving, setSaving] = useState(false);
@@ -604,6 +804,7 @@ function GruppoDetailModal({
         data: isoDate(editingSessione.data),
         partecipanti: String(editingSessione.partecipanti),
         prezzoPP: String(editingSessione.prezzoPP),
+        metodoPagamento: editingSessione.metodoPagamento ?? "Transferencia",
         note: editingSessione.note ?? "",
       });
     }
@@ -614,7 +815,8 @@ function GruppoDetailModal({
     setForm({
       data: isoDate(new Date()),
       partecipanti: "",
-      prezzoPP: lastPrezzo > 0 ? String(lastPrezzo) : "",
+      prezzoPP: defaultPrezzoPP > 0 ? String(defaultPrezzoPP) : "",
+      metodoPagamento: "Transferencia",
       note: "",
     });
     setEditingSessioneId(null);
@@ -631,6 +833,7 @@ function GruppoDetailModal({
       data: form.data,
       partecipanti,
       prezzoPP,
+      metodoPagamento: form.metodoPagamento,
       note: form.note,
     };
     try {
@@ -701,6 +904,15 @@ function GruppoDetailModal({
               >
                 {TIPO_LABEL[gruppo.tipo] ?? gruppo.tipo}
               </span>
+              {gruppo.prezzoPP != null && (
+                <span
+                  className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold"
+                  style={{ background: "#f1f5f9", color: "#475569" }}
+                  title="Prezzo per persona concordato"
+                >
+                  €{gruppo.prezzoPP}/pp concordato
+                </span>
+              )}
             </div>
             <p className="text-xs text-gray-500 mt-0.5">
               {gruppo.contatto ?? "Nessun contatto"}
@@ -793,9 +1005,26 @@ function GruppoDetailModal({
               <input
                 type="number"
                 value={form.partecipanti}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, partecipanti: e.target.value }))
-                }
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setForm((f) => {
+                    const next = { ...f, partecipanti: v };
+                    // Se il gruppo ha scaglioni, ricalcola prezzo/pp dal
+                    // numero partecipanti corrente. L'utente può poi
+                    // sovrascriverlo manualmente sul campo prezzoPP.
+                    if (hasScaglioni) {
+                      const n = parseInt(v) || 0;
+                      if (n > 0) {
+                        const p = prezzoFromScaglioni(
+                          gruppo.prezziScaglioni,
+                          n,
+                        );
+                        if (p != null) next.prezzoPP = String(p);
+                      }
+                    }
+                    return next;
+                  });
+                }}
                 placeholder="14"
                 className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white text-right"
               />
@@ -823,6 +1052,24 @@ function GruppoDetailModal({
               placeholder="Opzionale"
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white"
             />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600 block mb-1">
+              Metodo di pagamento
+            </label>
+            <select
+              value={form.metodoPagamento}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, metodoPagamento: e.target.value }))
+              }
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white"
+            >
+              {METODI_PAGAMENTO.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="flex justify-end">
             <button

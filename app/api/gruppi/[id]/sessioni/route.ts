@@ -28,6 +28,11 @@ export async function POST(
   const prezzoPP = round2(parseFloat(String(body.prezzoPP)) || 0);
   const totale = round2(partecipanti * prezzoPP);
 
+  const metodoRaw = typeof body.metodoPagamento === "string"
+    ? body.metodoPagamento.trim()
+    : "";
+  const metodoPagamento = metodoRaw || "Transferencia";
+
   const sessione = await prisma.sessioneGruppo.create({
     data: {
       gruppoId,
@@ -37,6 +42,7 @@ export async function POST(
       partecipanti,
       prezzoPP,
       totale,
+      metodoPagamento,
       note: body.note || null,
     },
   });
