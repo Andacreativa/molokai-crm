@@ -106,6 +106,7 @@ model Socio {
   matricolaGratuita      Boolean           @default(false)
   matricolaPagata        Boolean           @default(false)
   matricolaMesePagamento String?
+  matricolaFontePagamento String?          @default("Recibo") // Recibo | TPV | Contanti | Bonifico
   note                   String?
   createdAt              DateTime          @default(now())
   pagamentiMensili       PagamentoSocio[]
@@ -113,15 +114,16 @@ model Socio {
 }
 
 model PagamentoSocio {
-  id        Int      @id @default(autoincrement())
-  socioId   Int
-  socio     Socio    @relation(fields: [socioId], references: [id], onDelete: Cascade)
-  anno      Int
-  mese      Int      // 1-12
-  pagato    Boolean  @default(false)
-  importo   Float?
-  data      DateTime?
-  createdAt DateTime @default(now())
+  id              Int      @id @default(autoincrement())
+  socioId         Int
+  socio           Socio    @relation(fields: [socioId], references: [id], onDelete: Cascade)
+  anno            Int
+  mese            Int      // 1-12
+  pagato          Boolean  @default(false)
+  importo         Float?
+  data            DateTime?
+  fontePagamento  String?  @default("Recibo") // Recibo | TPV | Contanti | Bonifico
+  createdAt       DateTime @default(now())
 
   @@unique([socioId, anno, mese])
 }

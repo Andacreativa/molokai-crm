@@ -28,7 +28,6 @@ interface MeseDetail {
     stripe: number;
     gyg: number;
     cassa: number;
-    gruppi: number;
     altri: number;
     totale: number;
   };

@@ -43,7 +43,6 @@ interface MeseDetail {
     stripe: number;
     gyg: number;
     cassa: number;
-    gruppi: number;
     altri: number;
     totale: number;
   };
@@ -78,7 +77,6 @@ export async function GET(request: Request) {
     gyg,
     cassa,
     contanti,
-    sessioniGruppi,
     altriIngressi,
     spese,
     speseFisse,
@@ -94,7 +92,8 @@ export async function GET(request: Request) {
     prisma.prenotazioneGetYourGuide.findMany({ where: { anno } }),
     prisma.pagamentoInScuola.findMany({ where: { anno } }),
     prisma.incassoContanti.findMany({ where: { anno } }),
-    prisma.sessioneGruppo.findMany({ where: { anno, incassato: true } }),
+    // Gruppi: NON contribuiscono al bilancio (solo statistici, vedi
+    // dashboard). Pagamenti reali entrano via PagamentoInScuola o Fattura.
     prisma.altroIngresso.findMany({ where: { anno, incassato: true } }),
     prisma.spesa.findMany({ where: { anno } }),
     prisma.spesaFissa.findMany({ where: { attiva: true } }),
@@ -113,7 +112,6 @@ export async function GET(request: Request) {
       stripe: 0,
       gyg: 0,
       cassa: 0,
-      gruppi: 0,
       altri: 0,
       totale: 0,
     },
@@ -121,13 +119,26 @@ export async function GET(request: Request) {
     bilancio: 0,
   }));
 
-  // Soci: pagamenti mensili + matricole pagate (parsate da matricolaMesePagamento)
+  // Soci: pagamenti mensili + matricole pagate (parsate da matricolaMesePagamento).
+  // Filtriamo SOLO le fonti che NON sono già conteggiate altrove:
+  //   - "Recibo" (banca, addebito SEPA — non in nessun altro flusso)
+  //   - "Bonifico" (anche questa entra direttamente in banca)
+  //   - null (legacy: pagamenti pre-feature-fonte)
+  // ESCLUSIONI: "TPV" (già in PagamentoInScuola) e "Contanti" (già in IncassoContanti).
+  const fonteEntraInBilancio = (f: string | null | undefined) =>
+    f == null || f === "Recibo" || f === "Bonifico";
+
   for (const s of soci) {
     for (const p of s.pagamentiMensili) {
+      if (!fonteEntraInBilancio(p.fontePagamento)) continue;
       const importo = p.importo ?? s.prezzoPiano;
       mensili[p.mese - 1].entrate.soci += importo;
     }
-    if (s.matricolaPagata && !s.matricolaGratuita) {
+    if (
+      s.matricolaPagata &&
+      !s.matricolaGratuita &&
+      fonteEntraInBilancio(s.matricolaFontePagamento)
+    ) {
       const parsed = parseMeseAnnoStringa(s.matricolaMesePagamento);
       if (parsed && parsed.anno === anno) {
         mensili[parsed.mese - 1].entrate.matricole += s.matricolaImporto;
@@ -174,11 +185,6 @@ export async function GET(request: Request) {
     mensili[c.mese - 1].entrate.cassa += c.importo;
   }
 
-  // Gruppi
-  for (const s of sessioniGruppi) {
-    mensili[s.mese - 1].entrate.gruppi += s.totale;
-  }
-
   // Altri ingressi (solo incassati, coerente con Buoni.pagato)
   for (const a of altriIngressi) {
     mensili[a.mese - 1].entrate.altri += a.importo;
@@ -215,7 +221,6 @@ export async function GET(request: Request) {
         m.entrate.stripe +
         m.entrate.gyg +
         m.entrate.cassa +
-        m.entrate.gruppi +
         m.entrate.altri,
     );
     m.uscite.totale = round2(
@@ -243,7 +248,6 @@ export async function GET(request: Request) {
     Stripe: round2(mensili.reduce((s, m) => s + m.entrate.stripe, 0)),
     "Get Your Guide": round2(mensili.reduce((s, m) => s + m.entrate.gyg, 0)),
     Cassa: round2(mensili.reduce((s, m) => s + m.entrate.cassa, 0)),
-    Gruppi: round2(mensili.reduce((s, m) => s + m.entrate.gruppi, 0)),
     "Altri Ingressi": round2(mensili.reduce((s, m) => s + m.entrate.altri, 0)),
   };
 

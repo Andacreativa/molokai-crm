@@ -112,7 +112,10 @@ export async function GET(request: Request) {
   const entratePerMese = Array(12).fill(0) as number[];
   const uscitePerMese = Array(12).fill(0) as number[];
 
-  // Soci pagamenti + matricole (matricole sommate dentro Soci per la dashboard)
+  // Soci pagamenti + matricole (matricole sommate dentro Soci per la dashboard).
+  // NOTA: Gruppi NON appare nel breakdown — i pagamenti reali dei gruppi
+  // arrivano via PagamentoInScuola o Fattura. La statistica Gruppi è
+  // esposta separatamente come `gruppiAnno` (vedi sotto).
   const breakdownEntrate = {
     Soci: 0,
     Buoni: 0,
@@ -121,17 +124,27 @@ export async function GET(request: Request) {
     Stripe: 0,
     "Get Your Guide": 0,
     Cassa: 0,
-    Gruppi: 0,
     "Altri Ingressi": 0,
   };
 
+  // Soci: includiamo solo le fonti che non sono già conteggiate in altri
+  // canali. TPV → PagamentoInScuola, Contanti → IncassoContanti. Recibo e
+  // Bonifico (e null per legacy) entrano in bilancio sotto Soci.
+  const fonteEntraInBilancio = (f: string | null | undefined) =>
+    f == null || f === "Recibo" || f === "Bonifico";
+
   for (const s of soci) {
     for (const p of s.pagamentiMensili) {
+      if (!fonteEntraInBilancio(p.fontePagamento)) continue;
       const v = p.importo ?? s.prezzoPiano;
       entratePerMese[p.mese - 1] += v;
       breakdownEntrate.Soci += v;
     }
-    if (s.matricolaPagata && !s.matricolaGratuita) {
+    if (
+      s.matricolaPagata &&
+      !s.matricolaGratuita &&
+      fonteEntraInBilancio(s.matricolaFontePagamento)
+    ) {
       const parsed = parseMeseAnnoStringa(s.matricolaMesePagamento);
       if (parsed && parsed.anno === anno) {
         entratePerMese[parsed.mese - 1] += s.matricolaImporto;
@@ -168,10 +181,10 @@ export async function GET(request: Request) {
     entratePerMese[c.mese - 1] += c.totaleGiorno;
     breakdownEntrate.Cassa += c.totaleGiorno;
   }
-  for (const s of sessioniGruppi) {
-    entratePerMese[s.mese - 1] += s.totale;
-    breakdownEntrate.Gruppi += s.totale;
-  }
+  // Gruppi: somma separata, NON sommata in entratePerMese né nel breakdown.
+  const gruppiAnno = round2(
+    sessioniGruppi.reduce((s, x) => s + x.totale, 0),
+  );
   for (const a of altriIngressi) {
     entratePerMese[a.mese - 1] += a.importo;
     breakdownEntrate["Altri Ingressi"] += a.importo;
@@ -222,6 +235,7 @@ export async function GET(request: Request) {
     },
     mensili,
     breakdownEntrate,
+    gruppiAnno,
     ultimiSoci,
     ultimeSpese,
   });

@@ -68,6 +68,7 @@ interface DashboardData {
   annoData: { entrate: number; uscite: number; bilancio: number };
   mensili: MeseAgg[];
   breakdownEntrate: Record<string, number>;
+  gruppiAnno: number;
   ultimiSoci: UltimoSocio[];
   ultimeSpese: UltimaSpesa[];
 }
@@ -222,7 +223,7 @@ export default function DashboardPage() {
         />
         <ChannelCard
           label="Gruppi"
-          value={data.breakdownEntrate["Gruppi"] ?? 0}
+          value={data.gruppiAnno ?? 0}
           color="#ec4899"
           icon={School}
         />

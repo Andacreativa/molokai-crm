@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+const FONTI = ["Recibo", "TPV", "Contanti", "Bonifico"] as const;
+function normalizeFonte(v: unknown): string | null {
+  if (v == null) return null;
+  const s = String(v).trim();
+  return (FONTI as readonly string[]).includes(s) ? s : null;
+}
+
 export async function GET(
   _: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -36,6 +43,16 @@ export async function PUT(
     if (body.importo !== undefined && body.importo !== "") {
       data.matricolaImporto = parseFloat(body.importo) || 0;
     }
+    if (body.fontePagamento !== undefined) {
+      // Quando matricola viene segnata pagata, la fonte è obbligatoria con
+      // default "Recibo"; quando viene smarcata, restiamo neutri (null).
+      const f = normalizeFonte(body.fontePagamento);
+      data.matricolaFontePagamento = pagata ? (f ?? "Recibo") : null;
+    } else if (pagata) {
+      data.matricolaFontePagamento = "Recibo";
+    } else {
+      data.matricolaFontePagamento = null;
+    }
     await prisma.socio.update({
       where: { id: socioId },
       data,
@@ -56,6 +73,11 @@ export async function PUT(
       );
     }
 
+    // Fonte pagamento: default "Recibo" quando si segna pagato. Se l'utente
+    // smarca, azzeriamo a null per non lasciare uno stato inconsistente.
+    const fonteRaw = normalizeFonte(body.fontePagamento);
+    const fontePagamento = pagato ? (fonteRaw ?? "Recibo") : null;
+
     await prisma.pagamentoSocio.upsert({
       where: { socioId_anno_mese: { socioId, anno, mese } },
       create: {
@@ -65,11 +87,13 @@ export async function PUT(
         pagato,
         importo,
         data: pagato ? new Date() : null,
+        fontePagamento,
       },
       update: {
         pagato,
         importo,
         data: pagato ? new Date() : null,
+        fontePagamento,
       },
     });
   }

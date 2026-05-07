@@ -25,7 +25,15 @@ interface PagamentoMensile {
   pagato: boolean;
   importo: number | null;
   data?: string | null;
+  fontePagamento: string | null;
 }
+
+const FONTI_PAGAMENTO = [
+  "Recibo",
+  "TPV",
+  "Contanti",
+  "Bonifico",
+] as const;
 
 interface Socio {
   id: number;
@@ -45,6 +53,7 @@ interface Socio {
   matricolaGratuita: boolean;
   matricolaPagata: boolean;
   matricolaMesePagamento: string | null;
+  matricolaFontePagamento: string | null;
   note: string | null;
   pagamentiMensili: PagamentoMensile[];
 }
@@ -948,6 +957,33 @@ function SocioDetailModal({
           mese,
           pagato,
           importo: pagato ? socio.prezzoPiano : null,
+          // Quando pagato si attiva: preserva la fonte già scelta se c'era,
+          // altrimenti default "Recibo".
+          fontePagamento: pagato ? p?.fontePagamento ?? "Recibo" : null,
+        }),
+      });
+      const updated = (await res.json()) as Socio;
+      if (updated?.id) setSocio(updated);
+      onReload();
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const setFontePagamento = async (mese: number, fonte: string) => {
+    const p = pagamentoDi(mese);
+    if (!p?.pagato) return;
+    setSaving(`m-${mese}`);
+    try {
+      const res = await fetch(`/api/club/soci/${socio.id}/pagamenti`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          anno,
+          mese,
+          pagato: true,
+          importo: p.importo ?? socio.prezzoPiano,
+          fontePagamento: fonte,
         }),
       });
       const updated = (await res.json()) as Socio;
@@ -962,17 +998,26 @@ function SocioDetailModal({
     pagata?: boolean;
     mesePagamento?: string | null;
     importo?: number;
+    fontePagamento?: string;
   }) => {
     setSaving("matr");
     try {
+      const pagataNext = patch.pagata ?? socio.matricolaPagata;
+      const fonteNext =
+        patch.fontePagamento !== undefined
+          ? patch.fontePagamento
+          : pagataNext
+            ? socio.matricolaFontePagamento ?? "Recibo"
+            : null;
       const body = {
         tipo: "matricola",
-        pagata: patch.pagata ?? socio.matricolaPagata,
+        pagata: pagataNext,
         mesePagamento:
           patch.mesePagamento !== undefined
             ? patch.mesePagamento
             : socio.matricolaMesePagamento,
         ...(patch.importo !== undefined ? { importo: patch.importo } : {}),
+        fontePagamento: fonteNext,
       };
       const res = await fetch(`/api/club/soci/${socio.id}/pagamenti`, {
         method: "PUT",
@@ -1099,18 +1144,34 @@ function SocioDetailModal({
               </label>
             </div>
             {socio.matricolaPagata && (
-              <input
-                type="text"
-                defaultValue={socio.matricolaMesePagamento ?? ""}
-                onBlur={(e) => {
-                  const v = e.target.value.trim();
-                  if (v !== (socio.matricolaMesePagamento ?? "")) {
-                    saveMatricola({ mesePagamento: v || null });
+              <div className="flex items-center gap-2 flex-wrap">
+                <input
+                  type="text"
+                  defaultValue={socio.matricolaMesePagamento ?? ""}
+                  onBlur={(e) => {
+                    const v = e.target.value.trim();
+                    if (v !== (socio.matricolaMesePagamento ?? "")) {
+                      saveMatricola({ mesePagamento: v || null });
+                    }
+                  }}
+                  placeholder="Es. Gennaio 2026"
+                  className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 w-48"
+                />
+                <select
+                  value={socio.matricolaFontePagamento ?? "Recibo"}
+                  onChange={(e) =>
+                    saveMatricola({ fontePagamento: e.target.value })
                   }
-                }}
-                placeholder="Es. Gennaio 2026"
-                className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-sky-300 w-48"
-              />
+                  className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-sky-300"
+                  title="Fonte pagamento matricola"
+                >
+                  {FONTI_PAGAMENTO.map((f) => (
+                    <option key={f} value={f}>
+                      {f}
+                    </option>
+                  ))}
+                </select>
+              </div>
             )}
           </div>
         </div>
@@ -1134,8 +1195,8 @@ function SocioDetailModal({
                 : fmt(socio.prezzoPiano);
 
               return (
+                <div key={m} className="flex flex-col gap-1">
                 <button
-                  key={m}
                   onClick={() => togglePagato(m)}
                   disabled={loading || disabled}
                   className="flex flex-col items-center gap-1 px-1 py-2 rounded-lg border text-[10px] font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
@@ -1170,6 +1231,25 @@ function SocioDetailModal({
                     {importoLabel}
                   </span>
                 </button>
+                {pagato ? (
+                  <select
+                    value={p?.fontePagamento ?? "Recibo"}
+                    onChange={(e) => setFontePagamento(m, e.target.value)}
+                    disabled={loading}
+                    className="text-[9px] border border-gray-200 rounded-md px-1 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-sky-300"
+                    title="Fonte pagamento"
+                  >
+                    {FONTI_PAGAMENTO.map((f) => (
+                      <option key={f} value={f}>
+                        {f}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  // Spacer per allineare le altezze quando alcune celle hanno il select
+                  <div className="h-[18px]" />
+                )}
+                </div>
               );
             })}
           </div>
