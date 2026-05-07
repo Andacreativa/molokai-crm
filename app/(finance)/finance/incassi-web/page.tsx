@@ -9,6 +9,7 @@ import {
   Plus,
   Trash2,
   FileText,
+  ArrowLeft,
 } from "lucide-react";
 import { fmt, MESI, ANNI } from "@/lib/constants";
 
@@ -245,6 +246,24 @@ function FareHarborTab({
     return arr;
   }, [rows]);
 
+  // Aggregati per mese (lordo/fee/netto) per la vista summary di default.
+  const aggregatiPerMese = useMemo(() => {
+    const arr = Array.from({ length: 12 }, (_, i) => ({
+      mese: i + 1,
+      lordo: 0,
+      fee: 0,
+      netto: 0,
+    }));
+    for (const r of rows) {
+      const idx = r.mese - 1;
+      if (idx < 0 || idx > 11) continue;
+      arr[idx].lordo += r.lordo;
+      arr[idx].fee += r.fee;
+      arr[idx].netto += r.netto;
+    }
+    return arr;
+  }, [rows]);
+
   const isoDate = (d: string) => new Date(d).toISOString().slice(0, 10);
 
   const updateLocal = (id: number, patch: Partial<FHDayRow>) =>
@@ -302,13 +321,24 @@ function FareHarborTab({
 
   return (
     <div className="space-y-4">
-      {/* Toolbar bottoni in alto a destra */}
+      {/* Toolbar bottoni: a sinistra back button (in vista dettaglio mese)
+          + count, a destra azioni Aggiungi/Importa. */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <span className="text-xs text-gray-500">
-          {meseFiltro === null
-            ? `${rows.length} righe · tutti i mesi`
-            : `${rowsMese.length} righe · ${MESI[meseFiltro - 1]} ${anno}`}
-        </span>
+        <div className="flex items-center gap-3">
+          {meseFiltro !== null && (
+            <button
+              onClick={() => setMeseFiltro(null)}
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-sky-700 hover:text-sky-900"
+            >
+              <ArrowLeft className="w-4 h-4" /> Tutti i mesi
+            </button>
+          )}
+          <span className="text-xs text-gray-500">
+            {meseFiltro === null
+              ? `${rows.length} righe · tutti i mesi`
+              : `${rowsMese.length} righe · ${MESI[meseFiltro - 1]} ${anno}`}
+          </span>
+        </div>
         <div className="flex items-center gap-2">
           <button
             onClick={addRow}
@@ -344,7 +374,65 @@ function FareHarborTab({
         anno={anno}
       />
 
-      {/* Tabella per-data */}
+      {/* Vista summary mensile (default — quando nessun mese è selezionato).
+          Click su una riga → drill-down sulla vista per-data del mese. */}
+      {meseFiltro === null && (
+        <div className="glass-card rounded-2xl overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-100 bg-gray-50">
+                  {["Mese", "Lordo", "Fee", "Netto"].map((h, i) => (
+                    <th
+                      key={h}
+                      className={`text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 ${i === 0 ? "text-left" : "text-right"}`}
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="zebra">
+                {aggregatiPerMese.map((agg) => {
+                  const hasValue = agg.lordo !== 0 || agg.fee !== 0 || agg.netto !== 0;
+                  return (
+                    <tr
+                      key={agg.mese}
+                      onClick={() => setMeseFiltro(agg.mese)}
+                      className="border-b border-gray-50 hover:bg-sky-50 transition-colors cursor-pointer"
+                    >
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                        {MESI[agg.mese - 1]}
+                      </td>
+                      <td
+                        className="px-4 py-3 text-sm font-semibold text-right"
+                        style={{ color: hasValue ? "#1e293b" : "#cbd5e1" }}
+                      >
+                        {fmt(agg.lordo)}
+                      </td>
+                      <td
+                        className="px-4 py-3 text-sm font-semibold text-right"
+                        style={{ color: hasValue ? "#ef4444" : "#cbd5e1" }}
+                      >
+                        {fmt(agg.fee)}
+                      </td>
+                      <td
+                        className="px-4 py-3 text-sm font-bold text-right"
+                        style={{ color: hasValue ? "#0ea5e9" : "#cbd5e1" }}
+                      >
+                        {fmt(agg.netto)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Vista dettaglio per-data — solo quando un mese è selezionato. */}
+      {meseFiltro !== null && (
       <div className="glass-card rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -369,9 +457,7 @@ function FareHarborTab({
                   >
                     <FileText className="w-10 h-10 mx-auto mb-2 opacity-40" />
                     Nessun incasso per{" "}
-                    {meseFiltro === null
-                      ? anno
-                      : `${MESI[meseFiltro - 1]} ${anno}`}
+                    {`${MESI[meseFiltro - 1]} ${anno}`}
                   </td>
                 </tr>
               )}
@@ -451,6 +537,7 @@ function FareHarborTab({
           </table>
         </div>
       </div>
+      )}
 
       {showImport && (
         <FareHarborCsvImportModal
