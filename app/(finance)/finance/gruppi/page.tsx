@@ -10,8 +10,10 @@ import {
   School,
   Briefcase,
   Check,
+  Download,
 } from "lucide-react";
 import { fmt, MESI, ANNI } from "@/lib/constants";
+import { exportGruppoSessioniPDF } from "@/lib/export";
 
 // ─── Types ─────────────────────────────────────────────────────────────
 
@@ -920,12 +922,39 @@ function GruppoDetailModal({
               {gruppo.telefono && ` · ${gruppo.telefono}`}
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() =>
+                exportGruppoSessioniPDF(
+                  {
+                    nome: gruppo.nome,
+                    tipo: TIPO_LABEL[gruppo.tipo] ?? gruppo.tipo,
+                    contatto: gruppo.contatto,
+                    email: gruppo.email,
+                  },
+                  sessioniAnno.map((s) => ({
+                    data: s.data,
+                    partecipanti: s.partecipanti,
+                    prezzoPP: s.prezzoPP,
+                    totale: s.totale,
+                    incassato: s.incassato,
+                  })),
+                  anno,
+                )
+              }
+              className="glass-btn-secondary flex items-center gap-2 text-gray-700 text-xs font-medium px-3 py-2 rounded-lg"
+              title={`Esporta sessioni ${anno} in PDF`}
+            >
+              <Download className="w-4 h-4" style={{ color: "#0ea5e9" }} />
+              Scarica PDF
+            </button>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Stats anno */}

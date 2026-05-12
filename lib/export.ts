@@ -461,3 +461,205 @@ export async function exportFatturaPDF(
   const safeNum = (f.numero ?? "fattura").replace(/[/\\]/g, "-");
   doc.save(`${safeNum}.pdf`);
 }
+
+// ── Riepilogo sessioni Gruppo (PDF) ───────────────────────────────────
+
+interface GruppoPDFData {
+  nome: string;
+  tipo: string;
+  contatto: string | null;
+  email: string | null;
+}
+
+interface SessioneGruppoPDFData {
+  data: string; // ISO
+  partecipanti: number;
+  prezzoPP: number;
+  totale: number;
+  incassato: boolean;
+}
+
+export async function exportGruppoSessioniPDF(
+  gruppo: GruppoPDFData,
+  sessioni: SessioneGruppoPDFData[],
+  anno: number,
+) {
+  const { default: jsPDF } = await import("jspdf");
+  const { default: autoTable } = await import("jspdf-autotable");
+
+  const doc = new jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: "a4",
+    compress: true,
+  });
+  const W = 210,
+    ML = 14,
+    MR = 14;
+  const CW = W - ML - MR;
+
+  // Logo a sinistra (proporzionale via getImageProperties)
+  const logo = await loadLogo();
+  if (logo) {
+    const props = doc.getImageProperties(logo.data);
+    const logoW = 20;
+    const logoH = (props.height / props.width) * logoW;
+    doc.addImage(logo.data, logo.format, ML, 8, logoW, logoH);
+  }
+
+  // Titolo grande "RIEPILOGO SESSIONI" allineato a destra del logo
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.setTextColor(...DARK);
+  doc.text("RIEPILOGO SESSIONI", W - MR, 16, { align: "right" });
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...MUTED);
+  doc.text(
+    `Anno ${anno} · generato il ${new Date().toLocaleDateString("it-IT")}`,
+    W - MR,
+    22,
+    { align: "right" },
+  );
+
+  // Separator
+  doc.setDrawColor(...LIGHT);
+  doc.setLineWidth(0.3);
+  doc.line(ML, 36, W - MR, 36);
+
+  // Blocco gruppo
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(14);
+  doc.setTextColor(...DARK);
+  doc.text(gruppo.nome, ML, 44);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...MUTED);
+  const infoLine = [
+    gruppo.contatto ? `Referente: ${gruppo.contatto}` : null,
+    gruppo.email ? `Email: ${gruppo.email}` : null,
+    `Tipo: ${gruppo.tipo}`,
+  ]
+    .filter(Boolean)
+    .join("  ·  ");
+  doc.text(infoLine, ML, 50);
+
+  // Tabella sessioni
+  const tableStartY = 58;
+  autoTable(doc, {
+    startY: tableStartY,
+    head: [["DATA", "PARTECIPANTI", "PREZZO/PP", "TOTALE", "INCASSATO"]],
+    body: sessioni.map((s) => [
+      new Date(s.data).toLocaleDateString("it-IT"),
+      String(s.partecipanti),
+      fmt(s.prezzoPP),
+      fmt(s.totale),
+      s.incassato ? "Sì" : "No",
+    ]),
+    margin: { left: ML, right: MR },
+    styles: {
+      fontSize: 9,
+      cellPadding: 3,
+      lineColor: [226, 232, 240],
+      lineWidth: 0.1,
+    },
+    headStyles: {
+      fillColor: SKY,
+      textColor: 255,
+      fontStyle: "bold",
+      fontSize: 9,
+    },
+    alternateRowStyles: { fillColor: BG_SOFT },
+    columnStyles: {
+      0: { cellWidth: 30 },
+      1: { halign: "right", cellWidth: 30 },
+      2: { halign: "right", cellWidth: 32 },
+      3: { halign: "right", cellWidth: 32 },
+      4: { halign: "center", cellWidth: 28 },
+    },
+    didParseCell: (data) => {
+      // Colora la colonna "INCASSATO" in verde/arancione
+      if (data.section === "body" && data.column.index === 4) {
+        const txt = String(data.cell.raw ?? "");
+        if (txt === "Sì") data.cell.styles.textColor = [34, 197, 94];
+        else if (txt === "No") data.cell.styles.textColor = [249, 115, 22];
+      }
+    },
+  });
+
+  // Footer totali
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const lastY = (doc as any).lastAutoTable?.finalY ?? tableStartY;
+
+  const totaleIncassato =
+    Math.round(
+      sessioni
+        .filter((s) => s.incassato)
+        .reduce((sum, s) => sum + s.totale, 0) * 100,
+    ) / 100;
+  const daIncassare =
+    Math.round(
+      sessioni
+        .filter((s) => !s.incassato)
+        .reduce((sum, s) => sum + s.totale, 0) * 100,
+    ) / 100;
+  const totaleGenerale = Math.round((totaleIncassato + daIncassare) * 100) / 100;
+
+  const footY = lastY + 8;
+  const boxX = ML;
+  const boxW = CW;
+  const boxH = 26;
+
+  doc.setFillColor(...BG_SOFT);
+  doc.rect(boxX, footY, boxW, boxH, "F");
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...MUTED);
+
+  // Riga 1: N° Sessioni
+  doc.text("N° Sessioni totali", boxX + 4, footY + 6);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...DARK);
+  doc.text(String(sessioni.length), boxX + boxW - 4, footY + 6, {
+    align: "right",
+  });
+
+  // Riga 2: Incassato (verde) e Da incassare (arancione)
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(...MUTED);
+  doc.text("Totale Incassato", boxX + 4, footY + 12);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(34, 197, 94);
+  doc.text(fmt(totaleIncassato), boxX + boxW - 4, footY + 12, {
+    align: "right",
+  });
+
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(...MUTED);
+  doc.text("Da Incassare", boxX + 4, footY + 18);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(249, 115, 22);
+  doc.text(fmt(daIncassare), boxX + boxW - 4, footY + 18, {
+    align: "right",
+  });
+
+  // Riga totale generale (sky)
+  doc.setDrawColor(...LIGHT);
+  doc.setLineWidth(0.2);
+  doc.line(boxX + 4, footY + 20.5, boxX + boxW - 4, footY + 20.5);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(...SKY);
+  doc.text("TOTALE GENERALE", boxX + 4, footY + 25);
+  doc.setTextColor(...DARK);
+  doc.text(fmt(totaleGenerale), boxX + boxW - 4, footY + 25, {
+    align: "right",
+  });
+
+  const safeName = gruppo.nome.replace(/[/\\]/g, "-").replace(/\s+/g, "_");
+  doc.save(`Sessioni_${safeName}_${anno}.pdf`);
+}
