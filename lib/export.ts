@@ -479,11 +479,82 @@ interface SessioneGruppoPDFData {
   incassato: boolean;
 }
 
+type GruppoPDFLocale = "it" | "es";
+
+interface GruppoPDFStrings {
+  title: string;
+  generato: (anno: number, date: string) => string;
+  referente: string;
+  email: string;
+  tipo: string;
+  colData: string;
+  colPartecipanti: string;
+  colPrezzoPP: string;
+  colTotale: string;
+  colIncassato: string;
+  yes: string;
+  no: string;
+  nSessioni: string;
+  totalePartecipanti: string;
+  totaleIncassato: string;
+  daIncassare: string;
+  totaleGenerale: string;
+  fileNamePrefix: string;
+  dateLocale: string;
+}
+
+const GRUPPO_PDF_STRINGS: Record<GruppoPDFLocale, GruppoPDFStrings> = {
+  it: {
+    title: "RIEPILOGO SESSIONI",
+    generato: (a, d) => `Anno ${a} · generato il ${d}`,
+    referente: "Referente",
+    email: "Email",
+    tipo: "Tipo",
+    colData: "DATA",
+    colPartecipanti: "PARTECIPANTI",
+    colPrezzoPP: "PREZZO/PP",
+    colTotale: "TOTALE",
+    colIncassato: "INCASSATO",
+    yes: "Sì",
+    no: "No",
+    nSessioni: "N° Sessioni totali",
+    totalePartecipanti: "Totale Partecipanti",
+    totaleIncassato: "Totale Incassato",
+    daIncassare: "Da Incassare",
+    totaleGenerale: "TOTALE GENERALE",
+    fileNamePrefix: "Sessioni",
+    dateLocale: "it-IT",
+  },
+  es: {
+    title: "RESUMEN DE SESIONES",
+    generato: (a, d) => `Año ${a} · fecha de generación ${d}`,
+    referente: "Responsable",
+    email: "Email",
+    tipo: "Tipo",
+    colData: "FECHA",
+    colPartecipanti: "PARTICIPANTES",
+    colPrezzoPP: "PRECIO/PERSONA",
+    colTotale: "TOTAL",
+    colIncassato: "COBRADO",
+    yes: "Sí",
+    no: "No",
+    nSessioni: "N° Sesiones totales",
+    totalePartecipanti: "Total Participantes",
+    totaleIncassato: "Total Cobrado",
+    daIncassare: "Por Cobrar",
+    totaleGenerale: "TOTAL GENERAL",
+    fileNamePrefix: "Sesiones",
+    dateLocale: "es-ES",
+  },
+};
+
 export async function exportGruppoSessioniPDF(
   gruppo: GruppoPDFData,
   sessioni: SessioneGruppoPDFData[],
   anno: number,
+  locale: GruppoPDFLocale = "it",
 ) {
+  const t = GRUPPO_PDF_STRINGS[locale];
   const { default: jsPDF } = await import("jspdf");
   const { default: autoTable } = await import("jspdf-autotable");
 
@@ -507,17 +578,17 @@ export async function exportGruppoSessioniPDF(
     doc.addImage(logo.data, logo.format, ML, 8, logoW, logoH);
   }
 
-  // Titolo grande "RIEPILOGO SESSIONI" allineato a destra del logo
+  // Titolo grande allineato a destra del logo
   doc.setFont("helvetica", "bold");
   doc.setFontSize(18);
   doc.setTextColor(...DARK);
-  doc.text("RIEPILOGO SESSIONI", W - MR, 16, { align: "right" });
+  doc.text(t.title, W - MR, 16, { align: "right" });
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(...MUTED);
   doc.text(
-    `Anno ${anno} · generato il ${new Date().toLocaleDateString("it-IT")}`,
+    t.generato(anno, new Date().toLocaleDateString(t.dateLocale)),
     W - MR,
     22,
     { align: "right" },
@@ -538,9 +609,9 @@ export async function exportGruppoSessioniPDF(
   doc.setFontSize(9);
   doc.setTextColor(...MUTED);
   const infoLine = [
-    gruppo.contatto ? `Referente: ${gruppo.contatto}` : null,
-    gruppo.email ? `Email: ${gruppo.email}` : null,
-    `Tipo: ${gruppo.tipo}`,
+    gruppo.contatto ? `${t.referente}: ${gruppo.contatto}` : null,
+    gruppo.email ? `${t.email}: ${gruppo.email}` : null,
+    `${t.tipo}: ${gruppo.tipo}`,
   ]
     .filter(Boolean)
     .join("  ·  ");
@@ -550,13 +621,13 @@ export async function exportGruppoSessioniPDF(
   const tableStartY = 58;
   autoTable(doc, {
     startY: tableStartY,
-    head: [["DATA", "PARTECIPANTI", "PREZZO/PP", "TOTALE", "INCASSATO"]],
+    head: [[t.colData, t.colPartecipanti, t.colPrezzoPP, t.colTotale, t.colIncassato]],
     body: sessioni.map((s) => [
-      new Date(s.data).toLocaleDateString("it-IT"),
+      new Date(s.data).toLocaleDateString(t.dateLocale),
       String(s.partecipanti),
       fmt(s.prezzoPP),
       fmt(s.totale),
-      s.incassato ? "Sì" : "No",
+      s.incassato ? t.yes : t.no,
     ]),
     margin: { left: ML, right: MR },
     styles: {
@@ -580,11 +651,11 @@ export async function exportGruppoSessioniPDF(
       4: { halign: "center", cellWidth: 28 },
     },
     didParseCell: (data) => {
-      // Colora la colonna "INCASSATO" in verde/arancione
+      // Colora la colonna "INCASSATO/COBRADO" in verde/arancione
       if (data.section === "body" && data.column.index === 4) {
         const txt = String(data.cell.raw ?? "");
-        if (txt === "Sì") data.cell.styles.textColor = [34, 197, 94];
-        else if (txt === "No") data.cell.styles.textColor = [249, 115, 22];
+        if (txt === t.yes) data.cell.styles.textColor = [34, 197, 94];
+        else if (txt === t.no) data.cell.styles.textColor = [249, 115, 22];
       }
     },
   });
@@ -624,7 +695,7 @@ export async function exportGruppoSessioniPDF(
   doc.setTextColor(...MUTED);
 
   // Riga 1: N° Sessioni
-  doc.text("N° Sessioni totali", boxX + 4, footY + 6);
+  doc.text(t.nSessioni, boxX + 4, footY + 6);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...DARK);
   doc.text(String(sessioni.length), boxX + boxW - 4, footY + 6, {
@@ -634,7 +705,7 @@ export async function exportGruppoSessioniPDF(
   // Riga 2: Totale Partecipanti (sopra i totali economici)
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...MUTED);
-  doc.text("Totale Partecipanti", boxX + 4, footY + 12);
+  doc.text(t.totalePartecipanti, boxX + 4, footY + 12);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...DARK);
   doc.text(String(totalePartecipanti), boxX + boxW - 4, footY + 12, {
@@ -644,7 +715,7 @@ export async function exportGruppoSessioniPDF(
   // Riga 3: Incassato (verde)
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...MUTED);
-  doc.text("Totale Incassato", boxX + 4, footY + 18);
+  doc.text(t.totaleIncassato, boxX + 4, footY + 18);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(34, 197, 94);
   doc.text(fmt(totaleIncassato), boxX + boxW - 4, footY + 18, {
@@ -654,7 +725,7 @@ export async function exportGruppoSessioniPDF(
   // Riga 4: Da Incassare (arancione)
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...MUTED);
-  doc.text("Da Incassare", boxX + 4, footY + 24);
+  doc.text(t.daIncassare, boxX + 4, footY + 24);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(249, 115, 22);
   doc.text(fmt(daIncassare), boxX + boxW - 4, footY + 24, {
@@ -669,12 +740,12 @@ export async function exportGruppoSessioniPDF(
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.setTextColor(...SKY);
-  doc.text("TOTALE GENERALE", boxX + 4, footY + 31);
+  doc.text(t.totaleGenerale, boxX + 4, footY + 31);
   doc.setTextColor(...DARK);
   doc.text(fmt(totaleGenerale), boxX + boxW - 4, footY + 31, {
     align: "right",
   });
 
   const safeName = gruppo.nome.replace(/[/\\]/g, "-").replace(/\s+/g, "_");
-  doc.save(`Sessioni_${safeName}_${anno}.pdf`);
+  doc.save(`${t.fileNamePrefix}_${safeName}_${anno}.pdf`);
 }

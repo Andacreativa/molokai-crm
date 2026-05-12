@@ -923,31 +923,39 @@ function GruppoDetailModal({
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() =>
-                exportGruppoSessioniPDF(
-                  {
-                    nome: gruppo.nome,
-                    tipo: TIPO_LABEL[gruppo.tipo] ?? gruppo.tipo,
-                    contatto: gruppo.contatto,
-                    email: gruppo.email,
-                  },
-                  sessioniAnno.map((s) => ({
-                    data: s.data,
-                    partecipanti: s.partecipanti,
-                    prezzoPP: s.prezzoPP,
-                    totale: s.totale,
-                    incassato: s.incassato,
-                  })),
-                  anno,
-                )
-              }
-              className="glass-btn-secondary flex items-center gap-2 text-gray-700 text-xs font-medium px-3 py-2 rounded-lg"
-              title={`Esporta sessioni ${anno} in PDF`}
-            >
-              <Download className="w-4 h-4" style={{ color: "#0ea5e9" }} />
-              Scarica PDF
-            </button>
+            {(["it", "es"] as const).map((loc) => (
+              <button
+                key={loc}
+                onClick={() =>
+                  exportGruppoSessioniPDF(
+                    {
+                      nome: gruppo.nome,
+                      tipo: TIPO_LABEL[gruppo.tipo] ?? gruppo.tipo,
+                      contatto: gruppo.contatto,
+                      email: gruppo.email,
+                    },
+                    sessioniAnno.map((s) => ({
+                      data: s.data,
+                      partecipanti: s.partecipanti,
+                      prezzoPP: s.prezzoPP,
+                      totale: s.totale,
+                      incassato: s.incassato,
+                    })),
+                    anno,
+                    loc,
+                  )
+                }
+                className="glass-btn-secondary flex items-center gap-1.5 text-gray-700 text-xs font-medium px-3 py-2 rounded-lg"
+                title={
+                  loc === "it"
+                    ? `Esporta sessioni ${anno} in PDF (italiano)`
+                    : `Esporta sessioni ${anno} en PDF (español)`
+                }
+              >
+                <Download className="w-4 h-4" style={{ color: "#0ea5e9" }} />
+                Scarica PDF {loc === "it" ? "🇮🇹" : "🇪🇸"}
+              </button>
+            ))}
             <button
               onClick={onClose}
               className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100"
