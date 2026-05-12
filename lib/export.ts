@@ -606,11 +606,15 @@ export async function exportGruppoSessioniPDF(
         .reduce((sum, s) => sum + s.totale, 0) * 100,
     ) / 100;
   const totaleGenerale = Math.round((totaleIncassato + daIncassare) * 100) / 100;
+  const totalePartecipanti = sessioni.reduce(
+    (sum, s) => sum + s.partecipanti,
+    0,
+  );
 
   const footY = lastY + 8;
   const boxX = ML;
   const boxW = CW;
-  const boxH = 26;
+  const boxH = 32;
 
   doc.setFillColor(...BG_SOFT);
   doc.rect(boxX, footY, boxW, boxH, "F");
@@ -627,36 +631,47 @@ export async function exportGruppoSessioniPDF(
     align: "right",
   });
 
-  // Riga 2: Incassato (verde) e Da incassare (arancione)
+  // Riga 2: Totale Partecipanti (sopra i totali economici)
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...MUTED);
-  doc.text("Totale Incassato", boxX + 4, footY + 12);
+  doc.text("Totale Partecipanti", boxX + 4, footY + 12);
   doc.setFont("helvetica", "bold");
-  doc.setTextColor(34, 197, 94);
-  doc.text(fmt(totaleIncassato), boxX + boxW - 4, footY + 12, {
+  doc.setTextColor(...DARK);
+  doc.text(String(totalePartecipanti), boxX + boxW - 4, footY + 12, {
     align: "right",
   });
 
+  // Riga 3: Incassato (verde)
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...MUTED);
-  doc.text("Da Incassare", boxX + 4, footY + 18);
+  doc.text("Totale Incassato", boxX + 4, footY + 18);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(34, 197, 94);
+  doc.text(fmt(totaleIncassato), boxX + boxW - 4, footY + 18, {
+    align: "right",
+  });
+
+  // Riga 4: Da Incassare (arancione)
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(...MUTED);
+  doc.text("Da Incassare", boxX + 4, footY + 24);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(249, 115, 22);
-  doc.text(fmt(daIncassare), boxX + boxW - 4, footY + 18, {
+  doc.text(fmt(daIncassare), boxX + boxW - 4, footY + 24, {
     align: "right",
   });
 
   // Riga totale generale (sky)
   doc.setDrawColor(...LIGHT);
   doc.setLineWidth(0.2);
-  doc.line(boxX + 4, footY + 20.5, boxX + boxW - 4, footY + 20.5);
+  doc.line(boxX + 4, footY + 26.5, boxX + boxW - 4, footY + 26.5);
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.setTextColor(...SKY);
-  doc.text("TOTALE GENERALE", boxX + 4, footY + 25);
+  doc.text("TOTALE GENERALE", boxX + 4, footY + 31);
   doc.setTextColor(...DARK);
-  doc.text(fmt(totaleGenerale), boxX + boxW - 4, footY + 25, {
+  doc.text(fmt(totaleGenerale), boxX + boxW - 4, footY + 31, {
     align: "right",
   });
 

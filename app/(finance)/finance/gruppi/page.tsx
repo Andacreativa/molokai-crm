@@ -958,13 +958,21 @@ function GruppoDetailModal({
         </div>
 
         {/* Stats anno */}
-        <div className="grid grid-cols-2 gap-3 bg-gray-50 rounded-xl p-3">
+        <div className="grid grid-cols-3 gap-3 bg-gray-50 rounded-xl p-3">
           <div>
             <p className="text-[10px] text-gray-500 uppercase tracking-wide">
               Sessioni {anno}
             </p>
             <p className="text-sm font-bold text-gray-900">
               {sessioniAnno.length}
+            </p>
+          </div>
+          <div>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wide">
+              Totale Partecipanti
+            </p>
+            <p className="text-sm font-bold text-gray-900">
+              {sessioniAnno.reduce((sum, s) => sum + s.partecipanti, 0)}
             </p>
           </div>
           <div>
