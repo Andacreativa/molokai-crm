@@ -34,16 +34,21 @@ export async function POST(request: Request) {
     ? new Date(body.scadenza)
     : new Date(dataFattura.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-  // Righe + totali
+  // Righe + totali. Se prezzoConIva è true, i prezzoUnitario delle righe
+  // sono lordi (IVA inclusa) → ricaviamo base dividendo per (1 + iva%).
   const righe: RigaInput[] = Array.isArray(body.righe) ? body.righe : [];
-  const baseImponibile = round2(
-    righe.reduce(
-      (s, r) => s + (Number(r.quantita) || 0) * (Number(r.prezzoUnitario) || 0),
-      0,
-    ),
-  );
+  const prezzoConIva = Boolean(body.prezzoConIva);
   const iva = Number(body.iva ?? 21);
-  const totale = round2(baseImponibile * (1 + iva / 100));
+  const sommaRighe = righe.reduce(
+    (s, r) => s + (Number(r.quantita) || 0) * (Number(r.prezzoUnitario) || 0),
+    0,
+  );
+  const baseImponibile = prezzoConIva
+    ? round2(sommaRighe / (1 + iva / 100))
+    : round2(sommaRighe);
+  const totale = prezzoConIva
+    ? round2(sommaRighe)
+    : round2(baseImponibile * (1 + iva / 100));
 
   // Numero auto: F-{N}/{ANNO}, con N contatore annuale
   let numero = body.numero as string | undefined;
@@ -59,6 +64,7 @@ export async function POST(request: Request) {
       scadenza,
       clienteId: body.clienteId ? parseInt(body.clienteId) : null,
       righe: JSON.stringify(righe),
+      prezzoConIva,
       baseImponibile,
       iva,
       totale,

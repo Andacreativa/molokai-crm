@@ -59,6 +59,7 @@ interface Fattura {
   clienteId: number | null;
   cliente: Cliente | null;
   righe: string;
+  prezzoConIva: boolean;
   baseImponibile: number;
   iva: number;
   totale: number;
@@ -477,6 +478,9 @@ function FatturaFormModal({
     editing?.metodoPagamento ?? "transferencia",
   );
   const [note, setNote] = useState<string>(editing?.note ?? "");
+  const [prezzoConIva, setPrezzoConIva] = useState<boolean>(
+    editing?.prezzoConIva ?? false,
+  );
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -492,15 +496,22 @@ function FatturaFormModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 
-  const baseImponibile = round2(
-    righe.reduce(
-      (s, r) => s + (Number(r.quantita) || 0) * (Number(r.prezzoUnitario) || 0),
-      0,
-    ),
+  const sommaRighe = righe.reduce(
+    (s, r) =>
+      s + (Number(r.quantita) || 0) * (Number(r.prezzoUnitario) || 0),
+    0,
   );
   const ivaNum = Number(iva) || 0;
-  const ivaImporto = round2(baseImponibile * (ivaNum / 100));
-  const totale = round2(baseImponibile + ivaImporto);
+  // Modalità prezzo lordo: la somma delle righe È il totale (IVA inclusa),
+  // base si ricava dividendo per (1 + iva%). Modalità netto (default): la
+  // somma è la base, IVA si somma sopra.
+  const baseImponibile = prezzoConIva
+    ? round2(sommaRighe / (1 + ivaNum / 100))
+    : round2(sommaRighe);
+  const totale = prezzoConIva
+    ? round2(sommaRighe)
+    : round2(baseImponibile * (1 + ivaNum / 100));
+  const ivaImporto = round2(totale - baseImponibile);
 
   const updateRiga = (i: number, patch: Partial<Riga>) => {
     setRighe((prev) =>
@@ -534,6 +545,7 @@ function FatturaFormModal({
         scadenza,
         righe,
         iva: ivaNum,
+        prezzoConIva,
         pagato,
         metodoPagamento,
         note,
@@ -664,10 +676,24 @@ function FatturaFormModal({
         </div>
 
         <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
-              Righe
-            </label>
+          <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+            <div className="flex items-center gap-3 flex-wrap">
+              <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                Righe
+              </label>
+              <label className="inline-flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={prezzoConIva}
+                  onChange={(e) => setPrezzoConIva(e.target.checked)}
+                  className="w-3.5 h-3.5"
+                  style={{ accentColor: "#0ea5e9" }}
+                />
+                <span className="text-xs text-gray-700">
+                  Prezzo unitario IVA inclusa
+                </span>
+              </label>
+            </div>
             <button
               type="button"
               onClick={addRiga}
@@ -705,20 +731,28 @@ function FatturaFormModal({
                   }}
                   className="border border-gray-200 rounded-lg px-2 py-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-sky-300"
                 />
-                <input
-                  type="number"
-                  step="0.01"
-                  value={r.prezzoUnitario}
-                  onChange={(e) =>
-                    updateRiga(i, {
-                      prezzoUnitario: parseFloat(e.target.value) || 0,
-                    })
-                  }
-                  className="border border-gray-200 rounded-lg px-2 py-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-sky-300"
-                />
+                <div className="flex flex-col gap-0.5">
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={r.prezzoUnitario}
+                    onChange={(e) =>
+                      updateRiga(i, {
+                        prezzoUnitario: parseFloat(e.target.value) || 0,
+                      })
+                    }
+                    className="border border-gray-200 rounded-lg px-2 py-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-sky-300"
+                  />
+                  <span className="text-[9px] text-gray-500 text-right leading-none">
+                    {prezzoConIva ? "Precio con IVA" : "Precio sin IVA"}
+                  </span>
+                </div>
                 <div className="px-2 py-2 text-sm text-right font-semibold text-gray-800 bg-gray-50 rounded-lg">
                   {fmt(
-                    (Number(r.quantita) || 0) * (Number(r.prezzoUnitario) || 0),
+                    round2(
+                      (Number(r.quantita) || 0) *
+                        (Number(r.prezzoUnitario) || 0),
+                    ),
                   )}
                 </div>
                 <button

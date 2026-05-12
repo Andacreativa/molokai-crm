@@ -37,6 +37,7 @@ model Fattura {
   clienteId        Int?
   cliente          Cliente?  @relation(fields: [clienteId], references: [id], onDelete: SetNull)
   righe            String    // JSON: [{descrizione, quantita, prezzoUnitario}]
+  prezzoConIva     Boolean   @default(false) // se true, righe.prezzoUnitario è lordo (IVA inclusa)
   baseImponibile   Float
   iva              Float     @default(21)
   totale           Float

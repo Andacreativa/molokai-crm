@@ -53,27 +53,35 @@ export async function PATCH(
   if (body.anno !== undefined) data.anno = parseInt(body.anno);
   if (body.note !== undefined) data.note = body.note || null;
 
-  // Se cambiano righe o iva, ricalcolo baseImponibile e totale
+  // Se cambiano righe, iva, o prezzoConIva → ricalcolo baseImponibile e totale.
   const righeChanged = body.righe !== undefined;
   const ivaChanged = body.iva !== undefined;
-  if (righeChanged || ivaChanged) {
+  const prezzoConIvaChanged = body.prezzoConIva !== undefined;
+  if (righeChanged || ivaChanged || prezzoConIvaChanged) {
     const righe: RigaInput[] = righeChanged
       ? Array.isArray(body.righe)
         ? body.righe
         : []
       : JSON.parse(before.righe || "[]");
     const iva = ivaChanged ? Number(body.iva) : before.iva;
-    const baseImponibile = round2(
-      righe.reduce(
-        (s, r) =>
-          s + (Number(r.quantita) || 0) * (Number(r.prezzoUnitario) || 0),
-        0,
-      ),
+    const prezzoConIva = prezzoConIvaChanged
+      ? Boolean(body.prezzoConIva)
+      : before.prezzoConIva;
+    const sommaRighe = righe.reduce(
+      (s, r) =>
+        s + (Number(r.quantita) || 0) * (Number(r.prezzoUnitario) || 0),
+      0,
     );
-    const totale = round2(baseImponibile * (1 + iva / 100));
+    const baseImponibile = prezzoConIva
+      ? round2(sommaRighe / (1 + iva / 100))
+      : round2(sommaRighe);
+    const totale = prezzoConIva
+      ? round2(sommaRighe)
+      : round2(baseImponibile * (1 + iva / 100));
 
     if (righeChanged) data.righe = JSON.stringify(righe);
     data.iva = iva;
+    data.prezzoConIva = prezzoConIva;
     data.baseImponibile = baseImponibile;
     data.totale = totale;
   }
