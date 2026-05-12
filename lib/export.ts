@@ -644,11 +644,13 @@ export async function exportGruppoSessioniPDF(
     },
     alternateRowStyles: { fillColor: BG_SOFT },
     columnStyles: {
-      0: { cellWidth: 30 },
-      1: { halign: "right", cellWidth: 30 },
-      2: { halign: "right", cellWidth: 32 },
+      // Larghezze dimensionate per accomodare anche le label spagnole più
+      // lunghe ("PARTICIPANTES", "PRECIO/PERSONA") senza wrap.
+      0: { cellWidth: 26 },
+      1: { halign: "right", cellWidth: 40 },
+      2: { halign: "right", cellWidth: 42 },
       3: { halign: "right", cellWidth: 32 },
-      4: { halign: "center", cellWidth: 28 },
+      4: { halign: "center", cellWidth: 26 },
     },
     didParseCell: (data) => {
       // Colora la colonna "INCASSATO/COBRADO" in verde/arancione
