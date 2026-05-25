@@ -12,6 +12,9 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.90.0",
     "@base-ui/react": "^1.4.0",
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@prisma/adapter-neon": "^7.7.0",
     "@prisma/client": "^7.7.0",
     "class-variance-authority": "^0.7.1",
@@ -21,6 +24,7 @@
     "jszip": "^3.10.1",
     "lucide-react": "^1.8.0",
     "next": "16.2.3",
+    "papaparse": "^5.5.3",
     "prisma": "^7.7.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -34,6 +38,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/papaparse": "^5.5.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "dotenv": "^17.4.2",

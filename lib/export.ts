@@ -751,3 +751,315 @@ export async function exportGruppoSessioniPDF(
   const safeName = gruppo.nome.replace(/[/\\]/g, "-").replace(/\s+/g, "_");
   doc.save(`${t.fileNamePrefix}_${safeName}_${anno}.pdf`);
 }
+
+// ── Prodotti & Margini (PDF) ──────────────────────────────────────────
+
+interface ProdottoPDFData {
+  nome: string;
+  prezzoVendita: number;
+  feePerc?: number | null;
+  feeFissa?: number | null;
+}
+
+interface VenditaPDFData {
+  data: string; // ISO
+  nomeProdotto: string;
+  quantita: number;
+  prezzoUnitario: number;
+  canale: string | null;
+}
+
+interface ProdottiPDFKpi {
+  ricavoTotale: number;
+  guadagnoNetto: number;
+  margineMedio: number; // percentuale 0–100
+}
+
+interface ProdottiPDFTopRicavo {
+  nome: string;
+  ricavo: number;
+  netto: number;
+}
+
+export type ProdottiPDFSections = {
+  catalogo?: boolean;
+  vendite?: boolean;
+  stats?: boolean;
+};
+
+export async function exportProdottiPDF(
+  prodotti: ProdottoPDFData[],
+  vendite: VenditaPDFData[],
+  kpi: ProdottiPDFKpi,
+  anno: number,
+  topRicavo: ProdottiPDFTopRicavo[] = [],
+  sections: ProdottiPDFSections = {
+    catalogo: true,
+    vendite: true,
+    stats: true,
+  },
+) {
+  const includeCat = sections.catalogo !== false;
+  const includeVen = sections.vendite !== false;
+  const includeSta = sections.stats !== false;
+  // Calcolo suffix nome file in base alle sezioni
+  const flags = [includeCat, includeVen, includeSta].filter(Boolean).length;
+  let fileSuffix: string;
+  if (flags === 3) fileSuffix = "Margini";
+  else if (includeCat && flags === 1) fileSuffix = "Catalogo";
+  else if (includeVen && flags === 1) fileSuffix = "Vendite";
+  else if (includeSta && flags === 1) fileSuffix = "Statistiche";
+  else fileSuffix = "Report";
+  const { default: jsPDF } = await import("jspdf");
+  const { default: autoTable } = await import("jspdf-autotable");
+  // Riusa lo stesso helper di calcolo del frontend per coerenza.
+  const { calcolaMargini } = await import("./prodotti");
+
+  const doc = new jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: "a4",
+    compress: true,
+  });
+  const W = 210,
+    ML = 14,
+    MR = 14;
+  const CW = W - ML - MR;
+
+  // Header logo + titolo (stesso pattern di exportGruppoSessioniPDF)
+  const logo = await loadLogo();
+  if (logo) {
+    const props = doc.getImageProperties(logo.data);
+    const logoW = 20;
+    const logoH = (props.height / props.width) * logoW;
+    doc.addImage(logo.data, logo.format, ML, 8, logoW, logoH);
+  }
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.setTextColor(...DARK);
+  doc.text("PRODOTTI & MARGINI", W - MR, 16, { align: "right" });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...MUTED);
+  doc.text(
+    `Anno ${anno} · generato il ${new Date().toLocaleDateString("it-IT")}`,
+    W - MR,
+    22,
+    { align: "right" },
+  );
+
+  // Separator
+  doc.setDrawColor(...LIGHT);
+  doc.setLineWidth(0.3);
+  doc.line(ML, 36, W - MR, 36);
+
+  // KPI box (3 stat inline) — stesso stile del footer totali di Gruppi
+  const kpiY = 42;
+  const kpiH = 22;
+  doc.setFillColor(...BG_SOFT);
+  doc.rect(ML, kpiY, CW, kpiH, "F");
+
+  const kpiColW = CW / 3;
+  const labels: Array<{ label: string; value: string; color: [number, number, number] }> = [
+    {
+      label: "RICAVO TOTALE",
+      value: fmt(kpi.ricavoTotale),
+      color: SKY,
+    },
+    {
+      label: "GUADAGNO NETTO",
+      value: fmt(kpi.guadagnoNetto),
+      color: [34, 197, 94],
+    },
+    {
+      label: "MARGINE MEDIO",
+      value: `${kpi.margineMedio.toFixed(1)}%`,
+      color: kpi.margineMedio >= 65
+        ? [34, 197, 94]
+        : kpi.margineMedio >= 50
+          ? [202, 138, 4]
+          : [220, 38, 38],
+    },
+  ];
+  labels.forEach((k, i) => {
+    const cx = ML + kpiColW * i + kpiColW / 2;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(...MUTED);
+    doc.text(k.label, cx, kpiY + 8, { align: "center" });
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(...k.color);
+    doc.text(k.value, cx, kpiY + 16, { align: "center" });
+  });
+
+  let cursorY = kpiY + kpiH + 8;
+
+  // Helper page break + sezione title
+  const sezione = (titolo: string) => {
+    if (cursorY > 250) {
+      doc.addPage();
+      cursorY = 20;
+    }
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(...DARK);
+    doc.text(titolo, ML, cursorY);
+    cursorY += 3;
+  };
+  const tableBaseStyle = {
+    margin: { left: ML, right: MR },
+    styles: {
+      fontSize: 9,
+      cellPadding: 3,
+      lineColor: [226, 232, 240] as [number, number, number],
+      lineWidth: 0.1,
+    },
+    headStyles: {
+      fillColor: SKY,
+      textColor: 255 as const,
+      fontStyle: "bold" as const,
+      fontSize: 9,
+    },
+    alternateRowStyles: { fillColor: BG_SOFT },
+  };
+  const advanceCursor = () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    cursorY = ((doc as any).lastAutoTable?.finalY ?? cursorY) + 10;
+  };
+
+  // ── Catalogo prodotti ──
+  if (includeCat && prodotti.length > 0) {
+    sezione("CATALOGO PRODOTTI");
+    autoTable(doc, {
+      ...tableBaseStyle,
+      startY: cursorY,
+      head: [["NOME", "PREZZO", "IVA 21%", "FEE", "NETTO", "MARGINE"]],
+      body: prodotti.map((p) => {
+        const { iva, netto, margine } = calcolaMargini(p);
+        const feeLabel =
+          p.feePerc != null ? `${p.feePerc}%` : fmt(p.feeFissa ?? 0);
+        return [
+          p.nome,
+          fmt(p.prezzoVendita),
+          fmt(iva),
+          feeLabel,
+          fmt(netto),
+          `${margine.toFixed(1)}%`,
+        ];
+      }),
+      columnStyles: {
+        0: { cellWidth: "auto" },
+        1: { halign: "right", cellWidth: 24 },
+        2: { halign: "right", cellWidth: 24 },
+        3: { halign: "right", cellWidth: 22 },
+        4: { halign: "right", cellWidth: 26 },
+        5: { halign: "right", cellWidth: 22 },
+      },
+      didParseCell: (data) => {
+        if (data.section === "body" && data.column.index === 5) {
+          const m = parseFloat(String(data.cell.raw ?? "0"));
+          if (m >= 65) data.cell.styles.textColor = [22, 163, 74];
+          else if (m >= 50) data.cell.styles.textColor = [202, 138, 4];
+          else data.cell.styles.textColor = [220, 38, 38];
+          data.cell.styles.fontStyle = "bold";
+        }
+      },
+    });
+    advanceCursor();
+  }
+
+  // ── Vendite ──
+  if (includeVen && vendite.length > 0) {
+    sezione(`VENDITE ${anno}`);
+    autoTable(doc, {
+      ...tableBaseStyle,
+      startY: cursorY,
+      head: [["DATA", "PRODOTTO", "QT.", "PREZZO UNIT.", "TOTALE", "CANALE"]],
+      body: vendite.map((v) => [
+        new Date(v.data).toLocaleDateString("it-IT"),
+        v.nomeProdotto,
+        String(v.quantita),
+        fmt(v.prezzoUnitario),
+        fmt(v.prezzoUnitario * v.quantita),
+        v.canale ?? "—",
+      ]),
+      columnStyles: {
+        0: { cellWidth: 24 },
+        1: { cellWidth: "auto" },
+        2: { halign: "right", cellWidth: 14 },
+        3: { halign: "right", cellWidth: 28 },
+        4: { halign: "right", cellWidth: 30 },
+        5: { cellWidth: 24 },
+      },
+    });
+    advanceCursor();
+  }
+
+  // ── Statistiche ──
+  if (includeSta) {
+    // Top prodotti per ricavo (dalle vendite aggregate, già passate)
+    if (topRicavo.length > 0) {
+      sezione("TOP PRODOTTI PER RICAVO");
+      autoTable(doc, {
+        ...tableBaseStyle,
+        startY: cursorY,
+        head: [["#", "PRODOTTO", "RICAVO", "GUADAGNO NETTO", "% NETTO/RICAVO"]],
+        body: topRicavo.map((t, i) => [
+          String(i + 1),
+          t.nome,
+          fmt(t.ricavo),
+          fmt(t.netto),
+          t.ricavo > 0 ? `${((t.netto / t.ricavo) * 100).toFixed(1)}%` : "—",
+        ]),
+        columnStyles: {
+          0: { halign: "right", cellWidth: 10 },
+          1: { cellWidth: "auto" },
+          2: { halign: "right", cellWidth: 30 },
+          3: { halign: "right", cellWidth: 36 },
+          4: { halign: "right", cellWidth: 32 },
+        },
+      });
+      advanceCursor();
+    }
+
+    // Margine per prodotto (ranking del catalogo per margine desc)
+    if (prodotti.length > 0) {
+      sezione("MARGINE PER PRODOTTO");
+      const sortedByMargine = prodotti
+        .map((p) => ({ p, m: calcolaMargini(p) }))
+        .sort((a, b) => b.m.margine - a.m.margine);
+      autoTable(doc, {
+        ...tableBaseStyle,
+        startY: cursorY,
+        head: [["#", "PRODOTTO", "PREZZO", "NETTO", "MARGINE"]],
+        body: sortedByMargine.map(({ p, m }, i) => [
+          String(i + 1),
+          p.nome,
+          fmt(p.prezzoVendita),
+          fmt(m.netto),
+          `${m.margine.toFixed(1)}%`,
+        ]),
+        columnStyles: {
+          0: { halign: "right", cellWidth: 10 },
+          1: { cellWidth: "auto" },
+          2: { halign: "right", cellWidth: 28 },
+          3: { halign: "right", cellWidth: 28 },
+          4: { halign: "right", cellWidth: 26 },
+        },
+        didParseCell: (data) => {
+          if (data.section === "body" && data.column.index === 4) {
+            const m = parseFloat(String(data.cell.raw ?? "0"));
+            if (m >= 65) data.cell.styles.textColor = [22, 163, 74];
+            else if (m >= 50) data.cell.styles.textColor = [202, 138, 4];
+            else data.cell.styles.textColor = [220, 38, 38];
+            data.cell.styles.fontStyle = "bold";
+          }
+        },
+      });
+      advanceCursor();
+    }
+  }
+
+  doc.save(`Prodotti_${fileSuffix}_${anno}.pdf`);
+}
