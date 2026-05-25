@@ -1370,21 +1370,17 @@ function CategoriaCard({
                         onReload={onReload}
                       />
                     ))}
-                  {/* Costi sempre visibili sotto, con summary margine reale */}
-                  {p.costi.length > 0 && (
-                    <>
-                      {p.costi.map((c) => (
-                        <CostoInlineRow
-                          key={c.id}
-                          costo={c}
-                          prodotto={p}
-                          onReload={onReload}
-                        />
-                      ))}
-                      <CostiSummaryRow prodotto={p} />
-                      <CostoAddRow prodotto={p} onReload={onReload} />
-                    </>
-                  )}
+                  {/* Costi sempre visibili sotto. Aggiunta/summary solo
+                      nel modal di modifica prodotto (icona matita). */}
+                  {p.costi.length > 0 &&
+                    p.costi.map((c) => (
+                      <CostoInlineRow
+                        key={c.id}
+                        costo={c}
+                        prodotto={p}
+                        onReload={onReload}
+                      />
+                    ))}
                   {/* Se prodotto non ha costi né varianti: niente extra */}
                   {p.varianti.length === 0 && p.costi.length === 0 && null}
                   {/* Se ha varianti ma NON costi: aggiungi una riga per
@@ -1760,6 +1756,10 @@ function VarianteInlineRow({
 // (che usano sky). Le righe costi hanno background ambra tenue.
 const COSTO_BORDER = "3px solid #d97706";
 
+// Riga costo (sola visualizzazione/edit inline + delete). Stile visivo
+// identico a VarianteInlineRow tranne il bordo sinistro ambra.
+// Aggiunta nuovi costi e summary "Margine reale" sono gestiti SOLO dal
+// modal di modifica prodotto.
 function CostoInlineRow({
   costo,
   prodotto,
@@ -1800,9 +1800,9 @@ function CostoInlineRow({
       setBusy(false);
     }
   };
-  // Per il calcolo "impatto €" usiamo il prezzoVendita del prodotto se
-  // > 0, altrimenti la media delle varianti (così su prodotti con varianti
-  // l'impatto è comunque indicativo).
+  // Per il calcolo "impatto €": prezzo prodotto se > 0, altrimenti media
+  // varianti (così su prodotti con varianti l'impatto è comunque
+  // indicativo).
   const baseLordo =
     prodotto.prezzoVendita > 0
       ? prodotto.prezzoVendita
@@ -1813,9 +1813,24 @@ function CostoInlineRow({
   const impatto =
     costo.tipo === "fisso" ? costo.valore : (costo.valore / 100) * baseLordo;
 
+  // Stato edit-mode per il valore (toggle display fmt/raw, come variante)
+  const [valEditing, setValEditing] = useState(false);
+  const [valDraft, setValDraft] = useState("");
+  const parseVal = (s: string): number => {
+    const t = s.replace(/[€%\s]/g, "").trim();
+    if (!t) return 0;
+    if (t.includes(",")) {
+      return parseFloat(t.replace(/\./g, "").replace(",", ".")) || 0;
+    }
+    return parseFloat(t) || 0;
+  };
+  // Per fisso mostriamo fmt(valore); per percentuale "X%".
+  const valDisplay =
+    costo.tipo === "fisso" ? fmt(costo.valore) : `${costo.valore}%`;
+
   return (
     <tr
-      style={{ background: "#fffbeb", opacity: busy ? 0.6 : 1 }}
+      style={{ background: "#f8fbff", opacity: busy ? 0.6 : 1 }}
       className="border-b border-gray-50"
     >
       <td
@@ -1823,46 +1838,48 @@ function CostoInlineRow({
         style={{ borderLeft: COSTO_BORDER }}
       />
       <td className="px-3 py-1.5 text-sm pl-6 text-gray-700">
-        <span className="text-amber-500 mr-1">⊖</span>
+        <span className="text-gray-400 mr-1">↳</span>
         <input
           type="text"
           defaultValue={costo.nome}
           onBlur={(e) => update("nome", e.target.value, costo.nome)}
-          className="bg-transparent border-b border-transparent hover:border-gray-200 focus:border-amber-400 focus:outline-none px-1 py-0.5 text-sm font-medium text-gray-800 w-full max-w-[260px]"
+          className="bg-transparent border-b border-transparent hover:border-gray-200 focus:border-sky-300 focus:outline-none px-1 py-0.5 text-sm font-medium text-gray-800 w-full max-w-[260px]"
         />
       </td>
-      <td className="px-3 py-1.5 text-right">
+      <td className="px-3 py-1.5 text-sm text-right">
+        <input
+          type="text"
+          inputMode="decimal"
+          value={valEditing ? valDraft : valDisplay}
+          onFocus={(e) => {
+            setValEditing(true);
+            setValDraft(String(costo.valore));
+            setTimeout(() => e.target.select(), 0);
+          }}
+          onChange={(e) => setValDraft(e.target.value)}
+          onBlur={() => {
+            setValEditing(false);
+            const parsed = parseVal(valDraft);
+            update("valore", String(parsed), String(costo.valore));
+          }}
+          className="bg-transparent border-b border-transparent hover:border-gray-200 focus:border-sky-300 focus:outline-none px-1 py-0.5 text-sm text-right text-gray-900 w-24"
+        />
+      </td>
+      <td className="px-3 py-1.5 text-sm text-right text-gray-400">
         <select
           defaultValue={costo.tipo}
           onChange={(e) => update("tipo", e.target.value, costo.tipo)}
-          className="bg-transparent border-b border-transparent hover:border-gray-200 focus:border-amber-400 focus:outline-none px-1 py-0.5 text-xs text-gray-700"
+          className="bg-transparent border-b border-transparent hover:border-gray-200 focus:border-sky-300 focus:outline-none px-1 py-0.5 text-xs text-gray-700"
         >
           <option value="fisso">Fisso €</option>
-          <option value="percentuale">% del prezzo</option>
+          <option value="percentuale">% prezzo</option>
         </select>
       </td>
-      <td className="px-3 py-1.5 text-sm text-right">
-        <div className="flex items-center justify-end gap-1">
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            defaultValue={costo.valore}
-            onBlur={(e) =>
-              update("valore", e.target.value, String(costo.valore))
-            }
-            className="bg-transparent border-b border-transparent hover:border-gray-200 focus:border-amber-400 focus:outline-none px-1 py-0.5 text-sm text-right text-gray-900 w-16"
-          />
-          <span className="text-[10px] text-gray-400">
-            {costo.tipo === "fisso" ? "€" : "%"}
-          </span>
-        </div>
-      </td>
       <td className="px-3 py-1.5 text-right text-sm font-bold text-amber-700">
-        {fmt(impatto)}
+        − {fmt(impatto)}
       </td>
       <td className="px-3 py-1.5 text-right">
-        <span className="text-[10px] text-amber-600">impatto</span>
+        <span className="text-[10px] text-gray-400">impatto</span>
       </td>
       <td className="px-3 py-1.5">
         <div className="flex items-center justify-end">
@@ -1873,145 +1890,6 @@ function CostoInlineRow({
             title="Elimina costo"
           >
             <Trash2 className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </td>
-    </tr>
-  );
-}
-
-// Riepilogo sotto i costi: mostra "Margine reale" del prodotto dopo
-// aver sottratto tutti i costi. Solo se il prezzoVendita > 0 (altrimenti
-// per prodotti con varianti il margine reale è già su ogni riga variante).
-function CostiSummaryRow({ prodotto }: { prodotto: Prodotto }) {
-  if (prodotto.prezzoVendita <= 0) {
-    // Niente margine summary qui: i prodotti con prezzo base 0 (di norma
-    // quelli con varianti) hanno il margine reale sulle righe variante.
-    return null;
-  }
-  const margini = calcolaMargini(prodotto);
-  const badge = margineBadge(margini.margineReale);
-  return (
-    <tr style={{ background: "#fef3c7" }} className="border-b border-amber-200">
-      <td
-        className="px-2 py-1.5 w-8"
-        style={{ borderLeft: COSTO_BORDER }}
-      />
-      <td
-        colSpan={3}
-        className="px-3 py-1.5 text-xs font-semibold text-amber-800"
-      >
-        Margine reale (dopo IVA, fee e {prodotto.costi.length}{" "}
-        {prodotto.costi.length === 1 ? "costo" : "costi"})
-      </td>
-      <td className="px-3 py-1.5 text-right">
-        <span
-          className="text-sm font-bold"
-          style={{ color: margineColor(margini.margineReale) }}
-        >
-          {fmt(margini.nettoReale)}
-        </span>
-      </td>
-      <td className="px-3 py-1.5 text-right">
-        <span
-          className="inline-block px-2 py-0.5 rounded-full text-[11px] font-bold"
-          style={{ background: badge.bg, color: badge.color }}
-        >
-          {margini.margineReale.toFixed(1)}%
-        </span>
-      </td>
-      <td />
-    </tr>
-  );
-}
-
-// Riga inline per aggiungere un costo al volo
-function CostoAddRow({
-  prodotto,
-  onReload,
-}: {
-  prodotto: Prodotto;
-  onReload: () => void;
-}) {
-  const [nome, setNome] = useState("");
-  const [tipo, setTipo] = useState<"fisso" | "percentuale">("fisso");
-  const [valore, setValore] = useState("");
-  const [busy, setBusy] = useState(false);
-  const add = async () => {
-    const n = nome.trim();
-    const v = parseFloat(valore) || 0;
-    if (!n) return;
-    setBusy(true);
-    try {
-      await fetch(`/api/prodotti/${prodotto.id}/costi`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nome: n, tipo, valore: v }),
-      });
-      setNome("");
-      setTipo("fisso");
-      setValore("");
-      onReload();
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <tr
-      style={{ background: "#fefcf5" }}
-      className="border-b border-gray-100"
-    >
-      <td
-        className="px-2 py-1.5 w-8"
-        style={{ borderLeft: COSTO_BORDER }}
-      />
-      <td className="px-3 py-1.5 pl-6">
-        <input
-          type="text"
-          value={nome}
-          onChange={(e) => setNome(e.target.value)}
-          placeholder="Nuovo costo (es. Commissione FH)…"
-          className="bg-transparent border-b border-dashed border-amber-200 hover:border-amber-300 focus:border-amber-400 focus:outline-none px-1 py-0.5 text-sm text-gray-700 w-full max-w-[260px]"
-        />
-      </td>
-      <td className="px-3 py-1.5 text-right">
-        <select
-          value={tipo}
-          onChange={(e) => setTipo(e.target.value as "fisso" | "percentuale")}
-          className="bg-transparent border-b border-dashed border-amber-200 focus:border-amber-400 focus:outline-none px-1 py-0.5 text-xs text-gray-700"
-        >
-          <option value="fisso">Fisso €</option>
-          <option value="percentuale">% del prezzo</option>
-        </select>
-      </td>
-      <td className="px-3 py-1.5 text-right">
-        <div className="flex items-center justify-end gap-1">
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            value={valore}
-            onChange={(e) => setValore(e.target.value)}
-            placeholder={tipo === "fisso" ? "€" : "%"}
-            className="bg-transparent border-b border-dashed border-amber-200 hover:border-amber-300 focus:border-amber-400 focus:outline-none px-1 py-0.5 text-sm text-right text-gray-700 w-16"
-          />
-          <span className="text-[10px] text-gray-400">
-            {tipo === "fisso" ? "€" : "%"}
-          </span>
-        </div>
-      </td>
-      <td colSpan={2} />
-      <td className="px-3 py-1.5">
-        <div className="flex items-center justify-end">
-          <button
-            type="button"
-            onClick={add}
-            disabled={!nome.trim() || busy}
-            className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 hover:text-amber-900 px-2 py-1 rounded disabled:opacity-30"
-            title="Aggiungi costo"
-          >
-            <Plus className="w-3 h-3" />
-            Aggiungi
           </button>
         </div>
       </td>
