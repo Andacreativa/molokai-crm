@@ -82,18 +82,21 @@ export async function verifySession(
   }
 }
 
-// Verifica le credenziali contro le 2 utenze hardcoded in .env.
-// Restituisce lo username canonico (case-sensitive come in env) o null.
+// Verifica le credenziali contro le utenze definite in .env / Vercel env.
+// Cerca dinamicamente USER1_USERNAME..USER10_USERNAME (e relative password):
+// basta aggiungere coppie USER{N}_USERNAME + USER{N}_PASSWORD per abilitare
+// un nuovo utente, senza toccare il codice. Restituisce lo username canonico
+// (case-sensitive come in env) o null.
+const MAX_USERS = 10;
 export function checkCredentials(
   username: string,
   password: string,
 ): string | null {
-  const u1 = process.env.USER1_USERNAME;
-  const p1 = process.env.USER1_PASSWORD;
-  const u2 = process.env.USER2_USERNAME;
-  const p2 = process.env.USER2_PASSWORD;
-  if (u1 && p1 && username === u1 && password === p1) return u1;
-  if (u2 && p2 && username === u2 && password === p2) return u2;
+  for (let i = 1; i <= MAX_USERS; i++) {
+    const u = process.env[`USER${i}_USERNAME`];
+    const p = process.env[`USER${i}_PASSWORD`];
+    if (u && p && username === u && password === p) return u;
+  }
   return null;
 }
 
