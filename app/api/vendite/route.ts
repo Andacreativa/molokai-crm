@@ -24,7 +24,10 @@ export async function GET(req: NextRequest) {
 
   const vendite = await prisma.venditaProdotto.findMany({
     where,
-    include: { prodotto: true },
+    include: {
+      prodotto: { include: { varianti: true, costi: true } },
+      variante: true,
+    },
     orderBy: { data: "desc" },
   });
   return NextResponse.json(vendite);
@@ -37,7 +40,10 @@ export async function POST(req: NextRequest) {
       ...body,
       data: new Date(body.data),
     },
-    include: { prodotto: true },
+    include: {
+      prodotto: { include: { varianti: true, costi: true } },
+      variante: true,
+    },
   });
   return NextResponse.json(vendita, { status: 201 });
 }

@@ -4,6 +4,10 @@ import { prisma } from "@/lib/prisma";
 export async function GET() {
   const prodotti = await prisma.prodotto.findMany({
     where: { attivo: true },
+    include: {
+      varianti: { orderBy: [{ ordine: "asc" }, { id: "asc" }] },
+      costi: { orderBy: [{ id: "asc" }] },
+    },
     orderBy: [{ ordine: "asc" }, { nome: "asc" }],
   });
   return NextResponse.json(prodotti);

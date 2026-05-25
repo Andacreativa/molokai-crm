@@ -454,26 +454,51 @@ model AltroIngresso {
 // ─── PRODOTTI ───────────────────────────────────────────────
 
 model Prodotto {
-  id            Int               @id @default(autoincrement())
+  id            Int                @id @default(autoincrement())
   nome          String
   prezzoVendita Float
   feePerc       Float?
   feeFissa      Float?
-  attivo        Boolean           @default(true)
-  categoria     String            @default("singolo") // singolo | pack
-  ordine        Int               @default(0) // posizione drag&drop nel catalogo
-  createdAt     DateTime          @default(now())
+  attivo        Boolean            @default(true)
+  categoria     String             @default("singolo") // singolo | pack
+  ordine        Int                @default(0) // posizione drag&drop nel catalogo
+  createdAt     DateTime           @default(now())
+  vendite       VenditaProdotto[]
+  varianti      ProdottoVariante[]
+  costi         CostoProdotto[]
+}
+
+model CostoProdotto {
+  id         Int      @id @default(autoincrement())
+  prodottoId Int
+  prodotto   Prodotto @relation(fields: [prodottoId], references: [id], onDelete: Cascade)
+  nome       String
+  tipo       String   // "fisso" | "percentuale"
+  valore     Float
+  createdAt  DateTime @default(now())
+}
+
+model ProdottoVariante {
+  id            Int      @id @default(autoincrement())
+  prodottoId    Int
+  prodotto      Prodotto @relation(fields: [prodottoId], references: [id], onDelete: Cascade)
+  nome          String
+  prezzoVendita Float
+  ordine        Int      @default(0)
+  createdAt     DateTime @default(now())
   vendite       VenditaProdotto[]
 }
 
 model VenditaProdotto {
-  id             Int      @id @default(autoincrement())
+  id             Int               @id @default(autoincrement())
   prodottoId     Int
-  prodotto       Prodotto @relation(fields: [prodottoId], references: [id])
-  quantita       Int      @default(1)
+  prodotto       Prodotto          @relation(fields: [prodottoId], references: [id])
+  varianteId     Int?
+  variante       ProdottoVariante? @relation(fields: [varianteId], references: [id], onDelete: SetNull)
+  quantita       Int               @default(1)
   prezzoUnitario Float
-  data           DateTime @default(now())
+  data           DateTime          @default(now())
   canale         String?
   note           String?
-  createdAt      DateTime @default(now())
+  createdAt      DateTime          @default(now())
 }
