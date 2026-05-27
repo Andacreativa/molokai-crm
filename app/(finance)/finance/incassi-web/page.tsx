@@ -1090,7 +1090,7 @@ function GYGTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
           anno={anno}
           endpoint="gyg"
           title="Importa Get Your Guide da Excel (export per-booking)"
-          formatHint="Colonne: Booking Ref # · Status · Activity Date · Retail Price · Commission Amount · Retail Price Minus Commission. Le prenotazioni Reversal/Reversed vengono ignorate."
+          formatHint="Colonne: Date · Product · Booking Ref No. · Price · Net Price (formato '60.00 EUR'). Commissione = Price − Net Price."
           buildBatch={(rows, y) => {
             const payloads: Record<string, unknown>[] = [];
             const errors: string[] = [];
@@ -1098,47 +1098,46 @@ function GYGTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
               number,
               { lordo: number; commissioni: number; netto: number }
             >();
-            let skippedReversal = 0;
             let skippedOtherYear = 0;
             let skippedNoDate = 0;
+            // Parser dedicato: "60.00 EUR" / "1234.56 EUR" / "60.00".
+            // Le cifre sono in formato US (punto decimale, no thousand sep
+            // tipico per importi < 1000). Strip "EUR" e parseFloat.
+            const parseEur = (v: unknown): number => {
+              if (typeof v === "number") return v;
+              const s = String(v ?? "")
+                .replace(/EUR/gi, "")
+                .trim();
+              return parseFloat(s) || 0;
+            };
             rows.forEach((row, i) => {
-              const status = String(getCell(row, "Status") ?? "")
-                .trim()
-                .toLowerCase();
-              if (status === "reversal" || status === "reversed") {
-                skippedReversal++;
-                return;
-              }
-              const rawDate = getCell(row, "Activity Date");
-              const activityDate =
+              const rawDate = getCell(row, "Date");
+              // xlsx con cellDates:true converte numerici Excel in Date JS.
+              const bookingDate =
                 rawDate instanceof Date
                   ? rawDate
                   : new Date(String(rawDate ?? "").trim());
-              if (isNaN(activityDate.getTime())) {
+              if (isNaN(bookingDate.getTime())) {
                 skippedNoDate++;
-                errors.push(`Riga ${i + 2}: Activity Date non valida`);
+                errors.push(`Riga ${i + 2}: Date non valida`);
                 return;
               }
-              if (activityDate.getFullYear() !== y) {
+              if (bookingDate.getFullYear() !== y) {
                 skippedOtherYear++;
                 return;
               }
-              const mese = activityDate.getMonth() + 1;
-              const retailPrice = toNumber(getCell(row, "Retail Price"));
-              const commission = Math.abs(
-                toNumber(getCell(row, "Commission Amount")),
-              );
-              const netto = toNumber(
-                getCell(row, "Retail Price Minus Commission"),
-              );
+              const mese = bookingDate.getMonth() + 1;
+              const price = parseEur(getCell(row, "Price"));
+              const netPrice = parseEur(getCell(row, "Net Price"));
+              const commission = price - netPrice;
               const cur = byMonth.get(mese) ?? {
                 lordo: 0,
                 commissioni: 0,
                 netto: 0,
               };
-              cur.lordo += retailPrice;
+              cur.lordo += price;
               cur.commissioni += commission;
-              cur.netto += netto;
+              cur.netto += netPrice;
               byMonth.set(mese, cur);
             });
             for (const [mese, agg] of byMonth) {
@@ -1150,16 +1149,12 @@ function GYGTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
                 netto: Math.round(agg.netto * 100) / 100,
               });
             }
-            if (skippedReversal > 0)
-              errors.push(
-                `${skippedReversal} prenotazioni Reversal/Reversed saltate`,
-              );
             if (skippedOtherYear > 0)
               errors.push(
                 `${skippedOtherYear} prenotazioni di altri anni saltate`,
               );
             if (skippedNoDate > 0)
-              errors.push(`${skippedNoDate} righe senza Activity Date valida`);
+              errors.push(`${skippedNoDate} righe senza Date valida`);
             return { payloads, errors };
           }}
           onImported={() => {
