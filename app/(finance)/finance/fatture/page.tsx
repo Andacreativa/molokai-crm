@@ -60,6 +60,7 @@ interface Fattura {
   cliente: Cliente | null;
   righe: string;
   prezzoConIva: boolean;
+  tipo: "fattura" | "proforma" | "preventivo";
   baseImponibile: number;
   iva: number;
   totale: number;
@@ -98,12 +99,16 @@ const addDays = (isoYmd: string, days: number) => {
 // ─── Page (tab switcher) ──────────────────────────────────────────────
 
 export default function FatturePage() {
-  const [tab, setTab] = useState<"fatture" | "clienti" | "altri">("fatture");
+  const [tab, setTab] = useState<
+    "fatture" | "clienti" | "altri" | "proforma" | "preventivi"
+  >("fatture");
 
   const tabLabel: Record<typeof tab, string> = {
     fatture: "Fatture",
     clienti: "Clienti",
     altri: "Altri Ingressi",
+    proforma: "Proforma",
+    preventivi: "Preventivi",
   };
 
   return (
@@ -111,12 +116,15 @@ export default function FatturePage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Fatture & Clienti</h1>
         <p className="text-gray-500 text-sm mt-1">
-          Fatture emesse, anagrafica clienti e altri ingressi
+          Fatture emesse, anagrafica clienti, altri ingressi, proforma e
+          preventivi
         </p>
       </div>
 
-      <div className="flex gap-1 border-b border-gray-200">
-        {(["fatture", "clienti", "altri"] as const).map((t) => {
+      <div className="flex gap-1 border-b border-gray-200 flex-wrap">
+        {(
+          ["fatture", "clienti", "altri", "proforma", "preventivi"] as const
+        ).map((t) => {
           const active = tab === t;
           return (
             <button
@@ -135,7 +143,9 @@ export default function FatturePage() {
         })}
       </div>
 
-      {tab === "fatture" && <FattureTab />}
+      {tab === "fatture" && <FattureTab tipo="fattura" />}
+      {tab === "proforma" && <FattureTab tipo="proforma" />}
+      {tab === "preventivi" && <FattureTab tipo="preventivo" />}
       {tab === "clienti" && <ClientiTab />}
       {tab === "altri" && <AltriIngressiTab />}
     </div>
@@ -144,7 +154,20 @@ export default function FatturePage() {
 
 // ─── Fatture Tab ───────────────────────────────────────────────────────
 
-function FattureTab() {
+type TipoDocumento = "fattura" | "proforma" | "preventivo";
+
+const TIPO_LABEL_SING: Record<TipoDocumento, string> = {
+  fattura: "Fattura",
+  proforma: "Proforma",
+  preventivo: "Preventivo",
+};
+const TIPO_LABEL_PLUR: Record<TipoDocumento, string> = {
+  fattura: "fatture",
+  proforma: "proforma",
+  preventivo: "preventivi",
+};
+
+function FattureTab({ tipo = "fattura" }: { tipo?: TipoDocumento }) {
   const [fatture, setFatture] = useState<Fattura[]>([]);
   const [clienti, setClienti] = useState<Cliente[]>([]);
   const [anno, setAnno] = useState<number>(new Date().getFullYear());
@@ -154,10 +177,27 @@ function FattureTab() {
   const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Fattura | null>(null);
+  // Tipo del nuovo documento da creare. Sulla tab "fattura" si può scegliere
+  // tramite dropdown tra le 3 opzioni; sulle tab proforma/preventivi è già
+  // fissato dalla tab corrente.
+  const [newDocTipo, setNewDocTipo] = useState<TipoDocumento>(tipo);
+  const [showNewMenu, setShowNewMenu] = useState(false);
+  // Proforma e preventivi non hanno il concetto di "pagato": niente KPI
+  // incassato/da incassare, niente colonna Stato, niente filtro stato.
+  const showStato = tipo === "fattura";
+  // Dropdown solo sulla tab fattura (sulle altre il tipo è già implicito)
+  const useDropdown = tipo === "fattura";
+
+  const openNew = (docTipo: TipoDocumento) => {
+    setEditing(null);
+    setNewDocTipo(docTipo);
+    setShowForm(true);
+    setShowNewMenu(false);
+  };
 
   const load = async () => {
     const [fRes, cRes] = await Promise.all([
-      fetch(`/api/fatture?anno=${anno}`),
+      fetch(`/api/fatture?anno=${anno}&tipo=${tipo}`),
       fetch("/api/clienti"),
     ]);
     const fData = await fRes.json();
@@ -169,7 +209,7 @@ function FattureTab() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [anno]);
+  }, [anno, tipo]);
 
   const q = search.toLowerCase();
   const filtered = fatture.filter((f) => {
@@ -215,29 +255,67 @@ function FattureTab() {
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <p className="text-gray-500 text-sm">
-          {filtered.length} fatture · anno {anno}
+          {filtered.length} {TIPO_LABEL_PLUR[tipo]} · anno {anno}
         </p>
         <div className="flex items-center gap-3 flex-wrap">
           <FiltriBar anno={anno} onAnno={setAnno} />
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white"
-          >
-            <option value="">Tutte</option>
-            <option value="pagate">Pagate</option>
-            <option value="scadute">Non pagate</option>
-          </select>
+          {showStato && (
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white"
+            >
+              <option value="">Tutte</option>
+              <option value="pagate">Pagate</option>
+              <option value="scadute">Non pagate</option>
+            </select>
+          )}
           <PageSizeSelect pageSize={pageSize} onChange={setPageSize} />
-          <button
-            onClick={() => {
-              setEditing(null);
-              setShowForm(true);
-            }}
-            className="glass-btn-primary flex items-center gap-2 text-white text-sm font-medium px-4 py-2.5 rounded-xl"
-          >
-            <Plus className="w-4 h-4" /> Nuova Fattura
-          </button>
+          {useDropdown ? (
+            <div className="relative">
+              <button
+                onClick={() => setShowNewMenu((v) => !v)}
+                className="glass-btn-primary flex items-center gap-2 text-white text-sm font-medium px-4 py-2.5 rounded-xl"
+              >
+                <Plus className="w-4 h-4" /> Nuovo
+              </button>
+              {showNewMenu && (
+                <>
+                  {/* Overlay invisibile per chiudere su click esterno */}
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setShowNewMenu(false)}
+                  />
+                  <div className="absolute right-0 top-full mt-1 z-50 bg-white rounded-xl shadow-lg border border-gray-200 py-1 min-w-[180px]">
+                    {(
+                      [
+                        { tipo: "fattura" as const, label: "Fattura", icon: "📄" },
+                        { tipo: "proforma" as const, label: "Proforma", icon: "📋" },
+                        { tipo: "preventivo" as const, label: "Preventivo", icon: "📝" },
+                      ]
+                    ).map((opt) => (
+                      <button
+                        key={opt.tipo}
+                        onClick={() => openNew(opt.tipo)}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-sky-50 hover:text-sky-700 text-left"
+                      >
+                        <span className="text-base">{opt.icon}</span>
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          ) : (
+            <button
+              onClick={() => openNew(tipo)}
+              className="glass-btn-primary flex items-center gap-2 text-white text-sm font-medium px-4 py-2.5 rounded-xl"
+            >
+              <Plus className="w-4 h-4" />{" "}
+              {tipo === "proforma" ? "Nuovo Proforma" : "Nuovo Preventivo"}
+            </button>
+          )}
         </div>
       </div>
 
@@ -249,31 +327,37 @@ function FattureTab() {
         className="w-full max-w-sm border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white"
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className={`grid grid-cols-1 ${showStato ? "sm:grid-cols-3" : "sm:grid-cols-1"} gap-3`}>
         <div className="glass-card rounded-2xl p-4">
           <p className="text-[10px] text-gray-500 uppercase tracking-wide font-semibold">
-            Fatturato {anno}
+            {tipo === "fattura"
+              ? `Fatturato ${anno}`
+              : `Totale ${TIPO_LABEL_PLUR[tipo]} ${anno}`}
           </p>
           <p className="text-2xl font-bold text-gray-900 mt-1">
             {fmt(totaleFatturato)}
           </p>
         </div>
-        <div className="glass-card rounded-2xl p-4">
-          <p className="text-[10px] text-gray-500 uppercase tracking-wide font-semibold">
-            Incassato
-          </p>
-          <p className="text-2xl font-bold mt-1" style={{ color: "#22c55e" }}>
-            {fmt(incassato)}
-          </p>
-        </div>
-        <div className="glass-card rounded-2xl p-4">
-          <p className="text-[10px] text-gray-500 uppercase tracking-wide font-semibold">
-            Da incassare
-          </p>
-          <p className="text-2xl font-bold mt-1" style={{ color: "#f59e0b" }}>
-            {fmt(daIncassare)}
-          </p>
-        </div>
+        {showStato && (
+          <>
+            <div className="glass-card rounded-2xl p-4">
+              <p className="text-[10px] text-gray-500 uppercase tracking-wide font-semibold">
+                Incassato
+              </p>
+              <p className="text-2xl font-bold mt-1" style={{ color: "#22c55e" }}>
+                {fmt(incassato)}
+              </p>
+            </div>
+            <div className="glass-card rounded-2xl p-4">
+              <p className="text-[10px] text-gray-500 uppercase tracking-wide font-semibold">
+                Da incassare
+              </p>
+              <p className="text-2xl font-bold mt-1" style={{ color: "#f59e0b" }}>
+                {fmt(daIncassare)}
+              </p>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="glass-card rounded-2xl overflow-hidden">
@@ -289,7 +373,7 @@ function FattureTab() {
                   "IVA",
                   "Totale",
                   "Scadenza",
-                  "Stato",
+                  ...(showStato ? ["Stato"] : []),
                   "",
                 ].map((h) => (
                   <th
@@ -305,10 +389,14 @@ function FattureTab() {
               {filtered.length === 0 && (
                 <tr>
                   <td
-                    colSpan={9}
+                    colSpan={showStato ? 9 : 8}
                     className="text-center text-gray-400 py-12 text-sm"
                   >
-                    Nessuna fattura trovata
+                    {tipo === "fattura"
+                      ? "Nessuna fattura trovata"
+                      : tipo === "proforma"
+                        ? "Nessun proforma trovato"
+                        : "Nessun preventivo trovato"}
                   </td>
                 </tr>
               )}
@@ -344,27 +432,29 @@ function FattureTab() {
                         ? new Date(f.scadenza).toLocaleDateString("it-IT")
                         : "—"}
                     </td>
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={() => togglePagato(f)}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold transition-colors"
-                        style={
-                          f.pagato
-                            ? { background: "#dcfce7", color: "#166534" }
-                            : { background: "#fef3c7", color: "#92400e" }
-                        }
-                      >
-                        {f.pagato ? (
-                          <>
-                            <Check className="w-3 h-3" /> Pagata
-                          </>
-                        ) : (
-                          <>
-                            <X className="w-3 h-3" /> Non pagata
-                          </>
-                        )}
-                      </button>
-                    </td>
+                    {showStato && (
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => togglePagato(f)}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold transition-colors"
+                          style={
+                            f.pagato
+                              ? { background: "#dcfce7", color: "#166534" }
+                              : { background: "#fef3c7", color: "#92400e" }
+                          }
+                        >
+                          {f.pagato ? (
+                            <>
+                              <Check className="w-3 h-3" /> Pagata
+                            </>
+                          ) : (
+                            <>
+                              <X className="w-3 h-3" /> Non pagata
+                            </>
+                          )}
+                        </button>
+                      </td>
+                    )}
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2 justify-end">
                         <button
@@ -415,6 +505,7 @@ function FattureTab() {
         <FatturaFormModal
           editing={editing}
           clienti={clienti}
+          initialTipo={editing?.tipo ?? newDocTipo}
           onClose={() => setShowForm(false)}
           onSaved={() => {
             setShowForm(false);
@@ -431,17 +522,91 @@ function FattureTab() {
 function FatturaFormModal({
   editing,
   clienti,
+  initialTipo = "fattura",
   onClose,
   onSaved,
 }: {
   editing: Fattura | null;
   clienti: Cliente[];
+  initialTipo?: TipoDocumento;
   onClose: () => void;
   onSaved: () => void;
 }) {
+  // Tipo è fissato per la nuova creazione (deciso dal tab/dropdown). In
+  // edit prende sempre il valore dal record esistente.
+  const tipo: TipoDocumento = editing?.tipo ?? initialTipo;
+  const isFattura = tipo === "fattura";
   const [clienteId, setClienteId] = useState<string>(
     editing?.clienteId ? String(editing.clienteId) : "",
   );
+  // Lista locale dei clienti — parte dalla prop ma può crescere quando
+  // l'utente crea un cliente inline, senza dover ricaricare il modal.
+  const [localClienti, setLocalClienti] = useState<Cliente[]>(clienti);
+  useEffect(() => {
+    setLocalClienti(clienti);
+  }, [clienti]);
+  // Mini-form inline per creare un nuovo cliente al volo
+  const [showNewCliente, setShowNewCliente] = useState(false);
+  const [newCli, setNewCli] = useState({
+    nome: "",
+    partitaIva: "",
+    email: "",
+    telefono: "",
+    via: "",
+    cap: "",
+    citta: "",
+    paese: "Spagna",
+  });
+  const [creatingCli, setCreatingCli] = useState(false);
+  const resetNewCli = () => {
+    setNewCli({
+      nome: "",
+      partitaIva: "",
+      email: "",
+      telefono: "",
+      via: "",
+      cap: "",
+      citta: "",
+      paese: "Spagna",
+    });
+  };
+  const createAndSelectCliente = async () => {
+    const nome = newCli.nome.trim();
+    if (!nome) {
+      alert("Nome / Ragione sociale obbligatori");
+      return;
+    }
+    setCreatingCli(true);
+    try {
+      const res = await fetch("/api/clienti", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nome,
+          partitaIva: newCli.partitaIva.trim() || null,
+          email: newCli.email.trim() || null,
+          telefono: newCli.telefono.trim() || null,
+          via: newCli.via.trim() || null,
+          cap: newCli.cap.trim() || null,
+          citta: newCli.citta.trim() || null,
+          paese: newCli.paese.trim() || "Spagna",
+        }),
+      });
+      if (!res.ok) {
+        alert("Errore creazione cliente");
+        return;
+      }
+      const created = (await res.json()) as Cliente;
+      setLocalClienti((prev) =>
+        [...prev, created].sort((a, b) => a.nome.localeCompare(b.nome)),
+      );
+      setClienteId(String(created.id));
+      setShowNewCliente(false);
+      resetNewCli();
+    } finally {
+      setCreatingCli(false);
+    }
+  };
   const [data, setData] = useState<string>(
     editing?.data ? isoDate(editing.data) : isoDate(new Date()),
   );
@@ -450,7 +615,7 @@ function FatturaFormModal({
       ? isoDate(editing.scadenza)
       : addDays(isoDate(new Date()), 30),
   );
-  const clienteSelezionato = clienti.find(
+  const clienteSelezionato = localClienti.find(
     (c) => c.id === parseInt(clienteId || "0"),
   );
   const [iva, setIva] = useState<string>(
@@ -546,7 +711,9 @@ function FatturaFormModal({
         righe,
         iva: ivaNum,
         prezzoConIva,
-        pagato,
+        tipo,
+        // Proforma e preventivi non hanno stato "pagato": forziamo false
+        pagato: isFattura ? pagato : false,
         metodoPagamento,
         note,
       };
@@ -582,8 +749,8 @@ function FatturaFormModal({
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold text-gray-900">
             {editing
-              ? `Modifica ${editing.numero ?? "Fattura"}`
-              : "Nuova Fattura"}
+              ? `Modifica ${editing.numero ?? TIPO_LABEL_SING[tipo]}`
+              : `Nuovo ${TIPO_LABEL_SING[tipo]}`}
           </h2>
           <button
             onClick={onClose}
@@ -598,24 +765,151 @@ function FatturaFormModal({
             <label className="text-xs font-medium text-gray-600 block mb-1">
               Cliente *
             </label>
-            <select
-              value={clienteId}
-              onChange={(e) => setClienteId(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white"
-            >
-              <option value="">Seleziona cliente...</option>
-              {clienti.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nome}
-                  {c.cognome ? " " + c.cognome : ""}
-                  {c.partitaIva
-                    ? ` — ${c.partitaIva}`
-                    : c.dni
-                      ? ` — ${c.dni}`
-                      : ""}
-                </option>
-              ))}
-            </select>
+            <div className="flex items-stretch gap-2">
+              <select
+                value={clienteId}
+                onChange={(e) => setClienteId(e.target.value)}
+                disabled={showNewCliente}
+                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white disabled:opacity-50"
+              >
+                <option value="">Seleziona cliente...</option>
+                {localClienti.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nome}
+                    {c.cognome ? " " + c.cognome : ""}
+                    {c.partitaIva
+                      ? ` — ${c.partitaIva}`
+                      : c.dni
+                        ? ` — ${c.dni}`
+                        : ""}
+                  </option>
+                ))}
+              </select>
+              {!showNewCliente && (
+                <button
+                  type="button"
+                  onClick={() => setShowNewCliente(true)}
+                  className="glass-btn-secondary flex items-center gap-1 text-gray-700 text-sm font-medium px-3 py-2 rounded-lg whitespace-nowrap"
+                  title="Crea un nuovo cliente al volo"
+                >
+                  <Plus className="w-4 h-4" style={{ color: "#0ea5e9" }} />
+                  Nuovo cliente
+                </button>
+              )}
+            </div>
+
+            {/* Mini-form inline creazione nuovo cliente */}
+            {showNewCliente && (
+              <div className="mt-3 rounded-xl border border-sky-200 bg-sky-50/30 p-3 space-y-3">
+                <p className="text-xs font-semibold text-sky-800">
+                  Nuovo cliente
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="sm:col-span-2">
+                    <label className="text-[10px] font-medium text-gray-600 block mb-1">
+                      Nome / Ragione sociale *
+                    </label>
+                    <input
+                      type="text"
+                      value={newCli.nome}
+                      onChange={(e) =>
+                        setNewCli((c) => ({ ...c, nome: e.target.value }))
+                      }
+                      placeholder="Es. Acme SL"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-medium text-gray-600 block mb-1">
+                      DNI / CIF
+                    </label>
+                    <input
+                      type="text"
+                      value={newCli.partitaIva}
+                      onChange={(e) =>
+                        setNewCli((c) => ({
+                          ...c,
+                          partitaIva: e.target.value,
+                        }))
+                      }
+                      placeholder="B12345678 / 12345678A"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-medium text-gray-600 block mb-1">
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      value={newCli.email}
+                      onChange={(e) =>
+                        setNewCli((c) => ({ ...c, email: e.target.value }))
+                      }
+                      placeholder="cliente@…"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="text-[10px] font-medium text-gray-600 block mb-1">
+                      Telefono
+                    </label>
+                    <input
+                      type="tel"
+                      value={newCli.telefono}
+                      onChange={(e) =>
+                        setNewCli((c) => ({
+                          ...c,
+                          telefono: e.target.value,
+                        }))
+                      }
+                      placeholder="+34 …"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
+                    />
+                  </div>
+                </div>
+                {/* Indirizzo con autocomplete CAP (Nominatim) */}
+                <AddressFields
+                  value={{
+                    via: newCli.via,
+                    cap: newCli.cap,
+                    citta: newCli.citta,
+                    provincia: "",
+                    paese: newCli.paese,
+                  }}
+                  onChange={(v) =>
+                    setNewCli((c) => ({
+                      ...c,
+                      via: v.via,
+                      cap: v.cap,
+                      citta: v.citta,
+                      paese: v.paese,
+                    }))
+                  }
+                />
+                <div className="flex justify-end gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowNewCliente(false);
+                      resetNewCli();
+                    }}
+                    className="text-sm font-medium px-3 py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
+                  >
+                    Annulla
+                  </button>
+                  <button
+                    type="button"
+                    onClick={createAndSelectCliente}
+                    disabled={!newCli.nome.trim() || creatingCli}
+                    className="glass-btn-primary flex items-center gap-2 text-white text-sm font-medium px-3 py-2 rounded-lg disabled:opacity-50"
+                  >
+                    <Check className="w-4 h-4" />
+                    {creatingCli ? "Salvataggio…" : "Crea e seleziona"}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
           <div>
             <label className="text-xs font-medium text-gray-600 block mb-1">
@@ -810,18 +1104,22 @@ function FatturaFormModal({
               ))}
             </select>
           </div>
-          <div className="flex items-end">
-            <label className="inline-flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={pagato}
-                onChange={(e) => setPagato(e.target.checked)}
-                className="w-4 h-4"
-                style={{ accentColor: "#0ea5e9" }}
-              />
-              <span className="text-sm text-gray-700 font-medium">Pagata</span>
-            </label>
-          </div>
+          {isFattura && (
+            <div className="flex items-end">
+              <label className="inline-flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={pagato}
+                  onChange={(e) => setPagato(e.target.checked)}
+                  className="w-4 h-4"
+                  style={{ accentColor: "#0ea5e9" }}
+                />
+                <span className="text-sm text-gray-700 font-medium">
+                  Pagata
+                </span>
+              </label>
+            </div>
+          )}
         </div>
 
         <div>

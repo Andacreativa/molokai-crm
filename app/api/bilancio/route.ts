@@ -86,7 +86,11 @@ export async function GET(request: Request) {
       include: { pagamentiMensili: { where: { anno, pagato: true } } },
     }),
     prisma.buono.findMany({ where: { pagato: true } }),
-    prisma.fattura.findMany({ where: { anno, pagato: true } }),
+    // Solo fatture vere e proprie: proforma e preventivi sono esclusi
+    // da ogni aggregato finanziario.
+    prisma.fattura.findMany({
+      where: { anno, pagato: true, tipo: "fattura" },
+    }),
     prisma.incassoFareHarbor.findMany({ where: { anno } }),
     prisma.prenotazioneStripe.findMany({ where: { anno } }),
     prisma.prenotazioneGetYourGuide.findMany({ where: { anno } }),

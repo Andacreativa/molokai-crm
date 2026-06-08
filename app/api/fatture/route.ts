@@ -14,13 +14,21 @@ export async function GET(request: Request) {
   const anno = parseInt(
     searchParams.get("anno") || String(new Date().getFullYear()),
   );
+  const tipo = searchParams.get("tipo"); // opzionale: fattura|proforma|preventivo
   const fatture = await prisma.fattura.findMany({
-    where: { anno },
+    where: { anno, ...(tipo ? { tipo } : {}) },
     include: { cliente: true },
     orderBy: [{ data: "desc" }, { createdAt: "desc" }],
   });
   return NextResponse.json(fatture);
 }
+
+const TIPI_VALIDI = new Set(["fattura", "proforma", "preventivo"]);
+const PREFIX_NUMERO: Record<string, string> = {
+  fattura: "F",
+  proforma: "PRO",
+  preventivo: "PRV",
+};
 
 export async function POST(request: Request) {
   const body = await request.json();
@@ -50,11 +58,19 @@ export async function POST(request: Request) {
     ? round2(sommaRighe)
     : round2(baseImponibile * (1 + iva / 100));
 
-  // Numero auto: F-{N}/{ANNO}, con N contatore annuale
+  // Tipo: "fattura" (default), "proforma" o "preventivo"
+  const tipoRaw = String(body.tipo ?? "fattura").toLowerCase().trim();
+  const tipo = TIPI_VALIDI.has(tipoRaw) ? tipoRaw : "fattura";
+  // Proforma e preventivi non hanno stato pagamento.
+  const pagato = tipo === "fattura" ? Boolean(body.pagato) : false;
+
+  // Numero auto con prefix per tipo. Conteggio separato per tipo+anno
+  // così proforma e preventivi hanno la loro serie.
   let numero = body.numero as string | undefined;
   if (!numero) {
-    const count = await prisma.fattura.count({ where: { anno } });
-    numero = `F-${count + 1}/${anno}`;
+    const count = await prisma.fattura.count({ where: { anno, tipo } });
+    const prefix = PREFIX_NUMERO[tipo] ?? "F";
+    numero = `${prefix}-${count + 1}/${anno}`;
   }
 
   const fattura = await prisma.fattura.create({
@@ -65,10 +81,11 @@ export async function POST(request: Request) {
       clienteId: body.clienteId ? parseInt(body.clienteId) : null,
       righe: JSON.stringify(righe),
       prezzoConIva,
+      tipo,
       baseImponibile,
       iva,
       totale,
-      pagato: Boolean(body.pagato),
+      pagato,
       metodoPagamento: body.metodoPagamento || null,
       mese,
       anno,

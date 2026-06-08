@@ -164,7 +164,15 @@ interface FatturaPDFData {
   totale: number;
   metodoPagamento: string | null;
   note: string | null;
+  tipo?: "fattura" | "proforma" | "preventivo";
 }
+
+// Mapping titolo header PDF in spagnolo per ogni tipo documento.
+const TITOLO_PDF_ES: Record<string, string> = {
+  fattura: "FACTURA",
+  proforma: "PROFORMA",
+  preventivo: "PRESUPUESTO",
+};
 
 interface ClientePDFData {
   nome: string;
@@ -330,11 +338,12 @@ export async function exportFatturaPDF(
     doc.text(paeseES(c.paese), col1X, yC);
   }
 
-  // FACTURA box
+  // Header box (FACTURA / PROFORMA / PRESUPUESTO a seconda del tipo)
+  const titoloES = TITOLO_PDF_ES[f.tipo ?? "fattura"] ?? "FACTURA";
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
   doc.setTextColor(...SKY);
-  doc.text("FACTURA", col2X, boxY);
+  doc.text(titoloES, col2X, boxY);
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
