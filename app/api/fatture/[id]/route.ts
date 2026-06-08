@@ -52,6 +52,15 @@ export async function PATCH(
   if (body.mese !== undefined) data.mese = parseInt(body.mese);
   if (body.anno !== undefined) data.anno = parseInt(body.anno);
   if (body.note !== undefined) data.note = body.note || null;
+  // Stato workflow per proforma/preventivo
+  if (body.stato !== undefined) {
+    const STATI_VALIDI = new Set(["in_attesa", "accettato", "rifiutato"]);
+    const s =
+      typeof body.stato === "string" && STATI_VALIDI.has(body.stato.trim())
+        ? body.stato.trim()
+        : null;
+    data.stato = s;
+  }
 
   // Se cambiano righe, iva, o prezzoConIva → ricalcolo baseImponibile e totale.
   const righeChanged = body.righe !== undefined;

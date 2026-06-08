@@ -10,6 +10,9 @@ import {
   Check,
   Mail,
   Phone,
+  FileText,
+  FileClock,
+  FileEdit,
 } from "lucide-react";
 import { fmt, TIPO_IMPOSTA_OPTIONS, MESI, ANNI } from "@/lib/constants";
 import FiltriBar from "@/components/FiltriBar";
@@ -61,6 +64,8 @@ interface Fattura {
   righe: string;
   prezzoConIva: boolean;
   tipo: "fattura" | "proforma" | "preventivo";
+  stato: "in_attesa" | "accettato" | "rifiutato" | null;
+  daDocumentoOrigine: string | null;
   baseImponibile: number;
   iva: number;
   totale: number;
@@ -70,6 +75,20 @@ interface Fattura {
   anno: number;
   note: string | null;
 }
+
+type StatoDoc = "in_attesa" | "accettato" | "rifiutato";
+const STATO_LABEL: Record<StatoDoc, string> = {
+  in_attesa: "In attesa",
+  accettato: "Accettato",
+  rifiutato: "Rifiutato",
+};
+// Palette badge stato — stesso stile pill del badge "Pagata" già usato
+// per le fatture. Niente emoji/icone semaforo, solo colori di sfondo.
+const STATO_BADGE: Record<StatoDoc, { bg: string; color: string }> = {
+  in_attesa: { bg: "#f3f4f6", color: "#374151" },
+  accettato: { bg: "#dcfce7", color: "#166534" },
+  rifiutato: { bg: "#fee2e2", color: "#991b1b" },
+};
 
 // ─── Constants ─────────────────────────────────────────────────────────
 
@@ -195,6 +214,63 @@ function FattureTab({ tipo = "fattura" }: { tipo?: TipoDocumento }) {
     setShowNewMenu(false);
   };
 
+  // Flash message inline (es. "Fattura F-X/2026 creata")
+  const [flashMsg, setFlashMsg] = useState<string | null>(null);
+  useEffect(() => {
+    if (!flashMsg) return;
+    const t = setTimeout(() => setFlashMsg(null), 5000);
+    return () => clearTimeout(t);
+  }, [flashMsg]);
+
+  // Cambia stato di un proforma/preventivo. Se passa ad "accettato" e non
+  // lo era prima, chiede se convertirlo in fattura.
+  const changeStato = async (f: Fattura, nuovoStato: StatoDoc) => {
+    let convert = false;
+    if (nuovoStato === "accettato" && f.stato !== "accettato") {
+      convert = confirm(
+        "Vuoi creare automaticamente una fattura da questo documento?",
+      );
+    }
+    await fetch(`/api/fatture/${f.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ stato: nuovoStato }),
+    });
+    if (convert) {
+      let righeArr: unknown[] = [];
+      try {
+        const parsed = JSON.parse(f.righe);
+        if (Array.isArray(parsed)) righeArr = parsed;
+      } catch {
+        // ignore
+      }
+      const res = await fetch("/api/fatture", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tipo: "fattura",
+          clienteId: f.clienteId,
+          data: f.data,
+          scadenza: f.scadenza,
+          righe: righeArr,
+          iva: f.iva,
+          prezzoConIva: f.prezzoConIva,
+          pagato: false,
+          metodoPagamento: f.metodoPagamento,
+          note: f.note,
+          daDocumentoOrigine: f.numero,
+        }),
+      });
+      if (res.ok) {
+        const created = (await res.json()) as Fattura;
+        setFlashMsg(`Fattura ${created.numero} creata con successo`);
+      } else {
+        setFlashMsg("Errore creazione fattura");
+      }
+    }
+    load();
+  };
+
   const load = async () => {
     const [fRes, cRes] = await Promise.all([
       fetch(`/api/fatture?anno=${anno}&tipo=${tipo}`),
@@ -289,9 +365,21 @@ function FattureTab({ tipo = "fattura" }: { tipo?: TipoDocumento }) {
                   <div className="absolute right-0 top-full mt-1 z-50 bg-white rounded-xl shadow-lg border border-gray-200 py-1 min-w-[180px]">
                     {(
                       [
-                        { tipo: "fattura" as const, label: "Fattura", icon: "📄" },
-                        { tipo: "proforma" as const, label: "Proforma", icon: "📋" },
-                        { tipo: "preventivo" as const, label: "Preventivo", icon: "📝" },
+                        {
+                          tipo: "fattura" as const,
+                          label: "Fattura",
+                          Icon: FileText,
+                        },
+                        {
+                          tipo: "proforma" as const,
+                          label: "Proforma",
+                          Icon: FileClock,
+                        },
+                        {
+                          tipo: "preventivo" as const,
+                          label: "Preventivo",
+                          Icon: FileEdit,
+                        },
                       ]
                     ).map((opt) => (
                       <button
@@ -299,7 +387,10 @@ function FattureTab({ tipo = "fattura" }: { tipo?: TipoDocumento }) {
                         onClick={() => openNew(opt.tipo)}
                         className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-sky-50 hover:text-sky-700 text-left"
                       >
-                        <span className="text-base">{opt.icon}</span>
+                        <opt.Icon
+                          className="w-4 h-4 shrink-0"
+                          style={{ color: "#0ea5e9" }}
+                        />
                         {opt.label}
                       </button>
                     ))}
@@ -326,6 +417,22 @@ function FattureTab({ tipo = "fattura" }: { tipo?: TipoDocumento }) {
         placeholder="Cerca per numero o azienda..."
         className="w-full max-w-sm border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white"
       />
+
+      {flashMsg && (
+        <div
+          className="rounded-xl p-3 flex items-center gap-2 text-sm font-medium"
+          style={{ background: "#dcfce7", color: "#166534" }}
+        >
+          <Check className="w-4 h-4 shrink-0" />
+          <span className="flex-1">{flashMsg}</span>
+          <button
+            onClick={() => setFlashMsg(null)}
+            className="text-xs opacity-60 hover:opacity-100"
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       <div className={`grid grid-cols-1 ${showStato ? "sm:grid-cols-3" : "sm:grid-cols-1"} gap-3`}>
         <div className="glass-card rounded-2xl p-4">
@@ -373,7 +480,7 @@ function FattureTab({ tipo = "fattura" }: { tipo?: TipoDocumento }) {
                   "IVA",
                   "Totale",
                   "Scadenza",
-                  ...(showStato ? ["Stato"] : []),
+                  "Stato",
                   "",
                 ].map((h) => (
                   <th
@@ -389,7 +496,7 @@ function FattureTab({ tipo = "fattura" }: { tipo?: TipoDocumento }) {
               {filtered.length === 0 && (
                 <tr>
                   <td
-                    colSpan={showStato ? 9 : 8}
+                    colSpan={9}
                     className="text-center text-gray-400 py-12 text-sm"
                   >
                     {tipo === "fattura"
@@ -410,7 +517,14 @@ function FattureTab({ tipo = "fattura" }: { tipo?: TipoDocumento }) {
                     className="border-b border-gray-50 hover:bg-gray-50 transition-colors"
                   >
                     <td className="px-4 py-3 text-sm font-semibold text-gray-900">
-                      {f.numero ?? "—"}
+                      <div className="flex flex-col">
+                        <span>{f.numero ?? "—"}</span>
+                        {f.daDocumentoOrigine && (
+                          <span className="text-[10px] font-normal text-gray-400">
+                            Da {f.daDocumentoOrigine}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700">
                       {f.data
@@ -432,8 +546,9 @@ function FattureTab({ tipo = "fattura" }: { tipo?: TipoDocumento }) {
                         ? new Date(f.scadenza).toLocaleDateString("it-IT")
                         : "—"}
                     </td>
-                    {showStato && (
-                      <td className="px-4 py-3">
+                    <td className="px-4 py-3">
+                      {showStato ? (
+                        // Fattura: toggle pagato/non pagato
                         <button
                           onClick={() => togglePagato(f)}
                           className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold transition-colors"
@@ -453,8 +568,39 @@ function FattureTab({ tipo = "fattura" }: { tipo?: TipoDocumento }) {
                             </>
                           )}
                         </button>
-                      </td>
-                    )}
+                      ) : (
+                        // Proforma/Preventivo: pill stato cliccabile (select
+                        // mascherato senza freccia, stile coerente con la
+                        // pill "Pagata" delle fatture).
+                        <select
+                          value={f.stato ?? "in_attesa"}
+                          onChange={(e) =>
+                            changeStato(f, e.target.value as StatoDoc)
+                          }
+                          className="appearance-none inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold cursor-pointer border-0 focus:outline-none focus:ring-2 focus:ring-sky-300"
+                          style={{
+                            background:
+                              STATO_BADGE[
+                                (f.stato as StatoDoc) ?? "in_attesa"
+                              ].bg,
+                            color:
+                              STATO_BADGE[
+                                (f.stato as StatoDoc) ?? "in_attesa"
+                              ].color,
+                            paddingRight: "0.5rem",
+                          }}
+                          title="Cambia stato"
+                        >
+                          {(
+                            ["in_attesa", "accettato", "rifiutato"] as const
+                          ).map((s) => (
+                            <option key={s} value={s}>
+                              {STATO_LABEL[s]}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2 justify-end">
                         <button

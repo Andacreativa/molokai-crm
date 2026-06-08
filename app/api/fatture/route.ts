@@ -63,6 +63,23 @@ export async function POST(request: Request) {
   const tipo = TIPI_VALIDI.has(tipoRaw) ? tipoRaw : "fattura";
   // Proforma e preventivi non hanno stato pagamento.
   const pagato = tipo === "fattura" ? Boolean(body.pagato) : false;
+  // Stato workflow: solo per proforma/preventivo. Default "in_attesa";
+  // se il client passa esplicitamente un valore valido lo usiamo, altrimenti
+  // il default per le fatture vere è null.
+  const STATI_VALIDI = new Set(["in_attesa", "accettato", "rifiutato"]);
+  const statoRaw = typeof body.stato === "string" ? body.stato.trim() : "";
+  const stato =
+    tipo === "fattura"
+      ? null
+      : STATI_VALIDI.has(statoRaw)
+        ? statoRaw
+        : "in_attesa";
+  // Riferimento al documento origine (solo se passato esplicitamente — es.
+  // quando una fattura viene creata convertendo un proforma).
+  const daDocumentoOrigine =
+    typeof body.daDocumentoOrigine === "string" && body.daDocumentoOrigine.trim()
+      ? body.daDocumentoOrigine.trim()
+      : null;
 
   // Numero auto con prefix per tipo. Conteggio separato per tipo+anno
   // così proforma e preventivi hanno la loro serie.
@@ -82,6 +99,8 @@ export async function POST(request: Request) {
       righe: JSON.stringify(righe),
       prezzoConIva,
       tipo,
+      stato,
+      daDocumentoOrigine,
       baseImponibile,
       iva,
       totale,

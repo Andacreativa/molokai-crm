@@ -39,6 +39,8 @@ model Fattura {
   righe            String    // JSON: [{descrizione, quantita, prezzoUnitario}]
   prezzoConIva     Boolean   @default(false) // se true, righe.prezzoUnitario è lordo (IVA inclusa)
   tipo             String    @default("fattura") // "fattura" | "proforma" | "preventivo"
+  stato            String?   // null per fatture; "in_attesa"|"accettato"|"rifiutato" per proforma/preventivo
+  daDocumentoOrigine String? // es. "PRO-1/2026" quando una fattura è stata creata da un proforma/preventivo
   baseImponibile   Float
   iva              Float     @default(21)
   totale           Float
