@@ -852,50 +852,88 @@ function StripeTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
         <ExcelUploadModalButton
           anno={anno}
           endpoint="stripe"
-          title="Importa Stripe da CSV (export per-transaction)"
-          formatHint="Colonne: Type · Created · Amount · Fees · Net. Solo righe Type=Charge. Importi in formato IT (30,00)."
+          title="Importa Stripe da CSV (export payouts)"
+          formatHint="Colonne: payout_date · gross_amount · processing_fee_amount · net_payout_amount · payout_status · is_next_payout. Solo payout Succeeded non-futuri."
           buildBatch={(rows, y) => {
             const payloads: Record<string, unknown>[] = [];
             const errors: string[] = [];
+
+            // Validazione colonne: se il file non ha le colonne attese
+            // ritorna subito un errore chiaro con la lista delle colonne
+            // effettivamente trovate.
+            if (rows.length === 0) {
+              return {
+                payloads,
+                errors: ["Il file è vuoto (nessuna riga di dati trovata)."],
+              };
+            }
+            const foundCols = Object.keys(rows[0]);
+            const REQUIRED = [
+              "payout_date",
+              "gross_amount",
+              "processing_fee_amount",
+              "net_payout_amount",
+              "payout_status",
+            ];
+            const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+            const foundNorm = new Set(foundCols.map(norm));
+            const missing = REQUIRED.filter((r) => !foundNorm.has(norm(r)));
+            if (missing.length > 0) {
+              return {
+                payloads,
+                errors: [
+                  `Colonne mancanti: ${missing.join(", ")}. Colonne trovate nel file: ${foundCols.join(", ")}`,
+                ],
+              };
+            }
+
             const byMonth = new Map<
               number,
               { lordo: number; commissioni: number; netto: number }
             >();
-            let skippedNonCharge = 0;
+            let skippedNotSucceeded = 0;
+            let skippedNextPayout = 0;
             let skippedOtherYear = 0;
             let skippedBadDate = 0;
             rows.forEach((row, i) => {
-              const type = String(getCell(row, "Type") ?? "")
+              const status = String(getCell(row, "payout_status") ?? "")
                 .trim()
                 .toLowerCase();
-              if (type !== "charge") {
-                skippedNonCharge++;
+              if (status !== "succeeded") {
+                skippedNotSucceeded++;
                 return;
               }
-              const rawDate = getCell(row, "Created");
-              const created =
+              const isNext = String(getCell(row, "is_next_payout") ?? "")
+                .trim()
+                .toLowerCase();
+              if (isNext === "true" || isNext === "1" || isNext === "yes") {
+                skippedNextPayout++;
+                return;
+              }
+              const rawDate = getCell(row, "payout_date");
+              const payoutDate =
                 rawDate instanceof Date
                   ? rawDate
                   : new Date(String(rawDate ?? "").trim());
-              if (isNaN(created.getTime())) {
+              if (isNaN(payoutDate.getTime())) {
                 skippedBadDate++;
-                errors.push(`Riga ${i + 2}: Created non valida`);
+                errors.push(`Riga ${i + 2}: payout_date non valida`);
                 return;
               }
-              if (created.getFullYear() !== y) {
+              if (payoutDate.getFullYear() !== y) {
                 skippedOtherYear++;
                 return;
               }
-              const mese = created.getMonth() + 1;
-              const amount = toNumber(getCell(row, "Amount"));
-              const fees = toNumber(getCell(row, "Fees"));
-              const net = toNumber(getCell(row, "Net"));
+              const mese = payoutDate.getMonth() + 1;
+              const gross = toNumber(getCell(row, "gross_amount"));
+              const fees = toNumber(getCell(row, "processing_fee_amount"));
+              const net = toNumber(getCell(row, "net_payout_amount"));
               const cur = byMonth.get(mese) ?? {
                 lordo: 0,
                 commissioni: 0,
                 netto: 0,
               };
-              cur.lordo += amount;
+              cur.lordo += gross;
               cur.commissioni += fees;
               cur.netto += net;
               byMonth.set(mese, cur);
@@ -910,14 +948,18 @@ function StripeTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
                 netto: Math.round(agg.netto * 100) / 100,
               });
             }
-            if (skippedNonCharge > 0)
-              errors.push(`${skippedNonCharge} righe non-Charge saltate`);
+            if (skippedNotSucceeded > 0)
+              errors.push(
+                `${skippedNotSucceeded} payout non "Succeeded" saltati`,
+              );
+            if (skippedNextPayout > 0)
+              errors.push(`${skippedNextPayout} payout futuri (is_next_payout=True) saltati`);
             if (skippedOtherYear > 0)
               errors.push(
-                `${skippedOtherYear} transazioni di altri anni saltate`,
+                `${skippedOtherYear} payout di altri anni saltati`,
               );
             if (skippedBadDate > 0)
-              errors.push(`${skippedBadDate} righe senza Created valida`);
+              errors.push(`${skippedBadDate} righe senza payout_date valida`);
             return { payloads, errors };
           }}
           onImported={() => {
@@ -1089,55 +1131,102 @@ function GYGTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
         <ExcelUploadModalButton
           anno={anno}
           endpoint="gyg"
-          title="Importa Get Your Guide da Excel (export per-booking)"
-          formatHint="Colonne: Date · Product · Booking Ref No. · Price · Net Price (formato '60.00 EUR'). Commissione = Price − Net Price."
+          title="Importa Get Your Guide da Excel (Supplier Invoices)"
+          formatHint="Foglio 'Supplier Invoices'. Colonne: Activity Date · Status · Retail Price · Commission Amount · Retail Price Minus Commission. Normal + Reversal sommati algebricamente."
+          sheetName="Supplier Invoices"
           buildBatch={(rows, y) => {
             const payloads: Record<string, unknown>[] = [];
             const errors: string[] = [];
+
+            if (rows.length === 0) {
+              return {
+                payloads,
+                errors: ["Foglio vuoto (nessuna riga di dati trovata)."],
+              };
+            }
+            const foundCols = Object.keys(rows[0]);
+            const REQUIRED = [
+              "Activity Date",
+              "Status",
+              "Retail Price",
+              "Commission Amount",
+              "Retail Price Minus Commission",
+            ];
+            const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+            const foundNorm = new Set(foundCols.map(norm));
+            const missing = REQUIRED.filter((r) => !foundNorm.has(norm(r)));
+            if (missing.length > 0) {
+              return {
+                payloads,
+                errors: [
+                  `Colonne mancanti: ${missing.join(", ")}. Colonne trovate nel foglio: ${foundCols.join(", ")}`,
+                ],
+              };
+            }
+
             const byMonth = new Map<
               number,
               { lordo: number; commissioni: number; netto: number }
             >();
             let skippedOtherYear = 0;
             let skippedNoDate = 0;
-            // Parser dedicato: "60.00 EUR" / "1234.56 EUR" / "60.00".
-            // Le cifre sono in formato US (punto decimale, no thousand sep
-            // tipico per importi < 1000). Strip "EUR" e parseFloat.
-            const parseEur = (v: unknown): number => {
-              if (typeof v === "number") return v;
-              const s = String(v ?? "")
-                .replace(/EUR/gi, "")
-                .trim();
-              return parseFloat(s) || 0;
-            };
+            let skippedUnknownStatus = 0;
+            let normalCount = 0;
+            let reversalCount = 0;
             rows.forEach((row, i) => {
-              const rawDate = getCell(row, "Date");
-              // xlsx con cellDates:true converte numerici Excel in Date JS.
-              const bookingDate =
-                rawDate instanceof Date
-                  ? rawDate
-                  : new Date(String(rawDate ?? "").trim());
-              if (isNaN(bookingDate.getTime())) {
-                skippedNoDate++;
-                errors.push(`Riga ${i + 2}: Date non valida`);
+              // Status: "Normal" = prenotazione, "Reversal"/"Reversed" =
+              // storno. Entrambi sommati algebricamente (i reversal hanno
+              // segno opposto ai valori originali → si compensano quando
+              // presenti in coppia).
+              const status = String(getCell(row, "Status") ?? "")
+                .trim()
+                .toLowerCase();
+              if (
+                status !== "normal" &&
+                status !== "reversal" &&
+                status !== "reversed"
+              ) {
+                skippedUnknownStatus++;
                 return;
               }
-              if (bookingDate.getFullYear() !== y) {
+              if (status === "normal") normalCount++;
+              else reversalCount++;
+
+              const rawDate = getCell(row, "Activity Date");
+              // Excel serial numerico → xlsx con cellDates:true → Date JS.
+              const activityDate =
+                rawDate instanceof Date
+                  ? rawDate
+                  : typeof rawDate === "number"
+                    ? new Date(
+                        // Serial Excel (1900 date system): days since 1899-12-30
+                        Date.UTC(1899, 11, 30) + rawDate * 86400000,
+                      )
+                    : new Date(String(rawDate ?? "").trim());
+              if (isNaN(activityDate.getTime())) {
+                skippedNoDate++;
+                errors.push(`Riga ${i + 2}: Activity Date non valida`);
+                return;
+              }
+              if (activityDate.getFullYear() !== y) {
                 skippedOtherYear++;
                 return;
               }
-              const mese = bookingDate.getMonth() + 1;
-              const price = parseEur(getCell(row, "Price"));
-              const netPrice = parseEur(getCell(row, "Net Price"));
-              const commission = price - netPrice;
+              const mese = activityDate.getMonth() + 1;
+              const retail = toNumber(getCell(row, "Retail Price"));
+              const commission = toNumber(getCell(row, "Commission Amount"));
+              const net = toNumber(
+                getCell(row, "Retail Price Minus Commission"),
+              );
               const cur = byMonth.get(mese) ?? {
                 lordo: 0,
                 commissioni: 0,
                 netto: 0,
               };
-              cur.lordo += price;
+              // Somma algebrica: reversal ha già segno opposto nel file
+              cur.lordo += retail;
               cur.commissioni += commission;
-              cur.netto += netPrice;
+              cur.netto += net;
               byMonth.set(mese, cur);
             });
             for (const [mese, agg] of byMonth) {
@@ -1149,12 +1238,20 @@ function GYGTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
                 netto: Math.round(agg.netto * 100) / 100,
               });
             }
+            if (normalCount > 0 || reversalCount > 0)
+              errors.push(
+                `${normalCount} Normal + ${reversalCount} Reversal/Reversed processati (sommati algebricamente)`,
+              );
+            if (skippedUnknownStatus > 0)
+              errors.push(
+                `${skippedUnknownStatus} righe con Status sconosciuto saltate`,
+              );
             if (skippedOtherYear > 0)
               errors.push(
                 `${skippedOtherYear} prenotazioni di altri anni saltate`,
               );
             if (skippedNoDate > 0)
-              errors.push(`${skippedNoDate} righe senza Date valida`);
+              errors.push(`${skippedNoDate} righe senza Activity Date valida`);
             return { payloads, errors };
           }}
           onImported={() => {
@@ -1423,6 +1520,7 @@ function ExcelUploadBox({
   endpoint,
   title,
   formatHint,
+  sheetName,
   buildBatch,
   onImported,
 }: {
@@ -1430,6 +1528,8 @@ function ExcelUploadBox({
   endpoint: "fareharbor" | "stripe" | "gyg";
   title: string;
   formatHint: string;
+  // Nome esatto del foglio da leggere; fallback al primo se non trovato.
+  sheetName?: string;
   buildBatch: (
     rows: Record<string, unknown>[],
     anno: number,
@@ -1458,9 +1558,22 @@ function ExcelUploadBox({
             type: "array",
             cellDates: true,
           });
-      const ws = wb.Sheets[wb.SheetNames[0]];
+      // Sceglie il foglio: se sheetName è passato e presente lo usa,
+      // altrimenti cade sul primo. Match case-insensitive.
+      const wantedName = sheetName?.toLowerCase().trim();
+      const targetName = wantedName
+        ? wb.SheetNames.find((n) => n.toLowerCase().trim() === wantedName)
+        : undefined;
+      const ws = wb.Sheets[targetName ?? wb.SheetNames[0]];
       if (!ws) {
-        setResult({ ok: 0, errors: ["File vuoto o non valido"] });
+        setResult({
+          ok: 0,
+          errors: [
+            wantedName
+              ? `Foglio "${sheetName}" non trovato. Fogli presenti: ${wb.SheetNames.join(", ")}`
+              : "File vuoto o non valido",
+          ],
+        });
         return;
       }
       const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, {
@@ -1600,6 +1713,7 @@ function ExcelUploadModalButton({
   endpoint,
   title,
   formatHint,
+  sheetName,
   buildBatch,
   onImported,
 }: {
@@ -1607,6 +1721,7 @@ function ExcelUploadModalButton({
   endpoint: "fareharbor" | "stripe" | "gyg";
   title: string;
   formatHint: string;
+  sheetName?: string;
   buildBatch: (
     rows: Record<string, unknown>[],
     anno: number,
@@ -1646,6 +1761,7 @@ function ExcelUploadModalButton({
               endpoint={endpoint}
               title={title}
               formatHint={formatHint}
+              sheetName={sheetName}
               buildBatch={buildBatch}
               onImported={() => {
                 onImported();
