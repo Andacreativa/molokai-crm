@@ -1,4 +1,4 @@
-import { fmt } from "./constants";
+import { fmt, MESI } from "./constants";
 
 // Logo Molokai ridimensionato a max 512×512 px ed embeddato come PNG. A
 // 22mm di display 512px = ~590 DPI, ben oltre la soglia print (300 DPI):
@@ -1071,4 +1071,251 @@ export async function exportProdottiPDF(
   }
 
   doc.save(`Prodotti_${fileSuffix}_${anno}.pdf`);
+}
+
+// ── Bilancio (PDF) ────────────────────────────────────────────────────
+
+export interface BilancioMensilePDF {
+  mese: number; // 1-12
+  entrate: number;
+  uscite: number;
+  bilancio: number;
+  cumulativo: number;
+}
+
+export interface BilancioBreakdownPDF {
+  name: string;
+  value: number;
+}
+
+export interface BilancioPDFData {
+  anno: number;
+  mensili: BilancioMensilePDF[];
+  totali: { entrate: number; uscite: number; bilancio: number };
+  breakdownEntrate: BilancioBreakdownPDF[];
+  breakdownUscite: BilancioBreakdownPDF[];
+}
+
+const RED: [number, number, number] = [239, 68, 68];
+const GREEN: [number, number, number] = [34, 197, 94];
+const GRAY: [number, number, number] = [148, 163, 184];
+const DIM: [number, number, number] = [203, 213, 225];
+
+const bilancioRgb = (v: number): [number, number, number] =>
+  v > 0 ? GREEN : v < 0 ? RED : GRAY;
+
+export async function exportBilancioPDF(input: BilancioPDFData) {
+  const { default: jsPDF } = await import("jspdf");
+  const { default: autoTable } = await import("jspdf-autotable");
+
+  const doc = new jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: "a4",
+    compress: true,
+  });
+  const W = 210,
+    ML = 14,
+    MR = 14;
+  const CW = W - ML - MR;
+
+  // Header logo + titolo (stesso pattern Prodotti/Gruppi)
+  const logo = await loadLogo();
+  if (logo) {
+    const props = doc.getImageProperties(logo.data);
+    const logoW = 20;
+    const logoH = (props.height / props.width) * logoW;
+    doc.addImage(logo.data, logo.format, ML, 8, logoW, logoH);
+  }
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.setTextColor(...DARK);
+  doc.text(`BILANCIO ${input.anno}`, W - MR, 16, { align: "right" });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...MUTED);
+  doc.text(
+    `Anno ${input.anno} · generato il ${new Date().toLocaleDateString("it-IT")}`,
+    W - MR,
+    22,
+    { align: "right" },
+  );
+
+  // Separator
+  doc.setDrawColor(...LIGHT);
+  doc.setLineWidth(0.3);
+  doc.line(ML, 36, W - MR, 36);
+
+  // KPI box: Entrate / Uscite / Bilancio
+  const kpiY = 42;
+  const kpiH = 22;
+  doc.setFillColor(...BG_SOFT);
+  doc.rect(ML, kpiY, CW, kpiH, "F");
+
+  const kpiColW = CW / 3;
+  const kpiTotBilancio = bilancioRgb(input.totali.bilancio);
+  const kpis: Array<{ label: string; value: string; color: [number, number, number] }> = [
+    { label: "ENTRATE", value: fmt(input.totali.entrate), color: SKY },
+    { label: "USCITE", value: fmt(input.totali.uscite), color: RED },
+    { label: "BILANCIO", value: fmt(input.totali.bilancio), color: kpiTotBilancio },
+  ];
+  kpis.forEach((k, i) => {
+    const cx = ML + kpiColW * i + kpiColW / 2;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(...MUTED);
+    doc.text(k.label, cx, kpiY + 8, { align: "center" });
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(...k.color);
+    doc.text(k.value, cx, kpiY + 16, { align: "center" });
+  });
+
+  let cursorY = kpiY + kpiH + 8;
+
+  const tableBaseStyle = {
+    margin: { left: ML, right: MR },
+    styles: {
+      fontSize: 9,
+      cellPadding: 3,
+      lineColor: [226, 232, 240] as [number, number, number],
+      lineWidth: 0.1,
+    },
+    headStyles: {
+      fillColor: SKY,
+      textColor: 255 as const,
+      fontStyle: "bold" as const,
+      fontSize: 9,
+    },
+    alternateRowStyles: { fillColor: BG_SOFT },
+  };
+
+  const sezione = (titolo: string) => {
+    if (cursorY > 250) {
+      doc.addPage();
+      cursorY = 20;
+    }
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(...DARK);
+    doc.text(titolo, ML, cursorY);
+    cursorY += 3;
+  };
+  const advanceCursor = () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    cursorY = ((doc as any).lastAutoTable?.finalY ?? cursorY) + 10;
+  };
+
+  // ── Dettaglio mensile ──
+  sezione("DETTAGLIO MENSILE");
+  const mensiliCount = input.mensili.length;
+  autoTable(doc, {
+    ...tableBaseStyle,
+    startY: cursorY,
+    head: [["MESE", "ENTRATE", "USCITE", "SALDO MESE", "SALDO CUMULATIVO"]],
+    body: [
+      ...input.mensili.map((m) => [
+        MESI[m.mese - 1],
+        fmt(m.entrate),
+        fmt(m.uscite),
+        fmt(m.bilancio),
+        fmt(m.cumulativo),
+      ]),
+      [
+        "TOTALE",
+        fmt(input.totali.entrate),
+        fmt(input.totali.uscite),
+        fmt(input.totali.bilancio),
+        "—",
+      ],
+    ],
+    columnStyles: {
+      0: { cellWidth: 28 },
+      1: { halign: "right" },
+      2: { halign: "right" },
+      3: { halign: "right" },
+      4: { halign: "right" },
+    },
+    didParseCell: (data) => {
+      if (data.section !== "body") return;
+      const isTotale = data.row.index === mensiliCount;
+      if (isTotale) {
+        data.cell.styles.fontStyle = "bold";
+        data.cell.styles.fillColor = [229, 231, 235];
+        if (data.column.index === 1) data.cell.styles.textColor = SKY;
+        else if (data.column.index === 2) data.cell.styles.textColor = RED;
+        else if (data.column.index === 3)
+          data.cell.styles.textColor = bilancioRgb(input.totali.bilancio);
+        else if (data.column.index === 4) data.cell.styles.textColor = GRAY;
+        return;
+      }
+      const m = input.mensili[data.row.index];
+      if (data.column.index === 1) {
+        data.cell.styles.textColor = m.entrate > 0 ? SKY : DIM;
+      } else if (data.column.index === 2) {
+        data.cell.styles.textColor = m.uscite > 0 ? RED : DIM;
+      } else if (data.column.index === 3) {
+        data.cell.styles.fontStyle = "bold";
+        data.cell.styles.textColor = bilancioRgb(m.bilancio);
+      } else if (data.column.index === 4) {
+        data.cell.styles.fontStyle = "bold";
+        data.cell.styles.textColor = bilancioRgb(m.cumulativo);
+      }
+    },
+  });
+  advanceCursor();
+
+  // ── Breakdown Entrate ──
+  const entrate = input.breakdownEntrate
+    .filter((b) => b.value > 0)
+    .sort((a, b) => b.value - a.value);
+  if (entrate.length > 0) {
+    sezione("BREAKDOWN ENTRATE PER CANALE");
+    autoTable(doc, {
+      ...tableBaseStyle,
+      startY: cursorY,
+      head: [["CANALE", "IMPORTO", "% SU TOTALE"]],
+      body: entrate.map((b) => [
+        b.name,
+        fmt(b.value),
+        input.totali.entrate > 0
+          ? `${((b.value / input.totali.entrate) * 100).toFixed(1)}%`
+          : "—",
+      ]),
+      columnStyles: {
+        0: { cellWidth: "auto" },
+        1: { halign: "right", cellWidth: 40 },
+        2: { halign: "right", cellWidth: 32 },
+      },
+    });
+    advanceCursor();
+  }
+
+  // ── Breakdown Uscite ──
+  const uscite = input.breakdownUscite
+    .filter((b) => b.value > 0)
+    .sort((a, b) => b.value - a.value);
+  if (uscite.length > 0) {
+    sezione("BREAKDOWN USCITE PER CATEGORIA");
+    autoTable(doc, {
+      ...tableBaseStyle,
+      startY: cursorY,
+      head: [["CATEGORIA", "IMPORTO", "% SU TOTALE"]],
+      body: uscite.map((b) => [
+        b.name,
+        fmt(b.value),
+        input.totali.uscite > 0
+          ? `${((b.value / input.totali.uscite) * 100).toFixed(1)}%`
+          : "—",
+      ]),
+      columnStyles: {
+        0: { cellWidth: "auto" },
+        1: { halign: "right", cellWidth: 40 },
+        2: { halign: "right", cellWidth: 32 },
+      },
+    });
+    advanceCursor();
+  }
+
+  doc.save(`Bilancio_${input.anno}.pdf`);
 }

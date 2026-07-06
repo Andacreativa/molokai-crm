@@ -13,7 +13,9 @@ import {
   Pie,
   Legend,
 } from "recharts";
+import { FileDown } from "lucide-react";
 import { fmt, MESI, ANNI } from "@/lib/constants";
+import { exportBilancioPDF } from "@/lib/export";
 
 // ─── Types ─────────────────────────────────────────────────────────────
 
@@ -137,6 +139,26 @@ export default function BilancioPage() {
     .filter(([, v]) => v > 0)
     .map(([name, value]) => ({ name, value }));
 
+  const handleExportPDF = () => {
+    exportBilancioPDF({
+      anno,
+      mensili: data.mensili.map((m, i) => ({
+        mese: m.mese,
+        entrate: m.entrate.totale,
+        uscite: m.uscite.totale,
+        bilancio: m.bilancio,
+        cumulativo: data.cumulativoMensile[i],
+      })),
+      totali: data.totali,
+      breakdownEntrate: Object.entries(data.breakdown.entrate).map(
+        ([name, value]) => ({ name, value }),
+      ),
+      breakdownUscite: Object.entries(data.breakdown.uscite).map(
+        ([name, value]) => ({ name, value }),
+      ),
+    });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -146,17 +168,26 @@ export default function BilancioPage() {
             Riepilogo entrate, uscite e bilancio · anno {anno}
           </p>
         </div>
-        <select
-          value={anno}
-          onChange={(e) => setAnno(parseInt(e.target.value))}
-          className="text-sm font-medium px-3 py-2 rounded-xl border border-gray-200 bg-white text-gray-600 outline-none"
-        >
-          {ANNI.map((a) => (
-            <option key={a} value={a}>
-              {a}
-            </option>
-          ))}
-        </select>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportPDF}
+            className="glass-btn-secondary flex items-center gap-2 text-gray-700 text-sm font-medium px-4 py-2.5 rounded-xl"
+            title={`Esporta bilancio ${anno} in PDF`}
+          >
+            <FileDown className="w-4 h-4" style={{ color: "#ef4444" }} /> PDF
+          </button>
+          <select
+            value={anno}
+            onChange={(e) => setAnno(parseInt(e.target.value))}
+            className="text-sm font-medium px-3 py-2 rounded-xl border border-gray-200 bg-white text-gray-600 outline-none"
+          >
+            {ANNI.map((a) => (
+              <option key={a} value={a}>
+                {a}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* KPI cards */}
