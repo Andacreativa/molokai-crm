@@ -5,19 +5,21 @@ import { prisma } from "@/lib/prisma";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const MESI = [
-  "Gennaio",
-  "Febbraio",
+// Nomi mesi in spagnolo — usati per le cartelle mensili e il filename
+// del ZIP (destinato al commercialista spagnolo).
+const MESES_ES = [
+  "Enero",
+  "Febrero",
   "Marzo",
-  "Aprile",
-  "Maggio",
-  "Giugno",
-  "Luglio",
+  "Abril",
+  "Mayo",
+  "Junio",
+  "Julio",
   "Agosto",
-  "Settembre",
-  "Ottobre",
-  "Novembre",
-  "Dicembre",
+  "Septiembre",
+  "Octubre",
+  "Noviembre",
+  "Diciembre",
 ];
 
 export async function GET(request: Request) {
@@ -48,7 +50,7 @@ export async function GET(request: Request) {
     for (const f of fatture) {
       if (!f.fileData) continue;
 
-      const meseLabel = `${String(f.mese).padStart(2, "0")}-${MESI[f.mese - 1] ?? f.mese}`;
+      const meseLabel = `${String(f.mese).padStart(2, "0")}-${MESES_ES[f.mese - 1] ?? f.mese}`;
       const folder = zip.folder(`${f.anno}/${meseLabel}`)!;
 
       const dot = f.fileName.lastIndexOf(".");
@@ -73,11 +75,13 @@ export async function GET(request: Request) {
 
     const today = new Date().toISOString().slice(0, 10);
     const filterLabel = meseParam
-      ? `${MESI[parseInt(meseParam, 10) - 1] ?? meseParam}-${annoParam ?? today}`
+      ? `${MESES_ES[parseInt(meseParam, 10) - 1] ?? meseParam}-${annoParam ?? today}`
       : annoParam
-        ? `Anno-${annoParam}`
-        : "Tutte";
-    const zipName = `Fatture-Fornitori-${filterLabel}-${today}.zip`;
+        ? `Anio-${annoParam}`
+        : "Todas";
+    // Nome file: interamente in spagnolo per coerenza con la struttura
+    // interna e con il resto degli export destinati al commercialista.
+    const zipName = `Facturas-Proveedores-${filterLabel}-${today}.zip`;
 
     return new Response(new Uint8Array(buffer), {
       status: 200,
