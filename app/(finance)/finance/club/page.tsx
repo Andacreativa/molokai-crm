@@ -459,7 +459,7 @@ function SociTab() {
                 ].map((h) => (
                   <th
                     key={h}
-                    className={`text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 ${h === "Prezzo" ? "text-right" : "text-left"}`}
+                    className={`text-xs font-semibold text-gray-500 uppercase tracking-wide py-3 whitespace-nowrap ${h === "Prezzo" ? "px-3 text-right" : "px-4 text-left"}`}
                   >
                     {h}
                   </th>
@@ -495,7 +495,7 @@ function SociTab() {
                     <td className="px-4 py-3 text-sm text-gray-700">
                       {s.piano}
                     </td>
-                    <td className="px-4 py-3 text-sm font-semibold text-gray-900 text-right">
+                    <td className="px-3 py-3 text-sm font-semibold text-gray-900 text-right whitespace-nowrap">
                       {fmt(s.prezzoPiano)}
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-600">
