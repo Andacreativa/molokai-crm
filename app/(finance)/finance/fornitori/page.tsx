@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Plus,
   Pencil,
@@ -10,11 +10,14 @@ import {
   Check,
   Upload,
   Download,
+  FileDown,
+  AlertTriangle,
 } from "lucide-react";
 import { fmt, MESI } from "@/lib/constants";
 import AddressFields, { formatAddress } from "@/components/AddressFields";
 import FiltriBar from "@/components/FiltriBar";
 import { PageSizeSelect, PageNav } from "@/components/Pagination";
+import { exportFattureFornitoriPDF } from "@/lib/export";
 
 interface Fornitore {
   id: number;
@@ -616,7 +619,28 @@ interface FatturaFornitore {
   importo: number;
   dataFattura: string | null;
   createdAt: string;
+  // Popolato quando la fattura è nata da una Spesa via OCR — usato per
+  // ricavare base imponibile e IVA nel riepilogo fiscale.
+  spesa?: {
+    importo: number;
+    aliquotaIva: number;
+    ivaRecuperabile: number;
+  } | null;
 }
+
+const TRIMESTRE_OPTIONS_ES: {
+  value: number;
+  label: string;
+}[] = [
+  { value: 0, label: "Todos" },
+  { value: 1, label: "1er Trimestre (Ene-Mar)" },
+  { value: 2, label: "2º Trimestre (Abr-Jun)" },
+  { value: 3, label: "3er Trimestre (Jul-Sep)" },
+  { value: 4, label: "4º Trimestre (Oct-Dic)" },
+];
+
+// Ritorna il trimestre (1-4) del mese 1-12.
+const meseATrimestre = (m: number) => Math.ceil(m / 3);
 
 function FattureFornitoriTab({
   fornitori,
@@ -626,22 +650,24 @@ function FattureFornitoriTab({
   onFornitoreCreato: () => void;
 }) {
   const [fatture, setFatture] = useState<FatturaFornitore[]>([]);
-  const [filtroMese, setFiltroMese] = useState(0);
+  // 0 = Todos, 1..4 = trimestre
+  const [filtroTrimestre, setFiltroTrimestre] = useState(0);
   const [filtroAnno, setFiltroAnno] = useState(new Date().getFullYear());
   const [showUpload, setShowUpload] = useState(false);
   const [preview, setPreview] = useState<FatturaFornitore | null>(null);
 
   const load = async () => {
+    // Recuperiamo tutto l'anno e filtriamo lato client per trimestre
+    // (semplifica l'endpoint e supporta il default "Todos").
     const params = new URLSearchParams();
     params.set("anno", String(filtroAnno));
-    if (filtroMese > 0) params.set("mese", String(filtroMese));
     const data = await (await fetch(`/api/fatture-fornitori?${params}`)).json();
     setFatture(Array.isArray(data) ? data : []);
   };
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtroMese, filtroAnno]);
+  }, [filtroAnno]);
 
   const del = async (id: number) => {
     if (!confirm("Eliminare questa fattura?")) return;
@@ -649,10 +675,87 @@ function FattureFornitoriTab({
     load();
   };
 
+  // Set di ID marcati come "possibile duplicato" (stesso fornitore +
+  // stesso importo arrotondato + stesso mese/anno): tutti gli id nei
+  // gruppi con più di un elemento.
+  const possibiliDuplicati = (() => {
+    const groups = new Map<string, number[]>();
+    for (const f of fatture) {
+      if (!f.fornitoreId || !f.importo) continue;
+      const key = `${f.fornitoreId}|${Math.round(f.importo * 100)}|${f.mese}|${f.anno}`;
+      const arr = groups.get(key);
+      if (arr) arr.push(f.id);
+      else groups.set(key, [f.id]);
+    }
+    const dup = new Set<number>();
+    for (const ids of groups.values()) {
+      if (ids.length > 1) ids.forEach((id) => dup.add(id));
+    }
+    return dup;
+  })();
+
+  // Filtro client-side per trimestre
+  const fattureFiltrate = fatture.filter((f) => {
+    if (filtroTrimestre === 0) return true;
+    // Usa dataFattura se presente, altrimenti f.mese come fallback
+    if (f.dataFattura) {
+      const d = new Date(f.dataFattura);
+      if (d.getFullYear() !== filtroAnno) return false;
+      return meseATrimestre(d.getMonth() + 1) === filtroTrimestre;
+    }
+    return meseATrimestre(f.mese) === filtroTrimestre;
+  });
+
+  // Ricava base/IVA da spesa collegata (via OCR); in mancanza restituisce
+  // null (mostrato come "—" nel PDF), Total = importo.
+  const rowFiscale = (f: FatturaFornitore) => {
+    const sp = f.spesa;
+    if (sp && sp.importo > 0) {
+      const total = sp.importo;
+      const iva = sp.ivaRecuperabile ?? 0;
+      const base = Math.round((total - iva) * 100) / 100;
+      return { base, iva, total };
+    }
+    return { base: null as number | null, iva: null as number | null, total: f.importo };
+  };
+
+  const totali = fattureFiltrate.reduce(
+    (acc, f) => {
+      const r = rowFiscale(f);
+      acc.total += r.total;
+      if (r.base != null) acc.base += r.base;
+      if (r.iva != null) acc.iva += r.iva;
+      return acc;
+    },
+    { base: 0, iva: 0, total: 0 },
+  );
+  totali.base = Math.round(totali.base * 100) / 100;
+  totali.iva = Math.round(totali.iva * 100) / 100;
+  totali.total = Math.round(totali.total * 100) / 100;
+
+  const handleExportPDF = () => {
+    exportFattureFornitoriPDF({
+      anno: filtroAnno,
+      trimestre: filtroTrimestre === 0 ? null : filtroTrimestre,
+      fatture: fattureFiltrate.map((f) => {
+        const r = rowFiscale(f);
+        return {
+          fecha: f.dataFattura,
+          proveedor: f.fornitore?.nome ?? "—",
+          numero: f.fileName,
+          base: r.base,
+          iva: r.iva,
+          total: r.total,
+        };
+      }),
+      totali: { ...totali, conteggio: fattureFiltrate.length },
+    });
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <select
             value={filtroAnno}
             onChange={(e) => setFiltroAnno(parseInt(e.target.value))}
@@ -665,28 +768,53 @@ function FattureFornitoriTab({
             ))}
           </select>
           <select
-            value={filtroMese}
-            onChange={(e) => setFiltroMese(parseInt(e.target.value))}
+            value={filtroTrimestre}
+            onChange={(e) => setFiltroTrimestre(parseInt(e.target.value))}
             className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-sky-300"
           >
-            <option value={0}>Tutti i mesi</option>
-            {MESI.map((m, i) => (
-              <option key={i} value={i + 1}>
-                {m}
+            {TRIMESTRE_OPTIONS_ES.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
               </option>
             ))}
           </select>
-          <span className="text-xs text-gray-500">
-            {fatture.length} fatture
-          </span>
+          <div className="text-xs text-gray-600 flex items-center gap-3">
+            <span>
+              <span className="font-semibold text-gray-900">
+                {fattureFiltrate.length}
+              </span>{" "}
+              fatture
+            </span>
+            <span className="text-gray-300">·</span>
+            <span>
+              Totale{" "}
+              <span className="font-semibold text-gray-900 tabular-nums">
+                {fmt(totali.total)}
+              </span>
+            </span>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={handleExportPDF}
+            disabled={fattureFiltrate.length === 0}
+            title={
+              fattureFiltrate.length === 0
+                ? "Nessuna fattura nel filtro"
+                : "Exportar riepilogo PDF (es)"
+            }
+            className="glass-btn-secondary flex items-center gap-2 text-gray-700 text-sm font-medium px-4 py-2.5 rounded-xl disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <FileDown className="w-4 h-4" style={{ color: "#ef4444" }} />{" "}
+            Exportar PDF
+          </button>
           <button
             onClick={async () => {
-              if (fatture.length === 0) return;
+              if (fattureFiltrate.length === 0) return;
               const params = new URLSearchParams();
               params.set("anno", String(filtroAnno));
-              if (filtroMese > 0) params.set("mese", String(filtroMese));
+              // ZIP endpoint filtra per mese singolo; per "Todos" o trimestre
+              // scarichiamo tutto l'anno (utente può filtrare a monte)
               const res = await fetch(`/api/fatture-fornitori/zip?${params}`);
               if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
@@ -706,11 +834,11 @@ function FattureFornitoriTab({
               a.remove();
               setTimeout(() => URL.revokeObjectURL(url), 1000);
             }}
-            disabled={fatture.length === 0}
+            disabled={fattureFiltrate.length === 0}
             title={
-              fatture.length === 0
+              fattureFiltrate.length === 0
                 ? "Nessuna fattura nel filtro"
-                : "Scarica ZIP"
+                : "Scarica ZIP dell'anno"
             }
             className="flex items-center gap-2 border border-gray-200 text-gray-700 text-sm font-medium px-4 py-2.5 rounded-xl hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -747,23 +875,36 @@ function FattureFornitoriTab({
             </tr>
           </thead>
           <tbody>
-            {fatture.length === 0 && (
+            {fattureFiltrate.length === 0 && (
               <tr>
                 <td
                   colSpan={6}
                   className="text-center text-gray-400 py-12 text-sm"
                 >
-                  Nessuna fattura caricata
+                  Nessuna fattura nel periodo selezionato
                 </td>
               </tr>
             )}
-            {fatture.map((f, i) => (
+            {fattureFiltrate.map((f, i) => (
               <tr
                 key={f.id}
                 className={`border-b border-gray-50 hover:bg-gray-50 transition-colors ${i % 2 === 1 ? "bg-[#F9F9F9]" : "bg-white"}`}
               >
                 <td className="px-4 py-3 text-sm font-semibold text-gray-900">
-                  {f.fornitore?.nome ?? "—"}
+                  <div className="flex items-center gap-1.5">
+                    {possibiliDuplicati.has(f.id) && (
+                      <span
+                        title="Possibile duplicato: esiste un'altra fattura con lo stesso fornitore, importo e mese"
+                        className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100"
+                      >
+                        <AlertTriangle
+                          className="w-3.5 h-3.5"
+                          style={{ color: "#b45309" }}
+                        />
+                      </span>
+                    )}
+                    <span>{f.fornitore?.nome ?? "—"}</span>
+                  </div>
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-700">
                   <button
@@ -857,9 +998,17 @@ function UploadFatturaModal({
   const [extracting, setExtracting] = useState(false);
   const [creatingFornitore, setCreatingFornitore] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [checkingDup, setCheckingDup] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  // Duplicati trovati dal check pre-save; se non null → mostra warning modal.
+  // Quando l'utente conferma "Salva comunque" impostiamo overrideDup=true
+  // per skippare il check nella successiva chiamata a submit(). Ref invece di
+  // state per essere leggibile immediatamente nel prossimo submit() (evita
+  // stale-closure con setTimeout).
+  const [dupMatches, setDupMatches] = useState<DuplicateMatch[] | null>(null);
+  const overrideDupRef = useRef(false);
 
   // Match fornitore per partitaIva o nome quando estraiamo o quando i fornitori cambiano
   useEffect(() => {
@@ -1009,6 +1158,35 @@ function UploadFatturaModal({
       return setError(
         "Seleziona un fornitore dalla lista o aspetta l'estrazione AI",
       );
+    }
+
+    // Check duplicati: skip se l'utente ha già confermato "Salva comunque"
+    if (!overrideDupRef.current) {
+      setCheckingDup(true);
+      try {
+        const res = await fetch("/api/fatture-fornitori/check-duplicati", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fornitoreId: effectiveFornitoreId,
+            fileName: file.name,
+            importo: importo === "" ? 0 : Number(importo),
+            mese,
+            anno,
+            dataFattura: dataFattura || null,
+          }),
+        });
+        const dupData = (await res.json()) as { matches?: DuplicateMatch[] };
+        if (Array.isArray(dupData.matches) && dupData.matches.length > 0) {
+          setDupMatches(dupData.matches);
+          setCheckingDup(false);
+          return; // aspetta decisione utente nel warning modal
+        }
+      } catch (e) {
+        console.warn("[upload-fattura] check duplicati fallito, procedo:", e);
+      } finally {
+        setCheckingDup(false);
+      }
     }
 
     setUploading(true);
@@ -1251,17 +1429,228 @@ function UploadFatturaModal({
           </button>
           <button
             onClick={submit}
-            disabled={uploading || extracting || creatingFornitore || !file}
+            disabled={
+              uploading ||
+              extracting ||
+              creatingFornitore ||
+              checkingDup ||
+              !file
+            }
             className="glass-btn-primary flex-1 text-white text-sm font-medium py-2.5 rounded-xl disabled:opacity-60"
           >
             {uploading
               ? "Caricamento..."
               : creatingFornitore
                 ? "Creo fornitore..."
-                : "Carica"}
+                : checkingDup
+                  ? "Controllo duplicati..."
+                  : "Carica"}
           </button>
         </div>
       </div>
+
+      {dupMatches && (
+        <DuplicateWarningModal
+          matches={dupMatches}
+          nuova={{
+            fornitoreNome:
+              fornitori.find((f) => f.id === fornitoreId)?.nome ??
+              extractedNome ??
+              "—",
+            fileName: file?.name ?? "—",
+            importo: importo === "" ? 0 : Number(importo),
+            mese,
+            anno,
+            dataFattura: dataFattura || null,
+          }}
+          onCancel={() => setDupMatches(null)}
+          onConfirm={() => {
+            setDupMatches(null);
+            overrideDupRef.current = true;
+            // Rilancia submit — questa volta salta il check
+            submit();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Duplicate Warning Modal ──────────────────────────────────────────────
+
+interface DuplicateMatch {
+  id: number;
+  fornitore: string;
+  fileName: string;
+  mese: number;
+  anno: number;
+  importo: number;
+  dataFattura: string | null;
+  severity: "red" | "amber";
+  criterio: string;
+}
+
+function DuplicateWarningModal({
+  matches,
+  nuova,
+  onCancel,
+  onConfirm,
+}: {
+  matches: DuplicateMatch[];
+  nuova: {
+    fornitoreNome: string;
+    fileName: string;
+    importo: number;
+    mese: number;
+    anno: number;
+    dataFattura: string | null;
+  };
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const hasRed = matches.some((m) => m.severity === "red");
+  return (
+    <div
+      className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] p-4"
+      onClick={onCancel}
+    >
+      <div
+        className="glass-modal rounded-2xl w-full max-w-2xl p-6 space-y-4 max-h-[92vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start gap-3">
+          <div
+            className="p-2 rounded-xl"
+            style={{ background: hasRed ? "#fee2e2" : "#fef3c7" }}
+          >
+            <AlertTriangle
+              className="w-5 h-5"
+              style={{ color: hasRed ? "#b91c1c" : "#b45309" }}
+            />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-lg font-bold text-gray-900">
+              {hasRed
+                ? "Possibile duplicato quasi certo"
+                : "Possibile duplicato"}
+            </h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {matches.length}{" "}
+              {matches.length === 1
+                ? "fattura simile trovata in archivio"
+                : "fatture simili trovate in archivio"}
+              . Verifica prima di salvare.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="rounded-xl border border-gray-200 bg-white p-3">
+            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">
+              Nuova fattura
+            </p>
+            <div className="space-y-1 text-xs text-gray-700">
+              <RowKV k="Fornitore" v={nuova.fornitoreNome} />
+              <RowKV k="File" v={nuova.fileName} mono />
+              <RowKV k="Mese" v={`${MESI[nuova.mese - 1]} ${nuova.anno}`} />
+              <RowKV k="Importo" v={fmt(nuova.importo)} bold />
+              <RowKV
+                k="Data"
+                v={
+                  nuova.dataFattura
+                    ? new Date(nuova.dataFattura).toLocaleDateString("it-IT")
+                    : "—"
+                }
+              />
+            </div>
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">
+              Già in archivio ({matches.length})
+            </p>
+            <div className="space-y-3 max-h-[280px] overflow-y-auto pr-1">
+              {matches.map((m) => {
+                const isRed = m.severity === "red";
+                return (
+                  <div
+                    key={m.id}
+                    className="rounded-lg p-2.5 border"
+                    style={{
+                      background: isRed ? "#fef2f2" : "#fffbeb",
+                      borderColor: isRed ? "#fecaca" : "#fde68a",
+                    }}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <span
+                        className="text-[10px] font-bold uppercase tracking-wide"
+                        style={{ color: isRed ? "#b91c1c" : "#b45309" }}
+                      >
+                        {m.criterio}
+                      </span>
+                    </div>
+                    <div className="space-y-0.5 text-xs text-gray-700 mt-1.5">
+                      <RowKV k="Fornitore" v={m.fornitore} />
+                      <RowKV k="File" v={m.fileName} mono />
+                      <RowKV k="Mese" v={`${MESI[m.mese - 1]} ${m.anno}`} />
+                      <RowKV k="Importo" v={fmt(m.importo)} bold />
+                      <RowKV
+                        k="Data"
+                        v={
+                          m.dataFattura
+                            ? new Date(m.dataFattura).toLocaleDateString(
+                                "it-IT",
+                              )
+                            : "—"
+                        }
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-3 pt-2">
+          <button
+            onClick={onCancel}
+            className="flex-1 border border-gray-200 text-gray-600 text-sm font-medium py-2.5 rounded-xl hover:bg-gray-50"
+          >
+            Annulla
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 text-white text-sm font-medium py-2.5 rounded-xl"
+            style={{ background: hasRed ? "#dc2626" : "#d97706" }}
+          >
+            Salva comunque
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RowKV({
+  k,
+  v,
+  mono,
+  bold,
+}: {
+  k: string;
+  v: string;
+  mono?: boolean;
+  bold?: boolean;
+}) {
+  return (
+    <div className="grid grid-cols-[70px_1fr] gap-2">
+      <span className="text-gray-500">{k}</span>
+      <span
+        className={`text-gray-900 ${mono ? "font-mono text-[11px]" : ""} ${bold ? "font-semibold" : ""}`}
+        style={{ wordBreak: "break-all" }}
+      >
+        {v}
+      </span>
     </div>
   );
 }

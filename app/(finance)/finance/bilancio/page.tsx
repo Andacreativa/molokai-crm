@@ -13,9 +13,13 @@ import {
   Pie,
   Legend,
 } from "recharts";
-import { FileDown } from "lucide-react";
+import { FileDown, FileText } from "lucide-react";
 import { fmt, MESI, ANNI } from "@/lib/constants";
-import { exportBilancioPDF } from "@/lib/export";
+import {
+  exportBilancioPDF,
+  exportInformeFiscalPDF,
+  type InformeFiscalPDFData,
+} from "@/lib/export";
 
 // ─── Types ─────────────────────────────────────────────────────────────
 
@@ -101,6 +105,11 @@ export default function BilancioPage() {
   const [data, setData] = useState<BilancioData | null>(null);
   const [anno, setAnno] = useState(new Date().getFullYear());
   const [loading, setLoading] = useState(false);
+  const [fiscalOpen, setFiscalOpen] = useState(false);
+  const [fiscalTrimestre, setFiscalTrimestre] = useState(1);
+  const [fiscalAnno, setFiscalAnno] = useState(new Date().getFullYear());
+  const [fiscalLoading, setFiscalLoading] = useState(false);
+  const [fiscalError, setFiscalError] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -139,6 +148,34 @@ export default function BilancioPage() {
     .filter(([, v]) => v > 0)
     .map(([name, value]) => ({ name, value }));
 
+  const openFiscalModal = () => {
+    setFiscalAnno(anno);
+    setFiscalTrimestre(1);
+    setFiscalError(null);
+    setFiscalOpen(true);
+  };
+
+  const handleGenerateFiscal = async () => {
+    setFiscalLoading(true);
+    setFiscalError(null);
+    try {
+      const res = await fetch(
+        `/api/informe-fiscal?anno=${fiscalAnno}&trimestre=${fiscalTrimestre}`,
+      );
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error(t || `HTTP ${res.status}`);
+      }
+      const payload = (await res.json()) as InformeFiscalPDFData;
+      await exportInformeFiscalPDF(payload);
+      setFiscalOpen(false);
+    } catch (e) {
+      setFiscalError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setFiscalLoading(false);
+    }
+  };
+
   const handleExportPDF = () => {
     exportBilancioPDF({
       anno,
@@ -168,7 +205,15 @@ export default function BilancioPage() {
             Riepilogo entrate, uscite e bilancio · anno {anno}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={openFiscalModal}
+            className="glass-btn-secondary flex items-center gap-2 text-gray-700 text-sm font-medium px-4 py-2.5 rounded-xl"
+            title="Genera Informe Fiscal trimestrale (per commercialista)"
+          >
+            <FileText className="w-4 h-4" style={{ color: "#8b5cf6" }} />{" "}
+            Informe Fiscal
+          </button>
           <button
             onClick={handleExportPDF}
             className="glass-btn-secondary flex items-center gap-2 text-gray-700 text-sm font-medium px-4 py-2.5 rounded-xl"
@@ -353,6 +398,129 @@ export default function BilancioPage() {
           totale={data.totali.uscite}
           fallbackColor="#ef4444"
         />
+      </div>
+
+      {fiscalOpen && (
+        <FiscalModal
+          trimestre={fiscalTrimestre}
+          anno={fiscalAnno}
+          loading={fiscalLoading}
+          error={fiscalError}
+          onChangeTrimestre={setFiscalTrimestre}
+          onChangeAnno={setFiscalAnno}
+          onClose={() => setFiscalOpen(false)}
+          onGenerate={handleGenerateFiscal}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Fiscal Modal ──────────────────────────────────────────────────────
+
+const TRIMESTRE_OPTIONS: { value: number; label: string }[] = [
+  { value: 1, label: "1er Trimestre (Ene-Mar)" },
+  { value: 2, label: "2º Trimestre (Abr-Jun)" },
+  { value: 3, label: "3er Trimestre (Jul-Sep)" },
+  { value: 4, label: "4º Trimestre (Oct-Dic)" },
+];
+
+function FiscalModal({
+  trimestre,
+  anno,
+  loading,
+  error,
+  onChangeTrimestre,
+  onChangeAnno,
+  onClose,
+  onGenerate,
+}: {
+  trimestre: number;
+  anno: number;
+  loading: boolean;
+  error: string | null;
+  onChangeTrimestre: (v: number) => void;
+  onChangeAnno: (v: number) => void;
+  onClose: () => void;
+  onGenerate: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="glass-card rounded-2xl p-6 w-full max-w-md"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="text-lg font-bold text-gray-900">
+          Informe Fiscal Trimestral
+        </h2>
+        <p className="text-xs text-gray-500 mt-1">
+          Genera un PDF riepilogativo per il commercialista (in spagnolo) con
+          entrate per canale del trimestre selezionato.
+        </p>
+
+        <div className="mt-5 space-y-4">
+          <div>
+            <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
+              Trimestre
+            </label>
+            <select
+              value={trimestre}
+              onChange={(e) => onChangeTrimestre(parseInt(e.target.value))}
+              disabled={loading}
+              className="mt-1 w-full text-sm font-medium px-3 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-900 outline-none disabled:opacity-50"
+            >
+              {TRIMESTRE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
+              Año
+            </label>
+            <select
+              value={anno}
+              onChange={(e) => onChangeAnno(parseInt(e.target.value))}
+              disabled={loading}
+              className="mt-1 w-full text-sm font-medium px-3 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-900 outline-none disabled:opacity-50"
+            >
+              {ANNI.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {error && (
+          <p className="mt-3 text-xs text-red-700 bg-red-50 rounded-lg px-3 py-2">
+            {error}
+          </p>
+        )}
+
+        <div className="flex justify-end gap-2 mt-6">
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="text-sm font-medium px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 disabled:opacity-50"
+          >
+            Cancella
+          </button>
+          <button
+            onClick={onGenerate}
+            disabled={loading}
+            className="glass-btn-primary flex items-center gap-2 text-white text-sm font-medium px-4 py-2.5 rounded-xl disabled:opacity-50"
+          >
+            <FileDown className="w-4 h-4" />
+            {loading ? "Generazione..." : "Descarga PDF"}
+          </button>
+        </div>
       </div>
     </div>
   );

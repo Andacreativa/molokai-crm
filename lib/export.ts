@@ -1319,3 +1319,498 @@ export async function exportBilancioPDF(input: BilancioPDFData) {
 
   doc.save(`Bilancio_${input.anno}.pdf`);
 }
+
+// ── Informe Fiscal Trimestral (PDF, es-ES) ────────────────────────────
+
+export interface InformeFiscalCanal {
+  canal: string;
+  base: number | null;
+  iva: number | null;
+  total: number;
+}
+
+export interface InformeFiscalPorMes {
+  mese: number; // 1-12
+  total: number;
+}
+
+export interface InformeFiscalDetalle {
+  fecha: string; // YYYY-MM-DD
+  canal: string;
+  base: number | null;
+  iva: number | null;
+  total: number;
+}
+
+export interface InformeFiscalPDFData {
+  anno: number;
+  trimestre: number; // 1..4
+  canali: InformeFiscalCanal[];
+  porMes: InformeFiscalPorMes[];
+  detalleDiario: InformeFiscalDetalle[];
+  totali: { base: number; iva: number; total: number };
+}
+
+const MESI_ES = [
+  "Enero",
+  "Febrero",
+  "Marzo",
+  "Abril",
+  "Mayo",
+  "Junio",
+  "Julio",
+  "Agosto",
+  "Septiembre",
+  "Octubre",
+  "Noviembre",
+  "Diciembre",
+];
+
+const TRIMESTRE_LABEL: Record<number, string> = {
+  1: "1er Trimestre (Ene-Mar)",
+  2: "2º Trimestre (Abr-Jun)",
+  3: "3er Trimestre (Jul-Sep)",
+  4: "4º Trimestre (Oct-Dic)",
+};
+
+const TRIMESTRE_SHORT: Record<number, string> = {
+  1: "Q1",
+  2: "Q2",
+  3: "Q3",
+  4: "Q4",
+};
+
+function trimestrePeriodo(anno: number, trimestre: number): {
+  start: Date;
+  end: Date;
+} {
+  const meseStart = (trimestre - 1) * 3;
+  return {
+    start: new Date(anno, meseStart, 1),
+    end: new Date(anno, meseStart + 3, 0),
+  };
+}
+
+export async function exportInformeFiscalPDF(input: InformeFiscalPDFData) {
+  const { default: jsPDF } = await import("jspdf");
+  const { default: autoTable } = await import("jspdf-autotable");
+
+  const doc = new jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: "a4",
+    compress: true,
+  });
+  const W = 210,
+    ML = 14,
+    MR = 14;
+  const CW = W - ML - MR;
+
+  // Header logo + titolo (destra) + periodo
+  const logo = await loadLogo();
+  if (logo) {
+    const props = doc.getImageProperties(logo.data);
+    const logoW = 20;
+    const logoH = (props.height / props.width) * logoW;
+    doc.addImage(logo.data, logo.format, ML, 8, logoW, logoH);
+  }
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.setTextColor(...DARK);
+  doc.text(
+    `INFORME FISCAL ${TRIMESTRE_SHORT[input.trimestre]} ${input.anno}`,
+    W - MR,
+    15,
+    { align: "right" },
+  );
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...MUTED);
+  doc.text(TRIMESTRE_LABEL[input.trimestre] ?? "", W - MR, 21, {
+    align: "right",
+  });
+  const { start, end } = trimestrePeriodo(input.anno, input.trimestre);
+  doc.text(
+    `Del ${start.toLocaleDateString("es-ES")} al ${end.toLocaleDateString("es-ES")}`,
+    W - MR,
+    26,
+    { align: "right" },
+  );
+
+  // Ragione sociale (sotto il logo)
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(...DARK);
+  doc.text(AZIENDA_PDF.nome, ML, 36);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+  doc.setTextColor(...MUTED);
+  doc.text(
+    `CIF: ${AZIENDA_PDF.cif} · ${AZIENDA_PDF.via}, ${AZIENDA_PDF.cap} ${AZIENDA_PDF.citta}`,
+    ML,
+    41,
+  );
+
+  // Separator
+  doc.setDrawColor(...LIGHT);
+  doc.setLineWidth(0.3);
+  doc.line(ML, 46, W - MR, 46);
+
+  let cursorY = 54;
+
+  const tableBaseStyle = {
+    margin: { left: ML, right: MR },
+    styles: {
+      fontSize: 9,
+      cellPadding: 3,
+      lineColor: [226, 232, 240] as [number, number, number],
+      lineWidth: 0.1,
+    },
+    headStyles: {
+      fillColor: SKY,
+      textColor: 255 as const,
+      fontStyle: "bold" as const,
+      fontSize: 9,
+    },
+    alternateRowStyles: { fillColor: BG_SOFT },
+  };
+
+  const sezione = (titolo: string) => {
+    if (cursorY > 250) {
+      doc.addPage();
+      cursorY = 20;
+    }
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(...DARK);
+    doc.text(titolo, ML, cursorY);
+    cursorY += 3;
+  };
+  const advanceCursor = () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    cursorY = ((doc as any).lastAutoTable?.finalY ?? cursorY) + 10;
+  };
+
+  // ── Tabella INGRESOS POR CANAL ──
+  sezione("INGRESOS POR CANAL");
+  const canaliRows = [
+    ...input.canali.map((c) => [
+      c.canal,
+      c.base != null ? fmt(c.base) : "—",
+      c.iva != null ? fmt(c.iva) : "—",
+      fmt(c.total),
+    ]),
+    [
+      "TOTAL",
+      fmt(input.totali.base),
+      fmt(input.totali.iva),
+      fmt(input.totali.total),
+    ],
+  ];
+  autoTable(doc, {
+    ...tableBaseStyle,
+    startY: cursorY,
+    head: [["CANAL", "BASE IMPONIBLE", "IVA", "TOTAL"]],
+    body: canaliRows,
+    columnStyles: {
+      0: { cellWidth: "auto" },
+      1: { halign: "right", cellWidth: 36 },
+      2: { halign: "right", cellWidth: 28 },
+      3: { halign: "right", cellWidth: 36 },
+    },
+    didParseCell: (data) => {
+      if (data.section !== "body") return;
+      const isTotale = data.row.index === input.canali.length;
+      if (isTotale) {
+        data.cell.styles.fontStyle = "bold";
+        data.cell.styles.fillColor = [229, 231, 235];
+        if (data.column.index === 0) data.cell.styles.textColor = DARK;
+        else data.cell.styles.textColor = SKY;
+      }
+    },
+  });
+  advanceCursor();
+
+  // ── Tabella RESUMEN MENSUAL ──
+  sezione("RESUMEN MENSUAL");
+  const totalMensile =
+    Math.round(input.porMes.reduce((s, m) => s + m.total, 0) * 100) / 100;
+  autoTable(doc, {
+    ...tableBaseStyle,
+    startY: cursorY,
+    head: [["MES", "TOTAL INGRESOS"]],
+    body: [
+      ...input.porMes.map((m) => [MESI_ES[m.mese - 1] ?? "", fmt(m.total)]),
+      ["TOTAL", fmt(totalMensile)],
+    ],
+    columnStyles: {
+      0: { cellWidth: "auto" },
+      1: { halign: "right", cellWidth: 60 },
+    },
+    didParseCell: (data) => {
+      if (data.section !== "body") return;
+      const isTotale = data.row.index === input.porMes.length;
+      if (isTotale) {
+        data.cell.styles.fontStyle = "bold";
+        data.cell.styles.fillColor = [229, 231, 235];
+        if (data.column.index === 1) data.cell.styles.textColor = SKY;
+      }
+    },
+  });
+  advanceCursor();
+
+  // ── Tabella DETALLE DIARIO POR CANAL ──
+  // Nota: Stripe, GetYourGuide e le matricole/pagamenti soci senza data
+  // sono aggregati mensili — appaiono con fecha = 1° del mese.
+  if (input.detalleDiario.length > 0) {
+    sezione("DETALLE DIARIO POR CANAL");
+    // Parsing manuale della fecha per evitare shift TZ (le date sono
+    // salvate come stringhe UTC-day, non timestamp locali).
+    const fechaLabel = (iso: string): string => {
+      const [y, m, d] = iso.split("-");
+      return `${d}/${m}/${y}`;
+    };
+    const totalDetalle =
+      Math.round(
+        input.detalleDiario.reduce((s, d) => s + d.total, 0) * 100,
+      ) / 100;
+    const totalDetalleBase =
+      Math.round(
+        input.detalleDiario.reduce((s, d) => s + (d.base ?? 0), 0) * 100,
+      ) / 100;
+    const totalDetalleIVA =
+      Math.round(
+        input.detalleDiario.reduce((s, d) => s + (d.iva ?? 0), 0) * 100,
+      ) / 100;
+    autoTable(doc, {
+      ...tableBaseStyle,
+      startY: cursorY,
+      head: [["FECHA", "CANAL", "BASE IMPONIBLE", "IVA", "TOTAL"]],
+      body: [
+        ...input.detalleDiario.map((d) => [
+          fechaLabel(d.fecha),
+          d.canal,
+          d.base != null ? fmt(d.base) : "—",
+          d.iva != null ? fmt(d.iva) : "—",
+          fmt(d.total),
+        ]),
+        ["", "TOTAL", fmt(totalDetalleBase), fmt(totalDetalleIVA), fmt(totalDetalle)],
+      ],
+      columnStyles: {
+        0: { cellWidth: 24 },
+        1: { cellWidth: "auto" },
+        2: { halign: "right", cellWidth: 30 },
+        3: { halign: "right", cellWidth: 22 },
+        4: { halign: "right", cellWidth: 26 },
+      },
+      // Ripete l'header su ogni pagina in caso di tabella lunga
+      showHead: "everyPage",
+      didParseCell: (data) => {
+        if (data.section !== "body") return;
+        const isTotale = data.row.index === input.detalleDiario.length;
+        if (isTotale) {
+          data.cell.styles.fontStyle = "bold";
+          data.cell.styles.fillColor = [229, 231, 235];
+          if (data.column.index >= 2) data.cell.styles.textColor = SKY;
+        }
+      },
+    });
+    advanceCursor();
+  }
+
+  // ── Nota finale ──
+  if (cursorY > 265) {
+    doc.addPage();
+    cursorY = 20;
+  }
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(8.5);
+  doc.setTextColor(...MUTED);
+  const nota =
+    "Documento resumen a efectos contables — no sustituye los documentos fiscales originales.";
+  const notaLines = doc.splitTextToSize(nota, CW);
+  doc.text(notaLines, ML, cursorY);
+
+  doc.save(
+    `Informe_Fiscal_${TRIMESTRE_SHORT[input.trimestre]}_${input.anno}.pdf`,
+  );
+}
+
+// ── Fatture Fornitori — riepilogo periodo (PDF, es-ES) ────────────────
+
+export interface FatturaFornitorePDFRow {
+  fecha: string | null; // ISO
+  proveedor: string;
+  numero: string;
+  base: number | null;
+  iva: number | null;
+  total: number;
+}
+
+export interface FattureFornitoriPDFData {
+  anno: number;
+  trimestre: number | null; // null = todos
+  fatture: FatturaFornitorePDFRow[];
+  totali: { base: number; iva: number; total: number; conteggio: number };
+}
+
+export async function exportFattureFornitoriPDF(
+  input: FattureFornitoriPDFData,
+) {
+  const { default: jsPDF } = await import("jspdf");
+  const { default: autoTable } = await import("jspdf-autotable");
+
+  const doc = new jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: "a4",
+    compress: true,
+  });
+  const W = 210,
+    ML = 14,
+    MR = 14;
+  const CW = W - ML - MR;
+
+  // Header: logo + titolo + periodo
+  const logo = await loadLogo();
+  if (logo) {
+    const props = doc.getImageProperties(logo.data);
+    const logoW = 20;
+    const logoH = (props.height / props.width) * logoW;
+    doc.addImage(logo.data, logo.format, ML, 8, logoW, logoH);
+  }
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.setTextColor(...DARK);
+  const titolo = input.trimestre
+    ? `FACTURAS PROVEEDORES ${TRIMESTRE_SHORT[input.trimestre]} ${input.anno}`
+    : `FACTURAS PROVEEDORES ${input.anno}`;
+  doc.text(titolo, W - MR, 15, { align: "right" });
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...MUTED);
+  if (input.trimestre) {
+    doc.text(TRIMESTRE_LABEL[input.trimestre] ?? "", W - MR, 21, {
+      align: "right",
+    });
+    const { start, end } = trimestrePeriodo(input.anno, input.trimestre);
+    doc.text(
+      `Del ${start.toLocaleDateString("es-ES")} al ${end.toLocaleDateString("es-ES")}`,
+      W - MR,
+      26,
+      { align: "right" },
+    );
+  } else {
+    doc.text(`Ejercicio completo ${input.anno}`, W - MR, 21, {
+      align: "right",
+    });
+  }
+
+  // Ragione sociale
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(...DARK);
+  doc.text(AZIENDA_PDF.nome, ML, 36);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+  doc.setTextColor(...MUTED);
+  doc.text(
+    `CIF: ${AZIENDA_PDF.cif} · ${AZIENDA_PDF.via}, ${AZIENDA_PDF.cap} ${AZIENDA_PDF.citta}`,
+    ML,
+    41,
+  );
+
+  // Separator
+  doc.setDrawColor(...LIGHT);
+  doc.setLineWidth(0.3);
+  doc.line(ML, 46, W - MR, 46);
+
+  // Riga info (numero fatture)
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...MUTED);
+  doc.text(`Nº facturas: ${input.totali.conteggio}`, ML, 53);
+
+  const tableBaseStyle = {
+    margin: { left: ML, right: MR },
+    styles: {
+      fontSize: 8.5,
+      cellPadding: 2.5,
+      lineColor: [226, 232, 240] as [number, number, number],
+      lineWidth: 0.1,
+    },
+    headStyles: {
+      fillColor: SKY,
+      textColor: 255 as const,
+      fontStyle: "bold" as const,
+      fontSize: 8.5,
+    },
+    alternateRowStyles: { fillColor: BG_SOFT },
+  };
+
+  const fmtDate = (iso: string | null) =>
+    iso ? new Date(iso).toLocaleDateString("es-ES") : "—";
+
+  const bodyRows = input.fatture.map((f) => [
+    fmtDate(f.fecha),
+    f.proveedor,
+    f.numero,
+    f.base != null ? fmt(f.base) : "—",
+    f.iva != null ? fmt(f.iva) : "—",
+    fmt(f.total),
+  ]);
+
+  bodyRows.push([
+    "",
+    "",
+    "TOTAL",
+    fmt(input.totali.base),
+    fmt(input.totali.iva),
+    fmt(input.totali.total),
+  ]);
+
+  autoTable(doc, {
+    ...tableBaseStyle,
+    startY: 58,
+    head: [["FECHA", "PROVEEDOR", "Nº FACTURA", "BASE IMPONIBLE", "IVA", "TOTAL"]],
+    body: bodyRows,
+    columnStyles: {
+      0: { cellWidth: 22 },
+      1: { cellWidth: "auto" },
+      2: { cellWidth: 36 },
+      3: { halign: "right", cellWidth: 26 },
+      4: { halign: "right", cellWidth: 22 },
+      5: { halign: "right", cellWidth: 26 },
+    },
+    didParseCell: (data) => {
+      if (data.section !== "body") return;
+      const isTotale = data.row.index === input.fatture.length;
+      if (isTotale) {
+        data.cell.styles.fontStyle = "bold";
+        data.cell.styles.fillColor = [229, 231, 235];
+        if (data.column.index >= 3) data.cell.styles.textColor = SKY;
+      }
+    },
+  });
+
+  // Nota finale
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const lastY = (doc as any).lastAutoTable?.finalY ?? 60;
+  let cursorY = lastY + 8;
+  if (cursorY > 275) {
+    doc.addPage();
+    cursorY = 20;
+  }
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(8);
+  doc.setTextColor(...MUTED);
+  const nota =
+    "Documento resumen a efectos contables — no sustituye los documentos fiscales originales.";
+  doc.text(doc.splitTextToSize(nota, CW), ML, cursorY);
+
+  const period = input.trimestre
+    ? `${TRIMESTRE_SHORT[input.trimestre]}_${input.anno}`
+    : `${input.anno}`;
+  doc.save(`Facturas_Proveedores_${period}.pdf`);
+}

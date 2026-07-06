@@ -15,7 +15,19 @@ export async function GET(request: Request) {
 
     const fatture = await prisma.fatturaFornitore.findMany({
       where,
-      include: { fornitore: true },
+      include: {
+        fornitore: true,
+        // Include spesa collegata (se creata via OCR) per esporre
+        // aliquota IVA e IVA recuperabile — servono al riepilogo fiscale
+        // (base = importo - ivaRecuperabile).
+        spesa: {
+          select: {
+            importo: true,
+            aliquotaIva: true,
+            ivaRecuperabile: true,
+          },
+        },
+      },
       orderBy: [{ anno: "desc" }, { mese: "desc" }, { createdAt: "desc" }],
       omit: { fileData: true },
     });
