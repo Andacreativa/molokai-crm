@@ -763,7 +763,6 @@ function FareHarborCsvImportModal({
 
 function StripeTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
   const [rows, setRows] = useState<StripeRow[]>([]);
-  const [saving, setSaving] = useState<number | null>(null);
   const [meseFiltro, setMeseFiltro] = useState<number | null>(null);
 
   const load = async () => {
@@ -811,49 +810,14 @@ function StripeTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
       ? MESI.map((_, i) => i + 1)
       : [meseFiltro];
 
-  const save = async (
-    mese: number,
-    patch: Partial<Pick<StripeRow, "lordo" | "commissioni" | "rimborsi">>,
-  ) => {
-    setSaving(mese);
-    const current = rowFor(mese);
-    const next = { ...current, ...patch };
-    try {
-      const res = await fetch("/api/incassi-web/stripe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          anno,
-          mese,
-          lordo: next.lordo,
-          commissioni: next.commissioni,
-          rimborsi: next.rimborsi,
-        }),
-      });
-      const saved: StripeRow = await res.json();
-      setRows((prev) => {
-        const idx = prev.findIndex((r) => r.mese === mese);
-        if (idx >= 0) {
-          const copy = [...prev];
-          copy[idx] = saved;
-          return copy;
-        }
-        return [...prev, saved].sort((a, b) => a.mese - b.mese);
-      });
-      onSaved?.();
-    } finally {
-      setSaving(null);
-    }
-  };
-
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
         <ExcelUploadModalButton
           anno={anno}
           endpoint="stripe"
-          title="Importa Stripe da CSV (export transfers)"
-          formatHint="Colonne: Type · Created · Amount · Fees · Net. Solo Type=Charge. Numeri con virgola decimale ('100,00')."
+          title="Importa Stripe da CSV (export payouts verso banca)"
+          formatHint="Colonne: Amount · Arrival Date (UTC) · Status. Solo Status=paid. Amount con virgola decimale ('357,79'). Aggregato per mese sul netto accreditato."
           buildBatch={(rows, y) => {
             const payloads: Record<string, unknown>[] = [];
             const errors: string[] = [];
@@ -865,7 +829,7 @@ function StripeTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
               };
             }
             const foundCols = Object.keys(rows[0]);
-            const REQUIRED = ["Type", "Created", "Amount", "Fees", "Net"];
+            const REQUIRED = ["Amount", "Arrival Date (UTC)", "Status"];
             const norm = (s: string) =>
               s.toLowerCase().replace(/\s+/g, " ").trim();
             const foundNorm = new Set(foundCols.map(norm));
@@ -879,92 +843,76 @@ function StripeTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
               };
             }
 
-            // Parser dedicato per numeri Stripe IT: sempre virgola decimale,
-            // eventuali virgolette esterne. Es. '"100,00"' → 100.00.
-            // Se il valore ha già il punto (formato mixato inatteso) prova
-            // parseFloat diretto.
+            // Parser numeri IT: gestisce '"357,79"' → 357.79.
             const parseEuIt = (v: unknown): number => {
               if (typeof v === "number") return v;
               const s = String(v ?? "").replace(/["\s€]/g, "").trim();
               if (!s) return 0;
-              // Se contiene sia . che , il punto è thousand-sep, virgola
-              // decimale: rimuovi i punti, sostituisci la virgola con punto.
               if (s.includes(",") && s.includes(".")) {
                 return parseFloat(s.replace(/\./g, "").replace(",", ".")) || 0;
               }
-              // Solo virgola → decimale IT
               if (s.includes(",")) {
                 return parseFloat(s.replace(",", ".")) || 0;
               }
-              // Solo punto o nessun separatore → parseFloat diretto
               return parseFloat(s) || 0;
             };
 
-            const byMonth = new Map<
-              number,
-              { lordo: number; commissioni: number; netto: number }
-            >();
-            let skippedNonCharge = 0;
+            const byMonth = new Map<number, number>();
+            let skippedNotPaid = 0;
             let skippedOtherYear = 0;
             let skippedBadDate = 0;
             rows.forEach((row, i) => {
-              const type = String(getCell(row, "Type") ?? "")
+              const status = String(getCell(row, "Status") ?? "")
                 .trim()
                 .toLowerCase();
-              if (type !== "charge") {
-                skippedNonCharge++;
+              if (status !== "paid") {
+                skippedNotPaid++;
                 return;
               }
-              const rawDate = getCell(row, "Created");
-              // Formato "2026-06-19 10:58" o Date diretto (se cellDates
-              // ha già convertito). new Date() gestisce la stringa ISO-like.
-              const created =
+              // "Arrival Date (UTC)" — formato "2026-07-01 00:00"
+              const rawDate = getCell(row, "Arrival Date (UTC)");
+              const arrival =
                 rawDate instanceof Date
                   ? rawDate
                   : new Date(String(rawDate ?? "").trim().replace(" ", "T"));
-              if (isNaN(created.getTime())) {
+              if (isNaN(arrival.getTime())) {
                 skippedBadDate++;
-                errors.push(`Riga ${i + 2}: Created non valida`);
+                errors.push(`Riga ${i + 2}: Arrival Date (UTC) non valida`);
                 return;
               }
-              if (created.getFullYear() !== y) {
+              if (arrival.getFullYear() !== y) {
                 skippedOtherYear++;
                 return;
               }
-              const mese = created.getMonth() + 1;
+              const mese = arrival.getMonth() + 1;
               const amount = parseEuIt(getCell(row, "Amount"));
-              const fees = parseEuIt(getCell(row, "Fees"));
-              const net = parseEuIt(getCell(row, "Net"));
-              const cur = byMonth.get(mese) ?? {
-                lordo: 0,
-                commissioni: 0,
-                netto: 0,
-              };
-              cur.lordo += amount;
-              cur.commissioni += fees;
-              cur.netto += net;
-              byMonth.set(mese, cur);
+              byMonth.set(mese, (byMonth.get(mese) ?? 0) + amount);
             });
-            for (const [mese, agg] of byMonth) {
+            for (const [mese, netto] of byMonth) {
+              // Il CSV non ha dettaglio lordo/commissioni: mettiamo il valore
+              // solo nel netto. Sending lordo=amount + commissioni=0 fa sì
+              // che il server-side netto=lordo-commissioni-rimborsi=amount.
+              const val = Math.round(netto * 100) / 100;
               payloads.push({
                 anno: y,
                 mese,
-                lordo: Math.round(agg.lordo * 100) / 100,
-                commissioni: Math.round(agg.commissioni * 100) / 100,
+                lordo: val,
+                commissioni: 0,
                 rimborsi: 0,
-                netto: Math.round(agg.netto * 100) / 100,
               });
             }
-            if (skippedNonCharge > 0)
+            if (skippedNotPaid > 0)
               errors.push(
-                `${skippedNonCharge} righe non-Charge saltate (Payout/Transfer/Refund)`,
+                `${skippedNotPaid} payout non "paid" saltati`,
               );
             if (skippedOtherYear > 0)
               errors.push(
-                `${skippedOtherYear} transazioni di altri anni saltate`,
+                `${skippedOtherYear} payout di altri anni saltati`,
               );
             if (skippedBadDate > 0)
-              errors.push(`${skippedBadDate} righe senza Created valida`);
+              errors.push(
+                `${skippedBadDate} righe senza Arrival Date (UTC) valida`,
+              );
             return { payloads, errors };
           }}
           onImported={() => {
@@ -974,19 +922,16 @@ function StripeTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
         />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-        <StatCard label={`Lordo ${anno}`} value={totals.lordo} />
+      <div className="grid grid-cols-1 gap-3">
         <StatCard
-          label="Commissioni"
-          value={totals.commissioni}
-          color="#64748b"
+          label={`Netto accreditato ${anno}`}
+          value={totals.netto}
+          color="#0ea5e9"
         />
-        <StatCard label="Rimborsi" value={totals.rimborsi} color="#ef4444" />
-        <StatCard label="Netto" value={totals.netto} color="#0ea5e9" />
       </div>
 
       <MonthlyClickBox
-        title="Riepilogo Stripe mensile (netto)"
+        title="Riepilogo Stripe mensile (netto accreditato)"
         totaliMensili={totaliMensili}
         meseFiltro={meseFiltro}
         onMeseChange={setMeseFiltro}
@@ -998,49 +943,24 @@ function StripeTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
-                {["Mese", "Lordo", "Commissioni", "Rimborsi", "Netto"].map(
-                  (h, i) => (
-                    <th
-                      key={h}
-                      className={`text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 ${i === 0 ? "text-left" : "text-right"}`}
-                    >
-                      {h}
-                    </th>
-                  ),
-                )}
+                {["Mese", "Netto accreditato"].map((h, i) => (
+                  <th
+                    key={h}
+                    className={`text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 ${i === 0 ? "text-left" : "text-right"}`}
+                  >
+                    {h}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody className="zebra">
               {mesiVisibili.map((m) => {
                 const mese = MESI[m - 1];
                 const r = rowFor(m);
-                const loading = saving === m;
                 return (
-                  <tr
-                    key={m}
-                    className="border-b border-gray-50"
-                    style={loading ? { opacity: 0.6 } : undefined}
-                  >
+                  <tr key={m} className="border-b border-gray-50">
                     <td className="px-4 py-2 text-sm font-medium text-gray-900">
                       {mese}
-                    </td>
-                    <td className="px-2 py-1 text-right">
-                      <EuroInput
-                        value={r.lordo}
-                        onSave={(v) => save(m, { lordo: v })}
-                      />
-                    </td>
-                    <td className="px-2 py-1 text-right">
-                      <EuroInput
-                        value={r.commissioni}
-                        onSave={(v) => save(m, { commissioni: v })}
-                      />
-                    </td>
-                    <td className="px-2 py-1 text-right">
-                      <EuroInput
-                        value={r.rimborsi}
-                        onSave={(v) => save(m, { rimborsi: v })}
-                      />
                     </td>
                     <td
                       className="px-4 py-2 text-sm font-bold text-right"
