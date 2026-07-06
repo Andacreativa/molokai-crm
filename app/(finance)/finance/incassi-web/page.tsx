@@ -852,15 +852,12 @@ function StripeTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
         <ExcelUploadModalButton
           anno={anno}
           endpoint="stripe"
-          title="Importa Stripe da CSV (export payouts)"
-          formatHint="Colonne: payout_date · gross_amount · processing_fee_amount · net_payout_amount · payout_status · is_next_payout. Solo payout Succeeded non-futuri."
+          title="Importa Stripe da CSV (export transfers)"
+          formatHint="Colonne: Type · Created · Amount · Fees · Net. Solo Type=Charge. Numeri con virgola decimale ('100,00')."
           buildBatch={(rows, y) => {
             const payloads: Record<string, unknown>[] = [];
             const errors: string[] = [];
 
-            // Validazione colonne: se il file non ha le colonne attese
-            // ritorna subito un errore chiaro con la lista delle colonne
-            // effettivamente trovate.
             if (rows.length === 0) {
               return {
                 payloads,
@@ -868,14 +865,9 @@ function StripeTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
               };
             }
             const foundCols = Object.keys(rows[0]);
-            const REQUIRED = [
-              "payout_date",
-              "gross_amount",
-              "processing_fee_amount",
-              "net_payout_amount",
-              "payout_status",
-            ];
-            const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+            const REQUIRED = ["Type", "Created", "Amount", "Fees", "Net"];
+            const norm = (s: string) =>
+              s.toLowerCase().replace(/\s+/g, " ").trim();
             const foundNorm = new Set(foundCols.map(norm));
             const missing = REQUIRED.filter((r) => !foundNorm.has(norm(r)));
             if (missing.length > 0) {
@@ -887,53 +879,68 @@ function StripeTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
               };
             }
 
+            // Parser dedicato per numeri Stripe IT: sempre virgola decimale,
+            // eventuali virgolette esterne. Es. '"100,00"' → 100.00.
+            // Se il valore ha già il punto (formato mixato inatteso) prova
+            // parseFloat diretto.
+            const parseEuIt = (v: unknown): number => {
+              if (typeof v === "number") return v;
+              const s = String(v ?? "").replace(/["\s€]/g, "").trim();
+              if (!s) return 0;
+              // Se contiene sia . che , il punto è thousand-sep, virgola
+              // decimale: rimuovi i punti, sostituisci la virgola con punto.
+              if (s.includes(",") && s.includes(".")) {
+                return parseFloat(s.replace(/\./g, "").replace(",", ".")) || 0;
+              }
+              // Solo virgola → decimale IT
+              if (s.includes(",")) {
+                return parseFloat(s.replace(",", ".")) || 0;
+              }
+              // Solo punto o nessun separatore → parseFloat diretto
+              return parseFloat(s) || 0;
+            };
+
             const byMonth = new Map<
               number,
               { lordo: number; commissioni: number; netto: number }
             >();
-            let skippedNotSucceeded = 0;
-            let skippedNextPayout = 0;
+            let skippedNonCharge = 0;
             let skippedOtherYear = 0;
             let skippedBadDate = 0;
             rows.forEach((row, i) => {
-              const status = String(getCell(row, "payout_status") ?? "")
+              const type = String(getCell(row, "Type") ?? "")
                 .trim()
                 .toLowerCase();
-              if (status !== "succeeded") {
-                skippedNotSucceeded++;
+              if (type !== "charge") {
+                skippedNonCharge++;
                 return;
               }
-              const isNext = String(getCell(row, "is_next_payout") ?? "")
-                .trim()
-                .toLowerCase();
-              if (isNext === "true" || isNext === "1" || isNext === "yes") {
-                skippedNextPayout++;
-                return;
-              }
-              const rawDate = getCell(row, "payout_date");
-              const payoutDate =
+              const rawDate = getCell(row, "Created");
+              // Formato "2026-06-19 10:58" o Date diretto (se cellDates
+              // ha già convertito). new Date() gestisce la stringa ISO-like.
+              const created =
                 rawDate instanceof Date
                   ? rawDate
-                  : new Date(String(rawDate ?? "").trim());
-              if (isNaN(payoutDate.getTime())) {
+                  : new Date(String(rawDate ?? "").trim().replace(" ", "T"));
+              if (isNaN(created.getTime())) {
                 skippedBadDate++;
-                errors.push(`Riga ${i + 2}: payout_date non valida`);
+                errors.push(`Riga ${i + 2}: Created non valida`);
                 return;
               }
-              if (payoutDate.getFullYear() !== y) {
+              if (created.getFullYear() !== y) {
                 skippedOtherYear++;
                 return;
               }
-              const mese = payoutDate.getMonth() + 1;
-              const gross = toNumber(getCell(row, "gross_amount"));
-              const fees = toNumber(getCell(row, "processing_fee_amount"));
-              const net = toNumber(getCell(row, "net_payout_amount"));
+              const mese = created.getMonth() + 1;
+              const amount = parseEuIt(getCell(row, "Amount"));
+              const fees = parseEuIt(getCell(row, "Fees"));
+              const net = parseEuIt(getCell(row, "Net"));
               const cur = byMonth.get(mese) ?? {
                 lordo: 0,
                 commissioni: 0,
                 netto: 0,
               };
-              cur.lordo += gross;
+              cur.lordo += amount;
               cur.commissioni += fees;
               cur.netto += net;
               byMonth.set(mese, cur);
@@ -948,18 +955,16 @@ function StripeTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
                 netto: Math.round(agg.netto * 100) / 100,
               });
             }
-            if (skippedNotSucceeded > 0)
+            if (skippedNonCharge > 0)
               errors.push(
-                `${skippedNotSucceeded} payout non "Succeeded" saltati`,
+                `${skippedNonCharge} righe non-Charge saltate (Payout/Transfer/Refund)`,
               );
-            if (skippedNextPayout > 0)
-              errors.push(`${skippedNextPayout} payout futuri (is_next_payout=True) saltati`);
             if (skippedOtherYear > 0)
               errors.push(
-                `${skippedOtherYear} payout di altri anni saltati`,
+                `${skippedOtherYear} transazioni di altri anni saltate`,
               );
             if (skippedBadDate > 0)
-              errors.push(`${skippedBadDate} righe senza payout_date valida`);
+              errors.push(`${skippedBadDate} righe senza Created valida`);
             return { payloads, errors };
           }}
           onImported={() => {
