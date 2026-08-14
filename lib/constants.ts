@@ -109,6 +109,7 @@ export const CATEGORIE_PRODOTTO = [
 export const CANALI_VENDITA = [
   "FareHarbor",
   "Get Your Guide",
+  "CheckYeti",
   "Stripe",
   "Cassa",
   "Diretto",

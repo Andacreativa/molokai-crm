@@ -53,7 +53,7 @@ export async function GET(request: Request) {
 
   // Solo canali richiesti dal commercialista. ESCLUSI: Gruppi (statistici),
   // Altri Ingressi (non fiscali), Buoni (non richiesti).
-  const [soci, fatture, fareharbor, stripe, gyg, cassa, contanti] =
+  const [soci, fatture, fareharbor, stripe, gyg, checkyeti, cassa, contanti] =
     await Promise.all([
       prisma.socio.findMany({
         include: {
@@ -78,6 +78,9 @@ export async function GET(request: Request) {
         where: { anno, mese: { in: mesiTrim } },
       }),
       prisma.prenotazioneGetYourGuide.findMany({
+        where: { anno, mese: { in: mesiTrim } },
+      }),
+      prisma.prenotazioneCheckYeti.findMany({
         where: { anno, mese: { in: mesiTrim } },
       }),
       prisma.pagamentoInScuola.findMany({
@@ -147,7 +150,8 @@ export async function GET(request: Request) {
   }
   const facturasIVA = round2(facturasTotal - facturasBase);
 
-  // FareHarbor + Stripe + GYG: aggregati in un unico canale "Ingresos Web"
+  // FareHarbor + Stripe + GYG + CheckYeti: aggregati in un unico canale
+  // "Ingresos Web"
   // (nessun IVA-split disponibile per questi canali).
   const WEB_LABEL = "Ingresos Web";
   let webTotal = 0;
@@ -167,6 +171,12 @@ export async function GET(request: Request) {
     webTotal += r.netto;
     porMese[r.mese] = (porMese[r.mese] ?? 0) + r.netto;
     // GYG è aggregato mensile: riga sul 1° del mese
+    addDetalle(firstOfMonth(r.anno, r.mese), WEB_LABEL, r.netto);
+  }
+  for (const r of checkyeti) {
+    webTotal += r.netto;
+    porMese[r.mese] = (porMese[r.mese] ?? 0) + r.netto;
+    // CheckYeti è aggregato mensile: riga sul 1° del mese
     addDetalle(firstOfMonth(r.anno, r.mese), WEB_LABEL, r.netto);
   }
 

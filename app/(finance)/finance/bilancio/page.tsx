@@ -33,6 +33,7 @@ interface MeseDetail {
     fareharbor: number;
     stripe: number;
     gyg: number;
+    checkyeti: number;
     cassa: number;
     altri: number;
     totale: number;
@@ -67,6 +68,7 @@ const ENTRATA_COLORS: Record<string, string> = {
   FareHarbor: "#22c55e",
   Stripe: "#8b5cf6",
   "Get Your Guide": "#f59e0b",
+  CheckYeti: "#14b8a6",
   Cassa: "#06b6d4",
   Gruppi: "#ec4899",
   "Altri Ingressi": "#10b981",

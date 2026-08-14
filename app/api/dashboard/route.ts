@@ -57,6 +57,7 @@ export async function GET(request: Request) {
     fareharbor,
     stripe,
     gyg,
+    checkyeti,
     cassa,
     sessioniGruppi,
     altriIngressi,
@@ -78,6 +79,7 @@ export async function GET(request: Request) {
     prisma.incassoFareHarbor.findMany({ where: { anno } }),
     prisma.prenotazioneStripe.findMany({ where: { anno } }),
     prisma.prenotazioneGetYourGuide.findMany({ where: { anno } }),
+    prisma.prenotazioneCheckYeti.findMany({ where: { anno } }),
     prisma.pagamentoInScuola.findMany({ where: { anno } }),
     prisma.sessioneGruppo.findMany({ where: { anno, incassato: true } }),
     prisma.altroIngresso.findMany({ where: { anno, incassato: true } }),
@@ -126,6 +128,7 @@ export async function GET(request: Request) {
     FareHarbor: 0,
     Stripe: 0,
     "Get Your Guide": 0,
+    CheckYeti: 0,
     Cassa: 0,
     "Altri Ingressi": 0,
   };
@@ -179,6 +182,10 @@ export async function GET(request: Request) {
   for (const r of gyg) {
     entratePerMese[r.mese - 1] += r.netto;
     breakdownEntrate["Get Your Guide"] += r.netto;
+  }
+  for (const r of checkyeti) {
+    entratePerMese[r.mese - 1] += r.netto;
+    breakdownEntrate.CheckYeti += r.netto;
   }
   for (const c of cassa) {
     entratePerMese[c.mese - 1] += c.totaleGiorno;

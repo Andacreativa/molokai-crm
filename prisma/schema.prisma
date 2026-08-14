@@ -211,6 +211,17 @@ model PrenotazioneGetYourGuide {
   @@unique([anno, mese])
 }
 
+model PrenotazioneCheckYeti {
+  id           Int   @id @default(autoincrement())
+  anno         Int   @default(2026)
+  mese         Int
+  lordo        Float @default(0)
+  commissioni  Float @default(0)
+  netto        Float @default(0)
+
+  @@unique([anno, mese])
+}
+
 model PagamentoInScuola {
   id            Int      @id @default(autoincrement())
   data          DateTime @unique

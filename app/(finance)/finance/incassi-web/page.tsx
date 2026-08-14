@@ -12,6 +12,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { fmt, MESI, ANNI } from "@/lib/constants";
+import { commissioneCheckYeti } from "@/lib/checkyeti";
 
 // ─── Types ─────────────────────────────────────────────────────────────
 
@@ -46,7 +47,16 @@ interface GYGRow {
   netto: number;
 }
 
-type Tab = "fareharbor" | "stripe" | "gyg";
+interface CheckYetiRow {
+  id?: number;
+  anno: number;
+  mese: number;
+  lordo: number;
+  commissioni: number;
+  netto: number;
+}
+
+type Tab = "fareharbor" | "stripe" | "gyg" | "checkyeti";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -62,7 +72,7 @@ export default function IncassiWebPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Incassi Web</h1>
           <p className="text-gray-500 text-sm mt-1">
-            FareHarbor, Stripe, Get Your Guide · anno {anno}
+            FareHarbor, Stripe, Get Your Guide, CheckYeti · anno {anno}
           </p>
         </div>
         <select
@@ -85,6 +95,7 @@ export default function IncassiWebPage() {
             ["fareharbor", "FareHarbor"],
             ["stripe", "Stripe"],
             ["gyg", "Get Your Guide"],
+            ["checkyeti", "CheckYeti"],
           ] as const
         ).map(([key, label]) => {
           const active = tab === key;
@@ -108,6 +119,7 @@ export default function IncassiWebPage() {
       {tab === "fareharbor" && <FareHarborTab anno={anno} />}
       {tab === "stripe" && <StripeTab anno={anno} />}
       {tab === "gyg" && <GYGTab anno={anno} />}
+      {tab === "checkyeti" && <CheckYetiTab anno={anno} />}
     </div>
   );
 }
@@ -580,8 +592,10 @@ function FareHarborCsvImportModal({
     try {
       const XLSX = await import("xlsx");
       const isCSV = /\.csv$/i.test(file.name);
+      // `raw: true` sui CSV: vedi parseDateCell — senza, le date del CSV
+      // vengono rimandate indietro di un giorno dal roundtrip di xlsx.
       const wb = isCSV
-        ? XLSX.read(await file.text(), { type: "string", cellDates: true })
+        ? XLSX.read(await file.text(), { type: "string", raw: true })
         : XLSX.read(await file.arrayBuffer(), {
             type: "array",
             cellDates: true,
@@ -613,12 +627,8 @@ function FareHarborCsvImportModal({
           skippedNotSucceeded++;
           return;
         }
-        const rawDate = getCell(row, "payout_date");
-        const d =
-          rawDate instanceof Date
-            ? rawDate
-            : new Date(String(rawDate ?? "").trim());
-        if (isNaN(d.getTime())) {
+        const d = parseDateCell(getCell(row, "payout_date"));
+        if (!d) {
           skippedBadDate++;
           errors.push(`Riga ${i + 2}: payout_date non valida`);
           return;
@@ -630,7 +640,10 @@ function FareHarborCsvImportModal({
         const netto = toNumber(getCell(row, "net_payout_amount"));
         const fee = Math.abs(toNumber(getCell(row, "processing_fee_amount")));
         const lordo = toNumber(getCell(row, "gross_amount"));
-        righe.push({ data: d.toISOString(), netto, fee, lordo });
+        // Data-only "YYYY-MM-DD": il server ne fa una mezzanotte UTC, stabile
+        // qualunque sia il fuso del server. Inviare toISOString() di una
+        // mezzanotte locale sposterebbe il giorno su un server in UTC.
+        righe.push({ data: ymdLocale(d), netto, fee, lordo });
       });
 
       const res = await fetch("/api/incassi-fh-day", {
@@ -817,7 +830,7 @@ function StripeTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
           anno={anno}
           endpoint="stripe"
           title="Importa Stripe da CSV (export payouts verso banca)"
-          formatHint="Colonne: Amount · Arrival Date (UTC) · Status. Solo Status=paid. Amount con virgola decimale ('357,79'). Aggregato per mese sul netto accreditato."
+          formatHint="Colonne: Amount · Arrival Date (UTC) · Status. Solo Status=paid. Aggregato per mese di accredito. L'import sostituisce l'anno intero: i mesi senza payout nel file vengono azzerati."
           buildBatch={(rows, y) => {
             const payloads: Record<string, unknown>[] = [];
             const errors: string[] = [];
@@ -870,12 +883,8 @@ function StripeTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
                 return;
               }
               // "Arrival Date (UTC)" — formato "2026-07-01 00:00"
-              const rawDate = getCell(row, "Arrival Date (UTC)");
-              const arrival =
-                rawDate instanceof Date
-                  ? rawDate
-                  : new Date(String(rawDate ?? "").trim().replace(" ", "T"));
-              if (isNaN(arrival.getTime())) {
+              const arrival = parseDateCell(getCell(row, "Arrival Date (UTC)"));
+              if (!arrival) {
                 skippedBadDate++;
                 errors.push(`Riga ${i + 2}: Arrival Date (UTC) non valida`);
                 return;
@@ -888,11 +897,16 @@ function StripeTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
               const amount = parseEuIt(getCell(row, "Amount"));
               byMonth.set(mese, (byMonth.get(mese) ?? 0) + amount);
             });
-            for (const [mese, netto] of byMonth) {
+            // L'export payouts di Stripe è la lista completa dell'account:
+            // emettiamo tutti e 12 i mesi, azzerando quelli senza payout.
+            // Altrimenti un mese caricato da un import precedente resterebbe
+            // in tabella per sempre (l'upsert tocca solo i mesi presenti nel
+            // file), gonfiando il totale annuo con un valore fantasma.
+            for (let mese = 1; mese <= 12; mese++) {
               // Il CSV non ha dettaglio lordo/commissioni: mettiamo il valore
               // solo nel netto. Sending lordo=amount + commissioni=0 fa sì
               // che il server-side netto=lordo-commissioni-rimborsi=amount.
-              const val = Math.round(netto * 100) / 100;
+              const val = Math.round((byMonth.get(mese) ?? 0) * 100) / 100;
               payloads.push({
                 anno: y,
                 mese,
@@ -1117,18 +1131,8 @@ function GYGTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
               if (status === "normal") normalCount++;
               else reversalCount++;
 
-              const rawDate = getCell(row, "Activity Date");
-              // Excel serial numerico → xlsx con cellDates:true → Date JS.
-              const activityDate =
-                rawDate instanceof Date
-                  ? rawDate
-                  : typeof rawDate === "number"
-                    ? new Date(
-                        // Serial Excel (1900 date system): days since 1899-12-30
-                        Date.UTC(1899, 11, 30) + rawDate * 86400000,
-                      )
-                    : new Date(String(rawDate ?? "").trim());
-              if (isNaN(activityDate.getTime())) {
+              const activityDate = parseDateCell(getCell(row, "Activity Date"));
+              if (!activityDate) {
                 skippedNoDate++;
                 errors.push(`Riga ${i + 2}: Activity Date non valida`);
                 return;
@@ -1217,6 +1221,272 @@ function GYGTab({ anno, onSaved }: { anno: number; onSaved?: () => void }) {
                     {h}
                   </th>
                 ))}
+              </tr>
+            </thead>
+            <tbody className="zebra">
+              {mesiVisibili.map((m) => {
+                const mese = MESI[m - 1];
+                const r = rowFor(m);
+                const loading = saving === m;
+                return (
+                  <tr
+                    key={m}
+                    className="border-b border-gray-50"
+                    style={loading ? { opacity: 0.6 } : undefined}
+                  >
+                    <td className="px-4 py-2 text-sm font-medium text-gray-900">
+                      {mese}
+                    </td>
+                    <td className="px-2 py-1 text-right">
+                      <EuroInput value={r.lordo} onSave={(v) => save(m, v)} />
+                    </td>
+                    <td className="px-4 py-2 text-sm text-gray-600 text-right">
+                      {fmt(r.commissioni)}
+                    </td>
+                    <td
+                      className="px-4 py-2 text-sm font-bold text-right"
+                      style={{ color: "#0ea5e9" }}
+                    >
+                      {fmt(r.netto)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── CheckYeti Tab ─────────────────────────────────────────────────────
+
+function CheckYetiTab({
+  anno,
+  onSaved,
+}: {
+  anno: number;
+  onSaved?: () => void;
+}) {
+  const [rows, setRows] = useState<CheckYetiRow[]>([]);
+  const [saving, setSaving] = useState<number | null>(null);
+  const [meseFiltro, setMeseFiltro] = useState<number | null>(null);
+
+  const load = async () => {
+    const res = await fetch(`/api/incassi-web/checkyeti?anno=${anno}`);
+    const data = await res.json();
+    setRows(Array.isArray(data) ? data : []);
+  };
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anno]);
+
+  const rowFor = (mese: number): CheckYetiRow =>
+    rows.find((r) => r.mese === mese) ?? {
+      anno,
+      mese,
+      lordo: 0,
+      commissioni: 0,
+      netto: 0,
+    };
+
+  const totaliMensili = useMemo(() => {
+    const arr = Array(12).fill(0) as number[];
+    for (const r of rows) arr[r.mese - 1] += r.netto;
+    return arr;
+  }, [rows]);
+  const mesiVisibili =
+    meseFiltro === null ? MESI.map((_, i) => i + 1) : [meseFiltro];
+
+  const totals = useMemo(
+    () =>
+      rows.reduce(
+        (acc, r) => ({
+          lordo: acc.lordo + r.lordo,
+          commissioni: acc.commissioni + r.commissioni,
+          netto: acc.netto + r.netto,
+        }),
+        { lordo: 0, commissioni: 0, netto: 0 },
+      ),
+    [rows],
+  );
+
+  const save = async (mese: number, lordo: number) => {
+    setSaving(mese);
+    try {
+      const res = await fetch("/api/incassi-web/checkyeti", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ anno, mese, lordo }),
+      });
+      const saved: CheckYetiRow = await res.json();
+      setRows((prev) => {
+        const idx = prev.findIndex((r) => r.mese === mese);
+        if (idx >= 0) {
+          const copy = [...prev];
+          copy[idx] = saved;
+          return copy;
+        }
+        return [...prev, saved].sort((a, b) => a.mese - b.mese);
+      });
+      onSaved?.();
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <ExcelUploadModalButton
+          anno={anno}
+          endpoint="checkyeti"
+          title="Importa CheckYeti da CSV (export Bookings)"
+          formatHint="Colonne: Data d'inizio · Stato · Importo della prenotazione. Solo prenotazioni Completate, aggregate per mese dell'attività. Commissione 21,5% + IVA 21% per prenotazione."
+          buildBatch={(righe, y) => {
+            const payloads: Record<string, unknown>[] = [];
+            const errors: string[] = [];
+
+            if (righe.length === 0) {
+              return {
+                payloads,
+                errors: ["Il file è vuoto (nessuna riga di dati trovata)."],
+              };
+            }
+            const foundCols = Object.keys(righe[0]);
+            const REQUIRED = [
+              "Data d'inizio",
+              "Stato",
+              "Importo della prenotazione",
+            ];
+            const norm = (s: string) =>
+              s.toLowerCase().replace(/\s+/g, " ").trim();
+            const foundNorm = new Set(foundCols.map(norm));
+            const missing = REQUIRED.filter((r) => !foundNorm.has(norm(r)));
+            if (missing.length > 0) {
+              return {
+                payloads,
+                errors: [
+                  `Colonne mancanti: ${missing.join(", ")}. Colonne trovate nel file: ${foundCols.join(", ")}`,
+                ],
+              };
+            }
+
+            const byMonth = new Map<
+              number,
+              { lordo: number; commissioni: number }
+            >();
+            let completate = 0;
+            let skippedStato = 0;
+            let skippedOtherYear = 0;
+            let skippedNoDate = 0;
+            righe.forEach((row, i) => {
+              // Solo "Completata": Rifiutata/Annullata non generano payout né
+              // compaiono nelle fatture CheckYeti.
+              const stato = String(getCell(row, "Stato") ?? "")
+                .trim()
+                .toLowerCase();
+              if (stato !== "completata") {
+                skippedStato++;
+                return;
+              }
+              // "Data d'inizio" = data dell'attività (formato "29-05-2026"),
+              // coerente con l'Activity Date usata per Get Your Guide.
+              const dataInizio = parseDateCell(getCell(row, "Data d'inizio"));
+              if (!dataInizio) {
+                skippedNoDate++;
+                errors.push(`Riga ${i + 2}: Data d'inizio non valida`);
+                return;
+              }
+              if (dataInizio.getFullYear() !== y) {
+                skippedOtherYear++;
+                return;
+              }
+              completate++;
+              const mese = dataInizio.getMonth() + 1;
+              const importo = toNumber(
+                getCell(row, "Importo della prenotazione"),
+              );
+              const cur = byMonth.get(mese) ?? { lordo: 0, commissioni: 0 };
+              cur.lordo += importo;
+              // Commissione arrotondata per singola prenotazione, come fa
+              // CheckYeti in fattura.
+              cur.commissioni += commissioneCheckYeti(importo);
+              byMonth.set(mese, cur);
+            });
+
+            // Come per Stripe, l'export Bookings è la lista completa: tutti
+            // e 12 i mesi vengono riscritti, azzerando quelli senza
+            // prenotazioni invece di lasciare valori di import precedenti.
+            for (let mese = 1; mese <= 12; mese++) {
+              const agg = byMonth.get(mese) ?? { lordo: 0, commissioni: 0 };
+              const lordo = round2(agg.lordo);
+              const commissioni = round2(agg.commissioni);
+              payloads.push({
+                anno: y,
+                mese,
+                lordo,
+                commissioni,
+                netto: round2(lordo - commissioni),
+              });
+            }
+
+            if (completate > 0)
+              errors.push(`${completate} prenotazioni completate importate`);
+            if (skippedStato > 0)
+              errors.push(
+                `${skippedStato} righe non "Completata" saltate (rifiutate/annullate)`,
+              );
+            if (skippedOtherYear > 0)
+              errors.push(
+                `${skippedOtherYear} prenotazioni di altri anni saltate`,
+              );
+            if (skippedNoDate > 0)
+              errors.push(`${skippedNoDate} righe senza Data d'inizio valida`);
+            return { payloads, errors };
+          }}
+          onImported={() => {
+            load();
+            onSaved?.();
+          }}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <StatCard label={`Lordo ${anno}`} value={totals.lordo} />
+        <StatCard
+          label="Commissioni (21,5% + IVA)"
+          value={totals.commissioni}
+          color="#64748b"
+        />
+        <StatCard label="Netto accreditato" value={totals.netto} color="#0ea5e9" />
+      </div>
+
+      <MonthlyClickBox
+        title="Riepilogo CheckYeti mensile (netto)"
+        totaliMensili={totaliMensili}
+        meseFiltro={meseFiltro}
+        onMeseChange={setMeseFiltro}
+        anno={anno}
+      />
+
+      <div className="glass-card rounded-2xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50">
+                {["Mese", "Lordo", "Commissioni (21,5% + IVA)", "Netto"].map(
+                  (h, i) => (
+                    <th
+                      key={h}
+                      className={`text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 whitespace-nowrap ${i === 0 ? "text-left" : "text-right"}`}
+                    >
+                      {h}
+                    </th>
+                  ),
+                )}
               </tr>
             </thead>
             <tbody className="zebra">
@@ -1426,6 +1696,48 @@ function getCell(row: Record<string, unknown>, ...keys: string[]): unknown {
   return undefined;
 }
 
+// Parsing date da cella foglio/CSV.
+//
+// ATTENZIONE: non usare `new Date(stringa)` diretto sulle celle. La libreria
+// xlsx, se lasciata interpretare i valori testuali di un CSV, riconosce le
+// date, le converte in seriali Excel e le ri-formatta perdendo un giorno per
+// via del fuso (Europe/Madrid): "2026-07-01 00:00" tornava indietro come
+// "6/30/26", spostando i payout Stripe nel mese precedente. Ora i CSV si
+// leggono con `raw: true` (stringhe originali) e la conversione avviene qui.
+//
+// Formati gestiti: Date già pronta, seriale Excel numerico, ISO
+// "YYYY-MM-DD[ HH:mm]" (Stripe, FareHarbor) e giorno-primo "DD-MM-YYYY" /
+// "DD/MM/YYYY" (CheckYeti). La data è costruita a mezzanotte *locale* così
+// che getMonth()/getFullYear() restituiscano il giorno scritto nel file.
+function parseDateCell(v: unknown): Date | null {
+  if (v instanceof Date) return isNaN(v.getTime()) ? null : v;
+  if (typeof v === "number") {
+    // Seriale Excel (sistema 1900): giorni dal 1899-12-30.
+    const d = new Date(Date.UTC(1899, 11, 30) + v * 86400000);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  const s = String(v ?? "").trim();
+  if (!s) return null;
+
+  const iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (iso) {
+    return new Date(+iso[1], +iso[2] - 1, +iso[3]);
+  }
+  const dayFirst = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
+  if (dayFirst) {
+    return new Date(+dayFirst[3], +dayFirst[2] - 1, +dayFirst[1]);
+  }
+  const fallback = new Date(s);
+  return isNaN(fallback.getTime()) ? null : fallback;
+}
+
+// "YYYY-MM-DD" dai componenti locali della data (niente toISOString, che
+// applicherebbe l'offset di fuso e potrebbe cambiare il giorno).
+function ymdLocale(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
 function toNumber(v: unknown): number {
   if (typeof v === "number") return v;
   const s = String(v ?? "").trim();
@@ -1450,7 +1762,7 @@ function ExcelUploadBox({
   onImported,
 }: {
   anno: number;
-  endpoint: "fareharbor" | "stripe" | "gyg";
+  endpoint: "fareharbor" | "stripe" | "gyg" | "checkyeti";
   title: string;
   formatHint: string;
   // Nome esatto del foglio da leggere; fallback al primo se non trovato.
@@ -1475,10 +1787,12 @@ function ExcelUploadBox({
     try {
       const XLSX = await import("xlsx");
       const isCSV = /\.csv$/i.test(file.name);
-      // CSV → leggi come testo (UTF-8), xlsx binary → ArrayBuffer.
-      // xlsx library gestisce entrambi i formati con il tipo giusto.
+      // CSV → leggi come testo (UTF-8) con `raw: true`: le celle restano le
+      // stringhe originali del file. Senza questo, xlsx interpreta le date e
+      // le rimanda indietro di un giorno (vedi parseDateCell).
+      // xlsx binary → ArrayBuffer, dove le date sono seriali affidabili.
       const wb = isCSV
-        ? XLSX.read(await file.text(), { type: "string", cellDates: true })
+        ? XLSX.read(await file.text(), { type: "string", raw: true })
         : XLSX.read(await file.arrayBuffer(), {
             type: "array",
             cellDates: true,
@@ -1489,7 +1803,8 @@ function ExcelUploadBox({
       const targetName = wantedName
         ? wb.SheetNames.find((n) => n.toLowerCase().trim() === wantedName)
         : undefined;
-      const ws = wb.Sheets[targetName ?? wb.SheetNames[0]];
+      const usedName = targetName ?? wb.SheetNames[0];
+      const ws = wb.Sheets[usedName];
       if (!ws) {
         setResult({
           ok: 0,
@@ -1506,7 +1821,28 @@ function ExcelUploadBox({
         dateNF: "yyyy-mm-dd",
       });
 
+      // Foglio senza righe: diagnosi esplicita al posto del generico
+      // "foglio vuoto" di buildBatch, che non distingue fra file davvero
+      // vuoto e fallback silenzioso su un foglio sbagliato.
+      if (rawRows.length === 0) {
+        const errors = [
+          `Il foglio "${usedName}" non contiene nessuna riga, nemmeno l'intestazione: il file esportato è vuoto. Ri-esporta il report dal portale.`,
+        ];
+        if (wantedName && !targetName) {
+          errors.push(
+            `Nota: il foglio atteso "${sheetName}" non esiste in questo file. Fogli presenti: ${wb.SheetNames.join(", ")}`,
+          );
+        }
+        setResult({ ok: 0, errors });
+        return;
+      }
+
       const { payloads, errors } = buildBatch(rawRows, anno);
+      if (wantedName && !targetName) {
+        errors.unshift(
+          `Foglio "${sheetName}" non presente nel file: letto invece "${usedName}". Fogli presenti: ${wb.SheetNames.join(", ")}`,
+        );
+      }
 
       const responses = await Promise.allSettled(
         payloads.map((p) =>
@@ -1643,7 +1979,7 @@ function ExcelUploadModalButton({
   onImported,
 }: {
   anno: number;
-  endpoint: "fareharbor" | "stripe" | "gyg";
+  endpoint: "fareharbor" | "stripe" | "gyg" | "checkyeti";
   title: string;
   formatHint: string;
   sheetName?: string;

@@ -21,6 +21,7 @@ import {
   Anchor,
   CreditCard,
   Map,
+  Mountain,
   Store,
   School,
 } from "lucide-react";
@@ -79,6 +80,7 @@ const ENTRATA_COLORS: Record<string, string> = {
   FareHarbor: "#22c55e",
   Stripe: "#8b5cf6",
   "Get Your Guide": "#f59e0b",
+  CheckYeti: "#14b8a6",
   Cassa: "#06b6d4",
   Gruppi: "#ec4899",
 };
@@ -196,7 +198,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Riga canali di incasso (annuale) */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
         <ChannelCard
           label="FareHarbor"
           value={data.breakdownEntrate["FareHarbor"] ?? 0}
@@ -208,6 +210,12 @@ export default function DashboardPage() {
           value={data.breakdownEntrate["Get Your Guide"] ?? 0}
           color="#f59e0b"
           icon={Map}
+        />
+        <ChannelCard
+          label="CheckYeti"
+          value={data.breakdownEntrate["CheckYeti"] ?? 0}
+          color="#14b8a6"
+          icon={Mountain}
         />
         <ChannelCard
           label="Stripe"

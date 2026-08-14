@@ -42,6 +42,7 @@ interface MeseDetail {
     fareharbor: number;
     stripe: number;
     gyg: number;
+    checkyeti: number;
     cassa: number;
     altri: number;
     totale: number;
@@ -75,6 +76,7 @@ export async function GET(request: Request) {
     fareharbor,
     stripe,
     gyg,
+    checkyeti,
     cassa,
     contanti,
     altriIngressi,
@@ -94,6 +96,7 @@ export async function GET(request: Request) {
     prisma.incassoFareHarbor.findMany({ where: { anno } }),
     prisma.prenotazioneStripe.findMany({ where: { anno } }),
     prisma.prenotazioneGetYourGuide.findMany({ where: { anno } }),
+    prisma.prenotazioneCheckYeti.findMany({ where: { anno } }),
     prisma.pagamentoInScuola.findMany({ where: { anno } }),
     prisma.incassoContanti.findMany({ where: { anno } }),
     // Gruppi: NON contribuiscono al bilancio (solo statistici, vedi
@@ -115,6 +118,7 @@ export async function GET(request: Request) {
       fareharbor: 0,
       stripe: 0,
       gyg: 0,
+      checkyeti: 0,
       cassa: 0,
       altri: 0,
       totale: 0,
@@ -180,6 +184,11 @@ export async function GET(request: Request) {
     mensili[r.mese - 1].entrate.gyg += r.netto;
   }
 
+  // CheckYeti: netto (lordo meno commissione 21,5% + IVA)
+  for (const r of checkyeti) {
+    mensili[r.mese - 1].entrate.checkyeti += r.netto;
+  }
+
   // Cassa scuola: TPV (totaleGiorno) + Contanti (importo) confluiscono
   // entrambi nel bucket "cassa" per coerenza con la categoria del breakdown.
   for (const c of cassa) {
@@ -224,6 +233,7 @@ export async function GET(request: Request) {
         m.entrate.fareharbor +
         m.entrate.stripe +
         m.entrate.gyg +
+        m.entrate.checkyeti +
         m.entrate.cassa +
         m.entrate.altri,
     );
@@ -251,6 +261,7 @@ export async function GET(request: Request) {
     FareHarbor: round2(mensili.reduce((s, m) => s + m.entrate.fareharbor, 0)),
     Stripe: round2(mensili.reduce((s, m) => s + m.entrate.stripe, 0)),
     "Get Your Guide": round2(mensili.reduce((s, m) => s + m.entrate.gyg, 0)),
+    CheckYeti: round2(mensili.reduce((s, m) => s + m.entrate.checkyeti, 0)),
     Cassa: round2(mensili.reduce((s, m) => s + m.entrate.cassa, 0)),
     "Altri Ingressi": round2(mensili.reduce((s, m) => s + m.entrate.altri, 0)),
   };
